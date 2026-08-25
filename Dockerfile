@@ -1,4 +1,4 @@
-# Stage 1: Build
+# Stage 1: Build React
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -6,22 +6,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy source code và build ứng dụng
+# Copy mã nguồn và build React SPA sang thư mục dist
 COPY . .
 RUN npm run build
 
-# Stage 2: Run
-FROM node:20-alpine AS runner
-WORKDIR /app
+# Stage 2: Run with Nginx
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-ENV NODE_ENV=production
-ENV PORT=3000
-
-# Copy các artifacts cần thiết từ builder
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-
-EXPOSE 3000
-CMD ["npm", "start"]
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

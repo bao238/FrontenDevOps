@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { PRODUCTS, CATEGORIES, Product } from "./data/products";
+import { DEFAULT_USERS, UserAccount, DEFAULT_AVATAR } from "./data/users";
 import {
   Search,
   ShoppingCart,
@@ -36,8 +37,13 @@ import {
   Award,
   Check,
   Building,
-  Clock
+  Clock,
+  AlertCircle
 } from "lucide-react";
+
+import AdminPanel from "./components/AdminPanel";
+import ProductDetailPage from "./components/ProductDetailPage";
+import CartPage from "./components/CartPage";
 
 interface CartItem {
   product: Product;
@@ -53,13 +59,13 @@ interface UserProfile {
   memberSince: string;
 }
 
-interface OrderRecord {
+export interface OrderRecord {
   id: string;
   date: string;
   items: CartItem[];
   totalAmount: number;
   paymentMethod: string;
-  status: "Đang xử lý" | "Đang giao" | "Hoàn tất";
+  status: "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy";
   customerInfo: {
     fullName: string;
     phone: string;
@@ -68,8 +74,16 @@ interface OrderRecord {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact">("products");
-  const [products] = useState<Product[]>(PRODUCTS);
+  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart">("products");
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const saved = localStorage.getItem("dinhbao_products");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return PRODUCTS;
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
@@ -88,6 +102,21 @@ export default function App() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState<boolean>(false);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [users, setUsers] = useState<UserAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem("dinhbao_users");
+      if (saved) {
+        const parsed: UserAccount[] = JSON.parse(saved);
+        return parsed.map((u) => ({
+          ...u,
+          avatarUrl: !u.avatarUrl || u.avatarUrl.includes("unsplash.com") ? DEFAULT_AVATAR : u.avatarUrl,
+        }));
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_USERS;
+  });
 
   // Form states
   const [loginEmail, setLoginEmail] = useState<string>("");
@@ -119,12 +148,99 @@ export default function App() {
     note: "",
   });
 
+  // Admin Authentication States
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("dinhbao_admin_session") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [adminUsername, setAdminUsername] = useState<string>("");
+  const [adminPassword, setAdminPassword] = useState<string>("");
+  const [adminShowPassword, setAdminShowPassword] = useState<boolean>(false);
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
+
+  // Sync URL with activeTab & Product Detail (/admin and /product?id=...)
+  useEffect(() => {
+    const handleUrlSync = () => {
+      const path = window.location.pathname;
+      const params = new URLSearchParams(window.location.search);
+      const prodId = params.get("id");
+
+      if (path === "/admin" || path.startsWith("/admin")) {
+        setActiveTab("admin");
+        setSelectedProduct(null);
+      } else if (path === "/cart" || path.startsWith("/cart")) {
+        setActiveTab("cart");
+        setSelectedProduct(null);
+      } else if (prodId || path.startsWith("/product")) {
+        setActiveTab("products");
+        if (prodId) {
+          const found = products.find((p) => p.id === prodId);
+          if (found) setSelectedProduct(found);
+        }
+      } else {
+        setSelectedProduct(null);
+      }
+    };
+
+    handleUrlSync();
+    window.addEventListener("popstate", handleUrlSync);
+    return () => window.removeEventListener("popstate", handleUrlSync);
+  }, [products]);
+
+  const switchTab = (tab: "products" | "about" | "contact" | "admin" | "cart") => {
+    setActiveTab(tab);
+    setSelectedProduct(null);
+    if (tab === "admin") {
+      if (window.location.pathname !== "/admin") {
+        window.history.pushState({}, "", "/admin");
+      }
+    } else if (tab === "cart") {
+      if (window.location.pathname !== "/cart") {
+        window.history.pushState({}, "", "/cart");
+      }
+    } else {
+      if (window.location.pathname !== "/" || window.location.search) {
+        window.history.pushState({}, "", "/");
+      }
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleSelectProduct = (prod: Product) => {
+    setSelectedProduct(prod);
+    setActiveTab("products");
+    window.history.pushState({}, "", "/product?id=" + prod.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleBackToProducts = () => {
+    setSelectedProduct(null);
+    window.history.pushState({}, "", "/");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleBuyNow = (prod: Product, quantity = 1) => {
+    addToCart(prod, quantity);
+    switchTab("cart");
+  };
+
+  const handleClearCart = () => {
+    setCart([]);
+    showToast("Đã làm trống giỏ hàng thành công!");
+  };
+
   // Load saved user from local storage on mount
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem("dinhbao_user");
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
+        if (!parsed.avatarUrl || parsed.avatarUrl.includes("unsplash.com")) {
+          parsed.avatarUrl = DEFAULT_AVATAR;
+        }
         setCurrentUser(parsed);
         setCustomerInfo((prev) => ({
           ...prev,
@@ -166,13 +282,69 @@ export default function App() {
       return;
     }
 
+    const email = loginEmail.trim().toLowerCase();
+    const existing = users.find((u) => u.email.toLowerCase() === email);
+
+    if (existing) {
+      if (existing.status === "locked") {
+        showToast("Tài khoản của bạn đã bị KHÓA bởi Quản trị viên!");
+        return;
+      }
+      if (existing.password && existing.password !== loginPassword.trim()) {
+        showToast("Mật khẩu không chính xác! Vui lòng kiểm tra lại.");
+        return;
+      }
+      const loggedUser: UserProfile = {
+        id: existing.id,
+        name: existing.name,
+        email: existing.email,
+        phone: existing.phone,
+        avatarUrl: existing.avatarUrl,
+        memberSince: existing.createdAt || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
+      };
+      setCurrentUser(loggedUser);
+      localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
+      setCustomerInfo((prev) => ({
+        ...prev,
+        fullName: loggedUser.name,
+        phone: loggedUser.phone,
+        address: existing.address || prev.address,
+      }));
+      setIsAuthModalOpen(false);
+      showToast(`Chào mừng bạn trở lại, ${loggedUser.name}!`);
+      setLoginPassword("");
+      return;
+    }
+
+    // Nếu là tài khoản mới chưa có trong danh sách mẫu, cho phép tạo & lưu vào users
     const loggedUser: UserProfile = {
       id: "usr-" + Date.now(),
       name: loginEmail.split("@")[0] || "Khách Hàng",
       email: loginEmail,
       phone: "0905 123 456",
+      avatarUrl: "/default-avatar.png",
       memberSince: "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
     };
+
+    const newAccount: UserAccount = {
+      id: loggedUser.id,
+      name: loggedUser.name,
+      email: loggedUser.email,
+      phone: loggedUser.phone,
+      role: "customer",
+      status: "active",
+      password: loginPassword,
+      avatarUrl: "/default-avatar.png",
+      createdAt: new Date().toLocaleDateString("vi-VN"),
+    };
+
+    const updatedUsers = [newAccount, ...users];
+    setUsers(updatedUsers);
+    try {
+      localStorage.setItem("dinhbao_users", JSON.stringify(updatedUsers));
+    } catch (err) {
+      console.error(err);
+    }
 
     setCurrentUser(loggedUser);
     localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
@@ -198,12 +370,39 @@ export default function App() {
       return;
     }
 
-    const newUser: UserProfile = {
+    const email = regEmail.trim().toLowerCase();
+    if (users.some((u) => u.email.toLowerCase() === email)) {
+      showToast("Email này đã được đăng ký! Vui lòng chuyển sang Đăng nhập.");
+      return;
+    }
+
+    const newAccount: UserAccount = {
       id: "usr-" + Date.now(),
-      name: regName,
-      email: regEmail,
-      phone: regPhone,
-      memberSince: "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
+      name: regName.trim(),
+      email: regEmail.trim(),
+      phone: regPhone.trim(),
+      role: "customer",
+      status: "active",
+      password: regPassword,
+      avatarUrl: "/default-avatar.png",
+      createdAt: new Date().toLocaleDateString("vi-VN"),
+    };
+
+    const updatedUsers = [newAccount, ...users];
+    setUsers(updatedUsers);
+    try {
+      localStorage.setItem("dinhbao_users", JSON.stringify(updatedUsers));
+    } catch (err) {
+      console.error(err);
+    }
+
+    const newUser: UserProfile = {
+      id: newAccount.id,
+      name: newAccount.name,
+      email: newAccount.email,
+      phone: newAccount.phone,
+      avatarUrl: "/default-avatar.png",
+      memberSince: newAccount.createdAt,
     };
 
     setCurrentUser(newUser);
@@ -226,6 +425,7 @@ export default function App() {
       name: "Nguyễn Văn An",
       email: "demo@dinhbao.vn",
       phone: "0988 776 655",
+      avatarUrl: "/default-avatar.png",
       memberSince: "Tháng 8/2024",
     };
     setCurrentUser(demoUser);
@@ -378,6 +578,413 @@ export default function App() {
     setContactForm({ name: "", email: "", phone: "", message: "" });
   };
 
+  // Product CRUD Handlers for Admin
+  const handleAddProduct = (newProd: Product) => {
+    const updated = [newProd, ...products];
+    setProducts(updated);
+    try {
+      localStorage.setItem("dinhbao_products", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(`Đã thêm sản phẩm "${newProd.name}" thành công!`);
+  };
+
+  const handleUpdateProduct = (updatedProd: Product) => {
+    const updated = products.map((p) => (p.id === updatedProd.id ? updatedProd : p));
+    setProducts(updated);
+    try {
+      localStorage.setItem("dinhbao_products", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === updatedProd.id ? { ...item, product: updatedProd } : item
+      )
+    );
+    showToast(`Đã cập nhật sản phẩm "${updatedProd.name}"!`);
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    const updated = products.filter((p) => p.id !== productId);
+    setProducts(updated);
+    try {
+      localStorage.setItem("dinhbao_products", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    showToast("Đã xóa sản phẩm khỏi hệ thống!");
+  };
+
+  const handleResetDefaultProducts = () => {
+    setProducts(PRODUCTS);
+    try {
+      localStorage.setItem("dinhbao_products", JSON.stringify(PRODUCTS));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast("Đã khôi phục danh sách sản phẩm mẫu ban đầu!");
+  };
+
+  const handleUpdateOrderStatus = (
+    orderId: string,
+    newStatus: "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy"
+  ) => {
+    const updated = orders.map((ord) =>
+      ord.id === orderId ? { ...ord, status: newStatus } : ord
+    );
+    setOrders(updated);
+    try {
+      localStorage.setItem("dinhbao_orders", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(`Đã đổi trạng thái đơn #${orderId} thành "${newStatus}"!`);
+  };
+
+  const handleDeleteOrder = (orderId: string) => {
+    const updated = orders.filter((ord) => ord.id !== orderId);
+    setOrders(updated);
+    try {
+      localStorage.setItem("dinhbao_orders", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(`Đã xóa đơn hàng #${orderId}!`);
+  };
+
+  // User Management Handlers (Admin CRUD)
+  const handleAddUser = (newUser: UserAccount) => {
+    const updated = [newUser, ...users];
+    setUsers(updated);
+    try {
+      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(`Đã tạo tài khoản "${newUser.name}" thành công!`);
+  };
+
+  const handleUpdateUser = (updatedUser: UserAccount) => {
+    const updated = users.map((u) => (u.id === updatedUser.id ? updatedUser : u));
+    setUsers(updated);
+    try {
+      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(`Đã cập nhật tài khoản "${updatedUser.name}"!`);
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    const updated = users.filter((u) => u.id !== userId);
+    setUsers(updated);
+    try {
+      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(`Đã xóa tài khoản "${target ? target.name : userId}"!`);
+  };
+
+  const handleToggleLockUser = (userId: string) => {
+    const updated = users.map((u) => {
+      if (u.id === userId) {
+        const nextStatus: "active" | "locked" = u.status === "active" ? "locked" : "active";
+        showToast(
+          nextStatus === "locked"
+            ? `Đã khóa tài khoản "${u.name}"!`
+            : `Đã mở khóa tài khoản "${u.name}"!`
+        );
+        return { ...u, status: nextStatus };
+      }
+      return u;
+    });
+    setUsers(updated);
+    try {
+      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleResetDefaultUsers = () => {
+    setUsers(DEFAULT_USERS);
+    try {
+      localStorage.setItem("dinhbao_users", JSON.stringify(DEFAULT_USERS));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast("Đã khôi phục danh sách người dùng mặc định!");
+  };
+
+  // Admin Login Handlers
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminLoginError(null);
+    const u = adminUsername.trim().toLowerCase();
+    const p = adminPassword.trim();
+
+    // Look for account in users list
+    const found = users.find(
+      (acc) =>
+        (acc.email.toLowerCase() === u ||
+          acc.name.toLowerCase() === u ||
+          (u === "admin" && acc.role === "admin")) &&
+        acc.password === p
+    );
+
+    if (found) {
+      if (found.status === "locked") {
+        setAdminLoginError("Tài khoản này đã bị KHÓA bởi Quản trị viên!");
+        return;
+      }
+      if (found.role !== "admin" && found.role !== "staff") {
+        setAdminLoginError(
+          "Tài khoản này là 'Khách Hàng', không có quyền truy cập Cổng Quản Trị!"
+        );
+        return;
+      }
+      setIsAdminLoggedIn(true);
+      try {
+        localStorage.setItem("dinhbao_admin_session", "true");
+        localStorage.setItem("dinhbao_admin_user", JSON.stringify(found));
+      } catch (err) {
+        console.error(err);
+      }
+      showToast(`Đăng nhập Quản trị thành công! Xin chào ${found.name}`);
+      setAdminPassword("");
+      return;
+    }
+
+    // Fallback credentials for demo: admin / admin123 or bao@gmail.com / admin123
+    if (
+      (u === "admin" || u === "bao@gmail.com" || u === "admin@dinhbao.vn") &&
+      (p === "admin123" || p === "admin")
+    ) {
+      setIsAdminLoggedIn(true);
+      try {
+        localStorage.setItem("dinhbao_admin_session", "true");
+      } catch (err) {
+        console.error(err);
+      }
+      showToast("Đăng nhập quyền Quản trị (Admin) thành công!");
+      setAdminPassword("");
+    } else {
+      setAdminLoginError(
+        "Tài khoản hoặc mật khẩu không chính xác! (Mẫu: admin@dinhbao.vn / admin123)"
+      );
+    }
+  };
+
+  const handleAdminQuickLogin = () => {
+    setAdminUsername("admin@dinhbao.vn");
+    setAdminPassword("admin123");
+    setIsAdminLoggedIn(true);
+    setAdminLoginError(null);
+    try {
+      localStorage.setItem("dinhbao_admin_session", "true");
+    } catch (err) {
+      console.error(err);
+    }
+    showToast("Đã đăng nhập nhanh quyền Quản trị (Admin)!");
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminLoggedIn(false);
+    try {
+      localStorage.removeItem("dinhbao_admin_session");
+      localStorage.removeItem("dinhbao_admin_user");
+    } catch (err) {
+      console.error(err);
+    }
+    showToast("Đã đăng xuất tài khoản Quản trị!");
+  };
+
+  // NẾU ĐANG Ở TRANG /admin: HIỂN THỊ GIAO DIỆN ADMIN RIÊNG BIỆT (KHÔNG CÓ HEADER/CART CỦA CỬA HÀNG)
+  if (activeTab === "admin") {
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+            <span className="text-sm font-medium">{toastMessage}</span>
+          </div>
+        )}
+
+        {!isAdminLoggedIn ? (
+          /* 1. Màn hình Đăng Nhập Quản Trị độc lập (Toàn màn hình, bảo mật) */
+          <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-slate-950 text-slate-100 relative overflow-hidden">
+            <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="max-w-md w-full relative z-10">
+              <div className="bg-slate-900/95 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 space-y-6">
+                <div className="text-center space-y-2">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20">
+                    <ShieldCheck className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                    DinhBao Admin Portal
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Cổng Quản Trị Hệ Thống &bull; Đăng nhập để tiếp tục
+                  </p>
+                </div>
+
+                {adminLoginError && (
+                  <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 flex items-start space-x-2 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{adminLoginError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleAdminLogin} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1.5">
+                      Tài khoản hoặc Email Admin
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        placeholder="admin@dinhbao.vn hoặc admin"
+                        value={adminUsername}
+                        onChange={(e) => setAdminUsername(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1.5">
+                      Mật khẩu quản trị
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={adminShowPassword ? "text" : "password"}
+                        required
+                        placeholder="admin123"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        className="w-full pl-10 pr-10 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setAdminShowPassword(!adminShowPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      >
+                        {adminShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>Đăng Nhập Quản Trị</span>
+                  </button>
+
+                  <div className="pt-3 border-t border-slate-800 space-y-2.5 text-center">
+                    <button
+                      type="button"
+                      onClick={handleAdminQuickLogin}
+                      className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Đăng nhập nhanh (Tài khoản mẫu: admin / admin123)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => switchTab("products")}
+                      className="text-xs text-slate-400 hover:text-white transition-colors"
+                    >
+                      &larr; Quay lại Website Cửa Hàng
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* 2. Giao diện Trang Quản Trị Độc Lập khi đã đăng nhập */
+          <div className="min-h-screen flex flex-col justify-between">
+            {/* Header riêng của Admin */}
+            <header className="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-xl shadow-md">
+                  D
+                </div>
+                <div>
+                  <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight flex items-center space-x-2">
+                    <span>DinhBao Admin Console</span>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-bold uppercase">
+                      Hệ Thống Quản Trị
+                    </span>
+                  </h1>
+                  <p className="text-[11px] text-slate-400">Trang quản trị nội bộ &bull; /admin</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => switchTab("products")}
+                  className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                  <span>Về Cửa Hàng</span>
+                </button>
+                <button
+                  onClick={handleAdminLogout}
+                  className="flex items-center space-x-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            </header>
+
+            {/* Nội dung AdminPanel */}
+            <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+              <AdminPanel
+                products={products}
+                onAddProduct={handleAddProduct}
+                onUpdateProduct={handleUpdateProduct}
+                onDeleteProduct={handleDeleteProduct}
+                onResetDefaultProducts={handleResetDefaultProducts}
+                orders={orders}
+                onUpdateOrderStatus={handleUpdateOrderStatus}
+                onDeleteOrder={handleDeleteOrder}
+                onSwitchToStore={() => switchTab("products")}
+                onAdminLogout={handleAdminLogout}
+                users={users}
+                onAddUser={handleAddUser}
+                onUpdateUser={handleUpdateUser}
+                onDeleteUser={handleDeleteUser}
+                onToggleLockUser={handleToggleLockUser}
+                onResetDefaultUsers={handleResetDefaultUsers}
+              />
+            </main>
+
+            {/* Footer riêng của Admin */}
+            <footer className="bg-slate-900 border-t border-slate-800 text-slate-500 text-xs py-4 px-6 text-center">
+              DinhBao Store Admin Console &bull; Quản lý sản phẩm &amp; đơn hàng nội bộ
+            </footer>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col justify-between">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-8">
@@ -394,7 +1001,7 @@ export default function App() {
           {/* Brand & Mobile Actions */}
           <div className="flex items-center space-x-3 w-full md:w-auto justify-between">
             <div
-              onClick={() => setActiveTab("products")}
+              onClick={() => switchTab("products")}
               className="flex items-center space-x-3 cursor-pointer group"
             >
               <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
@@ -420,17 +1027,36 @@ export default function App() {
                     setIsAuthModalOpen(true);
                   }
                 }}
-                className="p-2.5 bg-slate-100 rounded-xl text-slate-700"
+                className="p-2 bg-slate-100 rounded-xl text-slate-700 flex items-center justify-center overflow-hidden"
               >
-                <User className="w-5 h-5" />
+                {currentUser ? (
+                  <img
+                    src={currentUser.avatarUrl || "/default-avatar.png"}
+                    alt={currentUser.name}
+                    className="w-6 h-6 rounded-full object-cover border border-slate-200"
+                  />
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
               </button>
               <button
-                onClick={() => setIsCartOpen(true)}
-                className="relative p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 transition-colors"
+                onClick={() => switchTab("cart")}
+                className={`relative p-2.5 rounded-xl transition-colors ${
+                  activeTab === "cart"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                }`}
+                title="Xem giỏ hàng"
               >
                 <ShoppingCart className="w-5 h-5" />
                 {totalItemsCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md">
+                  <span
+                    className={`absolute -top-1.5 -right-1.5 text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md ${
+                      activeTab === "cart"
+                        ? "bg-amber-400 text-slate-900"
+                        : "bg-blue-600 text-white"
+                    }`}
+                  >
                     {totalItemsCount}
                   </span>
                 )}
@@ -441,7 +1067,7 @@ export default function App() {
           {/* Navigation Links */}
           <nav className="flex items-center space-x-1 sm:space-x-2 bg-slate-100 p-1.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-600">
             <button
-              onClick={() => setActiveTab("products")}
+              onClick={() => switchTab("products")}
               className={`px-4 py-2 rounded-xl transition-all ${
                 activeTab === "products"
                   ? "bg-white text-blue-600 shadow-sm"
@@ -451,7 +1077,7 @@ export default function App() {
               Sản phẩm
             </button>
             <button
-              onClick={() => setActiveTab("about")}
+              onClick={() => switchTab("about")}
               className={`px-4 py-2 rounded-xl transition-all ${
                 activeTab === "about"
                   ? "bg-white text-blue-600 shadow-sm"
@@ -461,7 +1087,7 @@ export default function App() {
               Giới thiệu shop
             </button>
             <button
-              onClick={() => setActiveTab("contact")}
+              onClick={() => switchTab("contact")}
               className={`px-4 py-2 rounded-xl transition-all ${
                 activeTab === "contact"
                   ? "bg-white text-blue-600 shadow-sm"
@@ -478,22 +1104,41 @@ export default function App() {
               <div className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-2.5 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-800 transition-colors"
+                  className="flex items-center space-x-2.5 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
-                    {currentUser.name.charAt(0)}
-                  </div>
+                  <img
+                    src={currentUser.avatarUrl || "/default-avatar.png"}
+                    alt={currentUser.name}
+                    className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                  />
                   <span className="max-w-[100px] truncate">{currentUser.name}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
 
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95">
-                    <div className="px-3 py-2 border-b border-slate-100">
-                      <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{currentUser.email}</p>
+                    <div className="px-3 py-2 border-b border-slate-100 flex items-center space-x-2.5">
+                      <img
+                        src={currentUser.avatarUrl || "/default-avatar.png"}
+                        alt={currentUser.name}
+                        className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                      />
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{currentUser.email}</p>
+                      </div>
                     </div>
                     <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          switchTab("admin");
+                        }}
+                        className="w-full px-3 py-2 text-xs text-purple-700 hover:bg-purple-50 rounded-xl flex items-center space-x-2 font-bold"
+                      >
+                        <SlidersHorizontal className="w-4 h-4 text-purple-600" />
+                        <span>Trang Quản Trị (Admin)</span>
+                      </button>
                       <button
                         onClick={() => {
                           setIsUserMenuOpen(false);
@@ -544,12 +1189,23 @@ export default function App() {
 
             {/* Cart Button */}
             <button
-              onClick={() => setIsCartOpen(true)}
-              className="relative flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold text-xs shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02]"
+              onClick={() => switchTab("cart")}
+              className={`relative flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold text-xs shadow-md transition-all hover:scale-[1.02] ${
+                activeTab === "cart"
+                  ? "bg-slate-900 text-white shadow-slate-900/20"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
+              }`}
+              title="Xem giỏ hàng"
             >
               <ShoppingCart className="w-4 h-4" />
               <span>Giỏ hàng</span>
-              <span className="bg-white text-blue-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full ml-1">
+              <span
+                className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ml-1 ${
+                  activeTab === "cart"
+                    ? "bg-amber-400 text-slate-900"
+                    : "bg-white text-blue-700"
+                }`}
+              >
                 {totalItemsCount}
               </span>
             </button>
@@ -558,7 +1214,17 @@ export default function App() {
 
         {/* TAB 1: SẢN PHẨM (PRODUCTS) */}
         {activeTab === "products" && (
-          <div className="space-y-8 animate-in fade-in duration-200">
+          selectedProduct ? (
+            <ProductDetailPage
+              product={selectedProduct}
+              allProducts={products}
+              onAddToCart={addToCart}
+              onBuyNow={handleBuyNow}
+              onBack={handleBackToProducts}
+              onSelectRelatedProduct={handleSelectProduct}
+            />
+          ) : (
+            <div className="space-y-8 animate-in fade-in duration-200">
             {/* Hero Banner */}
             <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-600 text-white p-6 sm:p-10 shadow-xl">
               <div className="absolute -right-10 -bottom-10 w-80 h-80 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -713,7 +1379,7 @@ export default function App() {
                       {/* Product Image */}
                       <div
                         className="relative h-52 bg-slate-50 overflow-hidden cursor-pointer"
-                        onClick={() => setSelectedProduct(prod)}
+                        onClick={() => handleSelectProduct(prod)}
                       >
                         <img
                           src={prod.imageUrl}
@@ -750,7 +1416,7 @@ export default function App() {
                           </div>
 
                           <h3
-                            onClick={() => setSelectedProduct(prod)}
+                            onClick={() => handleSelectProduct(prod)}
                             className="font-bold text-sm text-slate-900 line-clamp-2 hover:text-blue-600 cursor-pointer transition-colors leading-snug"
                           >
                             {prod.name}
@@ -773,7 +1439,7 @@ export default function App() {
                           {/* Action buttons */}
                           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center space-x-2">
                             <button
-                              onClick={() => setSelectedProduct(prod)}
+                              onClick={() => handleSelectProduct(prod)}
                               className="flex-1 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors text-center"
                             >
                               Chi tiết
@@ -799,6 +1465,7 @@ export default function App() {
               )}
             </section>
           </div>
+          )
         )}
 
         {/* TAB 2: GIỚI THIỆU SHOP (ABOUT US) */}
@@ -1024,6 +1691,28 @@ export default function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB 4: GIỎ HÀNG TOÀN TRANG (FULL-PAGE CART) */}
+        {activeTab === "cart" && (
+          <CartPage
+            cart={cart}
+            onUpdateQuantity={updateQuantity}
+            onRemoveFromCart={removeFromCart}
+            onClearCart={handleClearCart}
+            onContinueShopping={() => switchTab("products")}
+            onProceedToCheckout={() => setIsCheckoutOpen(true)}
+            onSelectProduct={handleSelectProduct}
+            suggestedProducts={products}
+            promoCode={promoCode}
+            setPromoCode={setPromoCode}
+            appliedDiscount={appliedDiscount}
+            onApplyCoupon={handleApplyCoupon}
+            subtotal={subtotal}
+            discountAmount={discountAmount}
+            shippingFee={shippingFee}
+            totalAmount={finalTotal}
+          />
         )}
 
         {/* AUTHENTICATION MODAL */}
@@ -1319,261 +2008,6 @@ export default function App() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Product Detail Modal */}
-        {selectedProduct && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-              <div className="relative h-64 sm:h-72 bg-slate-100">
-                <img
-                  src={selectedProduct.imageUrl}
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="absolute top-4 right-4 bg-slate-900/70 hover:bg-slate-900 text-white p-2 rounded-full backdrop-blur-md transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <div className="absolute bottom-4 left-4 flex items-center space-x-2">
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-600 text-white shadow-md">
-                    {selectedProduct.category}
-                  </span>
-                  <span
-                    className={`text-xs font-bold px-3 py-1 rounded-full shadow-md ${
-                      selectedProduct.inStock
-                        ? "bg-emerald-600 text-white"
-                        : "bg-red-600 text-white"
-                    }`}
-                  >
-                    {selectedProduct.inStock ? "Còn hàng" : "Hết hàng"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-6 sm:p-8 space-y-5">
-                <div>
-                  <div className="flex items-center space-x-2 text-amber-500 text-sm font-semibold mb-1">
-                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    <span>{selectedProduct.rating} / 5.0</span>
-                    <span className="text-slate-400 text-xs">
-                      ({selectedProduct.reviewsCount} đánh giá từ khách hàng)
-                    </span>
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {selectedProduct.name}
-                  </h3>
-                  <div className="mt-2 flex items-baseline space-x-3">
-                    <span className="text-2xl font-extrabold text-red-600">
-                      {formatVND(selectedProduct.price)}
-                    </span>
-                    {selectedProduct.originalPrice > selectedProduct.price && (
-                      <span className="text-sm text-slate-400 line-through">
-                        {formatVND(selectedProduct.originalPrice)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="text-sm text-slate-600 leading-relaxed border-t border-b border-slate-100 py-3">
-                  {selectedProduct.description}
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 mb-2.5">
-                    Thông số kỹ thuật chi tiết:
-                  </h4>
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs space-y-2">
-                    {Object.entries(selectedProduct.specs).map(([key, val]) => (
-                      <div
-                        key={key}
-                        className="flex justify-between py-1 border-b border-slate-200/60 last:border-0"
-                      >
-                        <span className="text-slate-500 font-medium">{key}</span>
-                        <span className="text-slate-800 font-semibold text-right">
-                          {val}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center space-x-3">
-                  <button
-                    onClick={() => setSelectedProduct(null)}
-                    className="px-5 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-100 transition-colors"
-                  >
-                    Đóng
-                  </button>
-                  <button
-                    onClick={() => {
-                      addToCart(selectedProduct);
-                      setSelectedProduct(null);
-                    }}
-                    disabled={!selectedProduct.inStock}
-                    className={`flex-1 py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2 ${
-                      selectedProduct.inStock
-                        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
-                        : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    }`}
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    <span>
-                      {selectedProduct.inStock
-                        ? "Thêm vào giỏ hàng ngay"
-                        : "Hết hàng"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Shopping Cart Drawer */}
-        {isCartOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex justify-end">
-            <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-              <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center space-x-2">
-                  <ShoppingCart className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-bold text-slate-900 text-base">
-                    Giỏ hàng ({totalItemsCount})
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setIsCartOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                {cart.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 space-y-3">
-                    <ShoppingCart className="w-16 h-16 stroke-1 text-slate-300" />
-                    <p className="font-semibold text-slate-600">
-                      Giỏ hàng của bạn đang trống
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Hãy chọn mua các sản phẩm công nghệ tuyệt vời nhé!
-                    </p>
-                    <button
-                      onClick={() => setIsCartOpen(false)}
-                      className="mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs shadow-md"
-                    >
-                      Xem sản phẩm
-                    </button>
-                  </div>
-                ) : (
-                  cart.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="flex items-center space-x-3 bg-slate-50 p-3 rounded-2xl border border-slate-200"
-                    >
-                      <img
-                        src={item.product.imageUrl}
-                        alt={item.product.name}
-                        className="w-16 h-16 object-cover rounded-xl shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-xs text-slate-900 truncate">
-                          {item.product.name}
-                        </h4>
-                        <p className="text-xs font-extrabold text-blue-600 mt-0.5">
-                          {formatVND(item.product.price)}
-                        </p>
-
-                        <div className="flex items-center space-x-2 mt-2">
-                          <div className="flex items-center border border-slate-300 rounded-lg bg-white">
-                            <button
-                              onClick={() => updateQuantity(item.product.id, -1)}
-                              className="p-1 hover:bg-slate-100 text-slate-600 rounded-l"
-                            >
-                              <Minus className="w-3 h-3" />
-                            </button>
-                            <span className="px-2.5 text-xs font-bold text-slate-800">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQuantity(item.product.id, 1)}
-                              className="p-1 hover:bg-slate-100 text-slate-600 rounded-r"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <button
-                            onClick={() => removeFromCart(item.product.id)}
-                            className="text-red-500 hover:text-red-700 p-1 text-xs"
-                            title="Xóa sản phẩm"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {cart.length > 0 && (
-                <div className="p-5 border-t border-slate-200 bg-white space-y-4">
-                  <form onSubmit={handleApplyCoupon} className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
-                      placeholder="Mã giảm giá (VD: DINHBAO10)"
-                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
-                    >
-                      Áp dụng
-                    </button>
-                  </form>
-
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between text-slate-500">
-                      <span>Tạm tính:</span>
-                      <span>{formatVND(subtotal)}</span>
-                    </div>
-                    {appliedDiscount > 0 && (
-                      <div className="flex justify-between text-emerald-600 font-semibold">
-                        <span>Giảm giá (10%):</span>
-                        <span>-{formatVND(discountAmount)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-slate-500">
-                      <span>Phí vận chuyển:</span>
-                      <span>
-                        {shippingFee === 0 ? "Miễn phí" : formatVND(shippingFee)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-base font-extrabold text-slate-900 pt-2 border-t border-slate-200">
-                      <span>Tổng thanh toán:</span>
-                      <span className="text-red-600">{formatVND(finalTotal)}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setIsCartOpen(false);
-                      setIsCheckoutOpen(true);
-                    }}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center space-x-2"
-                  >
-                    <span>Tiến hành Đặt hàng</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
                 </div>
               )}
             </div>

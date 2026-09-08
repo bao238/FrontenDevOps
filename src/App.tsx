@@ -282,15 +282,26 @@ export default function App() {
       return;
     }
 
-    const email = loginEmail.trim().toLowerCase();
-    const existing = users.find((u) => u.email.toLowerCase() === email);
+    const inputVal = loginEmail.trim().toLowerCase();
+    const inputPass = loginPassword.trim();
+    const existing = users.find(
+      (u) =>
+        u.email.toLowerCase() === inputVal ||
+        (inputVal === "admin" && u.role === "admin") ||
+        u.name.toLowerCase() === inputVal
+    );
+
+    // Fallback nếu tài khoản admin hệ thống (admin / admin123 hoặc bao@gmail.com / admin123)
+    const isFallbackAdmin =
+      (inputVal === "admin" || inputVal === "bao@gmail.com" || inputVal === "admin@dinhbao.vn") &&
+      (inputPass === "admin123" || inputPass === "admin");
 
     if (existing) {
       if (existing.status === "locked") {
         showToast("Tài khoản của bạn đã bị KHÓA bởi Quản trị viên!");
         return;
       }
-      if (existing.password && existing.password !== loginPassword.trim()) {
+      if (existing.password && existing.password !== inputPass && !isFallbackAdmin) {
         showToast("Mật khẩu không chính xác! Vui lòng kiểm tra lại.");
         return;
       }
@@ -299,7 +310,7 @@ export default function App() {
         name: existing.name,
         email: existing.email,
         phone: existing.phone,
-        avatarUrl: existing.avatarUrl,
+        avatarUrl: existing.avatarUrl || "/default-avatar.png",
         memberSince: existing.createdAt || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
       };
       setCurrentUser(loggedUser);
@@ -311,8 +322,49 @@ export default function App() {
         address: existing.address || prev.address,
       }));
       setIsAuthModalOpen(false);
-      showToast(`Chào mừng bạn trở lại, ${loggedUser.name}!`);
       setLoginPassword("");
+
+      // NẾU LÀ TÀI KHOẢN ADMIN HOẶC STAFF -> TỰ ĐỘNG CHUYỂN QUA TRANG /admin VÀ KÍCH HOẠT PHIÊN QUẢN TRỊ
+      if (existing.role === "admin" || existing.role === "staff") {
+        setIsAdminLoggedIn(true);
+        try {
+          localStorage.setItem("dinhbao_admin_session", "true");
+          localStorage.setItem("dinhbao_admin_user", JSON.stringify(existing));
+        } catch (err) {
+          console.error(err);
+        }
+        switchTab("admin");
+        showToast(`Đăng nhập quyền Quản trị (${existing.role === "admin" ? "Admin" : "Nhân viên"}) thành công! Chuyển hướng sang Trang Admin...`);
+        return;
+      }
+
+      showToast(`Chào mừng bạn trở lại, ${loggedUser.name}!`);
+      return;
+    }
+
+    if (isFallbackAdmin) {
+      const adminAcc = users.find((u) => u.role === "admin") || DEFAULT_USERS[0];
+      const loggedUser: UserProfile = {
+        id: adminAcc.id,
+        name: adminAcc.name,
+        email: adminAcc.email,
+        phone: adminAcc.phone,
+        avatarUrl: adminAcc.avatarUrl || "/default-avatar.png",
+        memberSince: adminAcc.createdAt || "Tháng 01/2024",
+      };
+      setCurrentUser(loggedUser);
+      localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
+      setIsAdminLoggedIn(true);
+      try {
+        localStorage.setItem("dinhbao_admin_session", "true");
+        localStorage.setItem("dinhbao_admin_user", JSON.stringify(adminAcc));
+      } catch (err) {
+        console.error(err);
+      }
+      setIsAuthModalOpen(false);
+      setLoginPassword("");
+      switchTab("admin");
+      showToast("Đăng nhập quyền Quản trị (Admin) thành công! Chuyển hướng sang Trang Admin...");
       return;
     }
 
@@ -437,13 +489,47 @@ export default function App() {
       address: "123 Nguyễn Văn Linh, Quận Hải Châu, Đà Nẵng",
     }));
     setIsAuthModalOpen(false);
-    showToast("Đã đăng nhập nhanh với tài khoản Demo!");
+    showToast("Đã đăng nhập nhanh với tài khoản Khách Hàng (Demo)!");
+  };
+
+  // Quick Admin Login from storefront modal
+  const handleQuickAdminLoginFromModal = () => {
+    const adminAcc = users.find((u) => u.role === "admin") || DEFAULT_USERS[0];
+    const loggedUser: UserProfile = {
+      id: adminAcc.id,
+      name: adminAcc.name,
+      email: adminAcc.email,
+      phone: adminAcc.phone,
+      avatarUrl: adminAcc.avatarUrl || "/default-avatar.png",
+      memberSince: adminAcc.createdAt || "Tháng 01/2024",
+    };
+    setCurrentUser(loggedUser);
+    localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
+    setCustomerInfo((prev) => ({
+      ...prev,
+      fullName: loggedUser.name,
+      phone: loggedUser.phone,
+      address: adminAcc.address || "Tòa nhà DinhBao Center, Hải Châu, Đà Nẵng",
+    }));
+    setIsAdminLoggedIn(true);
+    try {
+      localStorage.setItem("dinhbao_admin_session", "true");
+      localStorage.setItem("dinhbao_admin_user", JSON.stringify(adminAcc));
+    } catch (err) {
+      console.error(err);
+    }
+    setIsAuthModalOpen(false);
+    switchTab("admin");
+    showToast("Đã đăng nhập quyền Quản trị (Admin) & chuyển tới Trang Quản Trị!");
   };
 
   // Handle Logout
   const handleLogout = () => {
     setCurrentUser(null);
+    setIsAdminLoggedIn(false);
     localStorage.removeItem("dinhbao_user");
+    localStorage.removeItem("dinhbao_admin_session");
+    localStorage.removeItem("dinhbao_admin_user");
     setIsUserMenuOpen(false);
     showToast("Đã đăng xuất tài khoản thành công.");
   };
@@ -1766,14 +1852,14 @@ export default function App() {
                     <div className="space-y-3 text-xs">
                       <div>
                         <label className="block font-semibold text-slate-700 mb-1">
-                          Email / Số điện thoại
+                          Email / Tài khoản / Số điện thoại
                         </label>
                         <div className="relative">
                           <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                           <input
-                            type="email"
+                            type="text"
                             required
-                            placeholder="example@dinhbao.vn"
+                            placeholder="admin@dinhbao.vn hoặc email của bạn"
                             value={loginEmail}
                             onChange={(e) => setLoginEmail(e.target.value)}
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1821,14 +1907,30 @@ export default function App() {
                     <div className="pt-3 border-t border-slate-100 text-center space-y-2">
                       <button
                         type="button"
+                        onClick={handleQuickAdminLoginFromModal}
+                        className="w-full py-2.5 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-800 hover:to-purple-800 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition-all flex items-center justify-center space-x-1.5"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
+                        <span>Đăng nhập nhanh Quản trị (Admin &bull; Vào thẳng /admin)</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={handleQuickDemoLogin}
                         className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Đăng nhập nhanh (Tài khoản mẫu Demo)</span>
+                        <span>Đăng nhập Khách Hàng Demo (Nguyễn Văn An)</span>
                       </button>
 
-                      <p className="text-xs text-slate-500">
+                      <div className="p-2.5 bg-blue-50/80 border border-blue-100 rounded-xl text-[11px] text-blue-800 flex items-start space-x-2 text-left">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-600" />
+                        <span>
+                          <strong>Tài khoản Admin:</strong> <code>admin@dinhbao.vn</code> (hoặc <code>admin</code>) &bull; Mật khẩu: <code>admin123</code> &rarr; hệ thống sẽ tự động chuyển sang Cổng Quản Trị.
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-500 pt-1">
                         Chưa có tài khoản?{" "}
                         <button
                           type="button"

@@ -422,24 +422,9 @@ export default function AdminPanel({
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onSwitchToStore}
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Quay lại Cửa Hàng</span>
-          </button>
-          {onAdminLogout && (
-            <button
-              onClick={onAdminLogout}
-              className="flex items-center space-x-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 border border-red-500/30 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all"
-              title="Đăng xuất tài khoản Admin"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Đăng xuất Admin</span>
-            </button>
-          )}
+        <div className="hidden sm:flex items-center space-x-2 bg-slate-800/80 border border-slate-700/80 px-4 py-2.5 rounded-2xl text-xs text-slate-300">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Hệ thống hoạt động bình thường</span>
         </div>
       </div>
 

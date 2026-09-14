@@ -98,6 +98,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
+  const [authError, setAuthError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState<boolean>(false);
@@ -277,8 +278,12 @@ export default function App() {
   // Handle Login
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginEmail || !loginPassword) {
-      showToast("Vui lòng nhập đầy đủ Email và Mật khẩu!");
+    setAuthError(null);
+
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      const err = "Vui lòng nhập đầy đủ Email/Tài khoản và Mật khẩu!";
+      setAuthError(err);
+      showToast(err);
       return;
     }
 
@@ -298,11 +303,15 @@ export default function App() {
 
     if (existing) {
       if (existing.status === "locked") {
-        showToast("Tài khoản của bạn đã bị KHÓA bởi Quản trị viên!");
+        const err = "Tài khoản của bạn đã bị KHÓA bởi Quản trị viên!";
+        setAuthError(err);
+        showToast(err);
         return;
       }
       if (existing.password && existing.password !== inputPass && !isFallbackAdmin) {
-        showToast("Mật khẩu không chính xác! Vui lòng kiểm tra lại.");
+        const err = "Mật khẩu không chính xác! Vui lòng kiểm tra lại.";
+        setAuthError(err);
+        showToast(err);
         return;
       }
       const loggedUser: UserProfile = {
@@ -323,6 +332,7 @@ export default function App() {
       }));
       setIsAuthModalOpen(false);
       setLoginPassword("");
+      setAuthError(null);
 
       // NẾU LÀ TÀI KHOẢN ADMIN HOẶC STAFF -> TỰ ĐỘNG CHUYỂN QUA TRANG /admin VÀ KÍCH HOẠT PHIÊN QUẢN TRỊ
       if (existing.role === "admin" || existing.role === "staff") {
@@ -363,68 +373,40 @@ export default function App() {
       }
       setIsAuthModalOpen(false);
       setLoginPassword("");
+      setAuthError(null);
       switchTab("admin");
       showToast("Đăng nhập quyền Quản trị (Admin) thành công! Chuyển hướng sang Trang Admin...");
       return;
     }
 
-    // Nếu là tài khoản mới chưa có trong danh sách mẫu, cho phép tạo & lưu vào users
-    const loggedUser: UserProfile = {
-      id: "usr-" + Date.now(),
-      name: loginEmail.split("@")[0] || "Khách Hàng",
-      email: loginEmail,
-      phone: "0905 123 456",
-      avatarUrl: "/default-avatar.png",
-      memberSince: "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
-    };
-
-    const newAccount: UserAccount = {
-      id: loggedUser.id,
-      name: loggedUser.name,
-      email: loggedUser.email,
-      phone: loggedUser.phone,
-      role: "customer",
-      status: "active",
-      password: loginPassword,
-      avatarUrl: "/default-avatar.png",
-      createdAt: new Date().toLocaleDateString("vi-VN"),
-    };
-
-    const updatedUsers = [newAccount, ...users];
-    setUsers(updatedUsers);
-    try {
-      localStorage.setItem("dinhbao_users", JSON.stringify(updatedUsers));
-    } catch (err) {
-      console.error(err);
-    }
-
-    setCurrentUser(loggedUser);
-    localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
-    setCustomerInfo((prev) => ({
-      ...prev,
-      fullName: loggedUser.name,
-      phone: loggedUser.phone,
-    }));
-    setIsAuthModalOpen(false);
-    showToast(`Chào mừng bạn trở lại, ${loggedUser.name}!`);
-    setLoginPassword("");
+    // Tài khoản không tồn tại trên hệ thống
+    const err = "Tài khoản hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại.";
+    setAuthError(err);
+    showToast(err);
   };
 
   // Handle Register
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!regName || !regEmail || !regPhone || !regPassword) {
-      showToast("Vui lòng điền đầy đủ các thông tin đăng ký!");
+      const err = "Vui lòng điền đầy đủ các thông tin đăng ký!";
+      setAuthError(err);
+      showToast(err);
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      showToast("Mật khẩu xác nhận không trùng khớp!");
+      const err = "Mật khẩu xác nhận không trùng khớp!";
+      setAuthError(err);
+      showToast(err);
       return;
     }
 
     const email = regEmail.trim().toLowerCase();
     if (users.some((u) => u.email.toLowerCase() === email)) {
-      showToast("Email này đã được đăng ký! Vui lòng chuyển sang Đăng nhập.");
+      const err = "Email này đã được đăng ký! Vui lòng chuyển sang tab Đăng Nhập.";
+      setAuthError(err);
+      showToast(err);
       return;
     }
 
@@ -468,59 +450,6 @@ export default function App() {
     showToast(`Đăng ký tài khoản thành công! Xin chào ${newUser.name}`);
     setRegPassword("");
     setRegConfirmPassword("");
-  };
-
-  // Quick Demo Login
-  const handleQuickDemoLogin = () => {
-    const demoUser: UserProfile = {
-      id: "demo-user-1",
-      name: "Nguyễn Văn An",
-      email: "demo@dinhbao.vn",
-      phone: "0988 776 655",
-      avatarUrl: "/default-avatar.png",
-      memberSince: "Tháng 8/2024",
-    };
-    setCurrentUser(demoUser);
-    localStorage.setItem("dinhbao_user", JSON.stringify(demoUser));
-    setCustomerInfo((prev) => ({
-      ...prev,
-      fullName: demoUser.name,
-      phone: demoUser.phone,
-      address: "123 Nguyễn Văn Linh, Quận Hải Châu, Đà Nẵng",
-    }));
-    setIsAuthModalOpen(false);
-    showToast("Đã đăng nhập nhanh với tài khoản Khách Hàng (Demo)!");
-  };
-
-  // Quick Admin Login from storefront modal
-  const handleQuickAdminLoginFromModal = () => {
-    const adminAcc = users.find((u) => u.role === "admin") || DEFAULT_USERS[0];
-    const loggedUser: UserProfile = {
-      id: adminAcc.id,
-      name: adminAcc.name,
-      email: adminAcc.email,
-      phone: adminAcc.phone,
-      avatarUrl: adminAcc.avatarUrl || "/default-avatar.png",
-      memberSince: adminAcc.createdAt || "Tháng 01/2024",
-    };
-    setCurrentUser(loggedUser);
-    localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
-    setCustomerInfo((prev) => ({
-      ...prev,
-      fullName: loggedUser.name,
-      phone: loggedUser.phone,
-      address: adminAcc.address || "Tòa nhà DinhBao Center, Hải Châu, Đà Nẵng",
-    }));
-    setIsAdminLoggedIn(true);
-    try {
-      localStorage.setItem("dinhbao_admin_session", "true");
-      localStorage.setItem("dinhbao_admin_user", JSON.stringify(adminAcc));
-    } catch (err) {
-      console.error(err);
-    }
-    setIsAuthModalOpen(false);
-    switchTab("admin");
-    showToast("Đã đăng nhập quyền Quản trị (Admin) & chuyển tới Trang Quản Trị!");
   };
 
   // Handle Logout
@@ -896,7 +825,7 @@ export default function App() {
       <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5">
+          <div className="fixed bottom-6 right-6 z-[9999] bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5">
             <Sparkles className="w-5 h-5 text-amber-400" />
             <span className="text-sm font-medium">{toastMessage}</span>
           </div>
@@ -1076,7 +1005,7 @@ export default function App() {
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5">
+          <div className="fixed bottom-6 right-6 z-[9999] bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5">
             <Sparkles className="w-5 h-5 text-amber-400" />
             <span className="text-sm font-medium">{toastMessage}</span>
           </div>
@@ -1808,7 +1737,10 @@ export default function App() {
               <div className="relative bg-slate-50 border-b border-slate-200 p-4 pb-0 flex items-center justify-between">
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => setAuthTab("login")}
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthTab("login");
+                    }}
                     className={`pb-3 px-4 text-xs font-bold transition-all border-b-2 ${
                       authTab === "login"
                         ? "border-blue-600 text-blue-600"
@@ -1818,7 +1750,10 @@ export default function App() {
                     Đăng Nhập
                   </button>
                   <button
-                    onClick={() => setAuthTab("register")}
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthTab("register");
+                    }}
                     className={`pb-3 px-4 text-xs font-bold transition-all border-b-2 ${
                       authTab === "register"
                         ? "border-blue-600 text-blue-600"
@@ -1830,7 +1765,10 @@ export default function App() {
                 </div>
 
                 <button
-                  onClick={() => setIsAuthModalOpen(false)}
+                  onClick={() => {
+                    setIsAuthModalOpen(false);
+                    setAuthError(null);
+                  }}
                   className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -1849,6 +1787,13 @@ export default function App() {
                       </p>
                     </div>
 
+                    {authError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start space-x-2.5 animate-in fade-in">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                        <span className="font-semibold leading-relaxed">{authError}</span>
+                      </div>
+                    )}
+
                     <div className="space-y-3 text-xs">
                       <div>
                         <label className="block font-semibold text-slate-700 mb-1">
@@ -1861,7 +1806,10 @@ export default function App() {
                             required
                             placeholder="admin@dinhbao.vn hoặc email của bạn"
                             value={loginEmail}
-                            onChange={(e) => setLoginEmail(e.target.value)}
+                            onChange={(e) => {
+                              setLoginEmail(e.target.value);
+                              if (authError) setAuthError(null);
+                            }}
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -1878,7 +1826,10 @@ export default function App() {
                             required
                             placeholder="••••••••"
                             value={loginPassword}
-                            onChange={(e) => setLoginPassword(e.target.value)}
+                            onChange={(e) => {
+                              setLoginPassword(e.target.value);
+                              if (authError) setAuthError(null);
+                            }}
                             className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                           <button
@@ -1904,37 +1855,15 @@ export default function App() {
                       <span>Đăng Nhập Ngay</span>
                     </button>
 
-                    <div className="pt-3 border-t border-slate-100 text-center space-y-2">
-                      <button
-                        type="button"
-                        onClick={handleQuickAdminLoginFromModal}
-                        className="w-full py-2.5 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-800 hover:to-purple-800 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition-all flex items-center justify-center space-x-1.5"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
-                        <span>Đăng nhập nhanh Quản trị (Admin &bull; Vào thẳng /admin)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleQuickDemoLogin}
-                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Đăng nhập Khách Hàng Demo (Nguyễn Văn An)</span>
-                      </button>
-
-                      <div className="p-2.5 bg-blue-50/80 border border-blue-100 rounded-xl text-[11px] text-blue-800 flex items-start space-x-2 text-left">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-600" />
-                        <span>
-                          <strong>Tài khoản Admin:</strong> <code>admin@dinhbao.vn</code> (hoặc <code>admin</code>) &bull; Mật khẩu: <code>admin123</code> &rarr; hệ thống sẽ tự động chuyển sang Cổng Quản Trị.
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-slate-500 pt-1">
+                    <div className="pt-3 border-t border-slate-100 text-center">
+                      <p className="text-xs text-slate-500">
                         Chưa có tài khoản?{" "}
                         <button
                           type="button"
-                          onClick={() => setAuthTab("register")}
+                          onClick={() => {
+                            setAuthError(null);
+                            setAuthTab("register");
+                          }}
                           className="text-blue-600 font-bold hover:underline"
                         >
                           Đăng ký ngay
@@ -1952,6 +1881,13 @@ export default function App() {
                         Tham gia cùng hàng ngàn khách hàng của DinhBao
                       </p>
                     </div>
+
+                    {authError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start space-x-2.5 animate-in fade-in">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                        <span className="font-semibold leading-relaxed">{authError}</span>
+                      </div>
+                    )}
 
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
@@ -2035,10 +1971,13 @@ export default function App() {
                       Đã có tài khoản?{" "}
                       <button
                         type="button"
-                        onClick={() => setAuthTab("login")}
+                        onClick={() => {
+                          setAuthError(null);
+                          setAuthTab("login");
+                        }}
                         className="text-blue-600 font-bold hover:underline"
                       >
-                        Đăng nhập
+                        Đăng nhập ngay
                       </button>
                     </p>
                   </form>

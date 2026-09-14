@@ -763,10 +763,20 @@ export default function App() {
         );
         return;
       }
+      const loggedUser: UserProfile = {
+        id: found.id,
+        name: found.name,
+        email: found.email,
+        phone: found.phone,
+        avatarUrl: found.avatarUrl || "/default-avatar.png",
+        memberSince: found.createdAt || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
+      };
+      setCurrentUser(loggedUser);
       setIsAdminLoggedIn(true);
       try {
         localStorage.setItem("dinhbao_admin_session", "true");
         localStorage.setItem("dinhbao_admin_user", JSON.stringify(found));
+        localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
       } catch (err) {
         console.error(err);
       }
@@ -780,9 +790,21 @@ export default function App() {
       (u === "admin" || u === "bao@gmail.com" || u === "admin@dinhbao.vn") &&
       (p === "admin123" || p === "admin")
     ) {
+      const adminAcc = users.find((acc) => acc.role === "admin") || DEFAULT_USERS[0];
+      const loggedUser: UserProfile = {
+        id: adminAcc.id,
+        name: adminAcc.name,
+        email: adminAcc.email,
+        phone: adminAcc.phone,
+        avatarUrl: adminAcc.avatarUrl || "/default-avatar.png",
+        memberSince: adminAcc.createdAt || "Tháng 01/2024",
+      };
+      setCurrentUser(loggedUser);
       setIsAdminLoggedIn(true);
       try {
         localStorage.setItem("dinhbao_admin_session", "true");
+        localStorage.setItem("dinhbao_admin_user", JSON.stringify(adminAcc));
+        localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
       } catch (err) {
         console.error(err);
       }
@@ -790,33 +812,23 @@ export default function App() {
       setAdminPassword("");
     } else {
       setAdminLoginError(
-        "Tài khoản hoặc mật khẩu không chính xác! (Mẫu: admin@dinhbao.vn / admin123)"
+        "Tài khoản hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại."
       );
     }
   };
 
-  const handleAdminQuickLogin = () => {
-    setAdminUsername("admin@dinhbao.vn");
-    setAdminPassword("admin123");
-    setIsAdminLoggedIn(true);
-    setAdminLoginError(null);
-    try {
-      localStorage.setItem("dinhbao_admin_session", "true");
-    } catch (err) {
-      console.error(err);
-    }
-    showToast("Đã đăng nhập nhanh quyền Quản trị (Admin)!");
-  };
-
   const handleAdminLogout = () => {
     setIsAdminLoggedIn(false);
+    setCurrentUser(null);
+    setIsUserMenuOpen(false);
     try {
       localStorage.removeItem("dinhbao_admin_session");
       localStorage.removeItem("dinhbao_admin_user");
+      localStorage.removeItem("dinhbao_user");
     } catch (err) {
       console.error(err);
     }
-    showToast("Đã đăng xuất tài khoản Quản trị!");
+    showToast("Đã đăng xuất toàn bộ tài khoản thành công!");
   };
 
   // NẾU ĐANG Ở TRANG /admin: HIỂN THỊ GIAO DIỆN ADMIN RIÊNG BIỆT (KHÔNG CÓ HEADER/CART CỦA CỬA HÀNG)
@@ -908,16 +920,7 @@ export default function App() {
                     <span>Đăng Nhập Quản Trị</span>
                   </button>
 
-                  <div className="pt-3 border-t border-slate-800 space-y-2.5 text-center">
-                    <button
-                      type="button"
-                      onClick={handleAdminQuickLogin}
-                      className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Đăng nhập nhanh (Tài khoản mẫu: admin / admin123)</span>
-                    </button>
-
+                  <div className="pt-3 border-t border-slate-800 text-center">
                     <button
                       type="button"
                       onClick={() => switchTab("products")}

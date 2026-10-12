@@ -1,11 +1,35 @@
 version: '3.8'
 
 services:
+  techstore-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: techstore-backend
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DB_SERVER: den1.mssql7.gear.host
+      DB_DATABASE: devops1
+      DB_USER: devops1
+      DB_PASSWORD: "Mz9bX818-~qM"
+      DB_PORT: 1433
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+    restart: always
+
   techstore-frontend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: techstore-frontend
     ports:
-      - "3000:3000"
+      - "80:3000"
+    depends_on:
+      - techstore-backend
     restart: always
+
+networks:
+  default:
+    name: techstore-network

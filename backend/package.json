@@ -1,0 +1,16 @@
+{
+  "name": "techstore-backend",
+  "version": "1.0.0",
+  "description": "TechStore REST API with Microsoft SQL Server (GearHost) for DevOps Course",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mssql": "^11.0.1"
+  }
+}

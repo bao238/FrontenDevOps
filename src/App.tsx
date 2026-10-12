@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { PRODUCTS, CATEGORIES, Product } from "./data/products";
 import { DEFAULT_USERS, UserAccount, DEFAULT_AVATAR } from "./data/users";
+import { api } from "./services/api";
 import {
   Search,
   ShoppingCart,
@@ -257,6 +258,23 @@ export default function App() {
     } catch {
       // ignore
     }
+
+    // Tự động đồng bộ từ Backend REST API (GearHost MS SQL)
+    api.getProducts().then((res) => {
+      if (res && res.data && res.data.length > 0) {
+        setProducts(res.data);
+      }
+    });
+    api.getOrders().then((ordList) => {
+      if (ordList && ordList.length > 0) {
+        setOrders(ordList);
+      }
+    });
+    api.getUsers().then((userList) => {
+      if (userList && userList.length > 0) {
+        setUsers(userList);
+      }
+    });
   }, []);
 
   // Format VND currency
@@ -575,6 +593,14 @@ export default function App() {
       // ignore
     }
 
+    // Gửi đơn hàng lên Backend / GearHost MS SQL
+    api.createOrder({
+      customerInfo: { ...customerInfo },
+      items: [...cart],
+      totalAmount: finalTotal,
+      paymentMethod: customerInfo.paymentMethod
+    }).catch(console.error);
+
     setOrderSuccess(true);
     setCart([]);
     setAppliedDiscount(0);
@@ -595,6 +621,7 @@ export default function App() {
 
   // Product CRUD Handlers for Admin
   const handleAddProduct = (newProd: Product) => {
+    api.createProduct(newProd).catch(console.error);
     const updated = [newProd, ...products];
     setProducts(updated);
     try {
@@ -606,6 +633,7 @@ export default function App() {
   };
 
   const handleUpdateProduct = (updatedProd: Product) => {
+    api.updateProduct(updatedProd.id, updatedProd).catch(console.error);
     const updated = products.map((p) => (p.id === updatedProd.id ? updatedProd : p));
     setProducts(updated);
     try {
@@ -622,6 +650,7 @@ export default function App() {
   };
 
   const handleDeleteProduct = (productId: string) => {
+    api.deleteProduct(productId).catch(console.error);
     const updated = products.filter((p) => p.id !== productId);
     setProducts(updated);
     try {
@@ -647,6 +676,7 @@ export default function App() {
     orderId: string,
     newStatus: "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy"
   ) => {
+    api.updateOrderStatus(orderId, newStatus).catch(console.error);
     const updated = orders.map((ord) =>
       ord.id === orderId ? { ...ord, status: newStatus } : ord
     );
@@ -660,6 +690,7 @@ export default function App() {
   };
 
   const handleDeleteOrder = (orderId: string) => {
+    api.deleteOrder(orderId).catch(console.error);
     const updated = orders.filter((ord) => ord.id !== orderId);
     setOrders(updated);
     try {
@@ -672,6 +703,7 @@ export default function App() {
 
   // User Management Handlers (Admin CRUD)
   const handleAddUser = (newUser: UserAccount) => {
+    api.createUser(newUser).catch(console.error);
     const updated = [newUser, ...users];
     setUsers(updated);
     try {
@@ -683,6 +715,7 @@ export default function App() {
   };
 
   const handleUpdateUser = (updatedUser: UserAccount) => {
+    api.updateUser(updatedUser.id, updatedUser).catch(console.error);
     const updated = users.map((u) => (u.id === updatedUser.id ? updatedUser : u));
     setUsers(updated);
     try {
@@ -694,6 +727,7 @@ export default function App() {
   };
 
   const handleDeleteUser = (userId: string) => {
+    api.deleteUser(userId).catch(console.error);
     const target = users.find((u) => u.id === userId);
     const updated = users.filter((u) => u.id !== userId);
     setUsers(updated);
@@ -706,6 +740,11 @@ export default function App() {
   };
 
   const handleToggleLockUser = (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target) {
+      const nextStatus: "active" | "locked" = target.status === "active" ? "locked" : "active";
+      api.toggleUserStatus(userId, nextStatus).catch(console.error);
+    }
     const updated = users.map((u) => {
       if (u.id === userId) {
         const nextStatus: "active" | "locked" = u.status === "active" ? "locked" : "active";

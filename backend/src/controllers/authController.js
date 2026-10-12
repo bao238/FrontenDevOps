@@ -64,23 +64,58 @@ exports.login = async (req, res) => {
 
 // POST /api/auth/register / POST /api/users
 exports.register = async (req, res) => {
-  const { name, email, phone, password, role, status, address } = req.body;
-  const newUser = {
-    id: req.body.id || `usr-cust-${Date.now()}`,
-    name,
-    email,
-    phone: phone || '',
-    role: role || 'customer',
-    status: status || 'active',
-    password: password || '123456',
-    avatarUrl: '/default-avatar.png',
-    address: address || '',
-    createdAt: new Date().toLocaleDateString('vi-VN')
-  };
+  const { name, email, phone, password, role, status, address, avatarUrl } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ message: 'Họ và tên người dùng là bắt buộc' });
+  }
+  if (!email || !email.trim()) {
+    return res.status(400).json({ message: 'Email đăng nhập là bắt buộc' });
+  }
+
+  // 1. Kiểm tra định dạng số điện thoại 10 số
+  const cleanPhone = (phone || '').trim();
+  if (!cleanPhone) {
+    return res.status(400).json({ message: 'Số điện thoại là bắt buộc, vui lòng nhập đủ 10 số' });
+  }
+  if (!/^0\d{9}$/.test(cleanPhone)) {
+    return res.status(400).json({ message: 'Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0 (Ví dụ: 0905123456)' });
+  }
+
+  const finalAvatar = (avatarUrl && avatarUrl.trim()) ? avatarUrl.trim() : '/images/default-avatar.png';
 
   const pool = getPool();
   if (isDbConnected() && pool) {
     try {
+      // 2. Kiểm tra trùng Email
+      const checkEmail = await pool.request()
+        .input('email', sql.NVarChar(255), email.trim().toLowerCase())
+        .query('SELECT id FROM dbo.Users WHERE LOWER(email) = @email');
+      if (checkEmail.recordset.length > 0) {
+        return res.status(400).json({ message: `Email "${email.trim()}" đã tồn tại trong hệ thống!` });
+      }
+
+      // 3. Kiểm tra trùng Tên người dùng
+      const checkName = await pool.request()
+        .input('name', sql.NVarChar(255), name.trim().toLowerCase())
+        .query('SELECT id FROM dbo.Users WHERE LOWER(name) = @name');
+      if (checkName.recordset.length > 0) {
+        return res.status(400).json({ message: `Tên người dùng "${name.trim()}" đã tồn tại trong hệ thống!` });
+      }
+
+      const newUser = {
+        id: req.body.id || `usr-cust-${Date.now()}`,
+        name: name.trim(),
+        email: email.trim(),
+        phone: cleanPhone,
+        role: role || 'customer',
+        status: status || 'active',
+        password: password || '123456',
+        avatarUrl: finalAvatar,
+        address: (address || '').trim(),
+        createdAt: new Date().toLocaleDateString('vi-VN')
+      };
+
       await pool.request()
         .input('id', sql.NVarChar(50), newUser.id)
         .input('name', sql.NVarChar(255), newUser.name)
@@ -96,13 +131,36 @@ exports.register = async (req, res) => {
           VALUES (@id, @name, @email, @phone, @role, @status, @password, @avatar_url, @address)
         `);
 
-      return res.status(201).json({ message: 'Thêm tài khoản thành công trên GearHost', user: newUser });
+      return res.status(201).json({ message: 'Thêm tài khoản thành công', user: newUser });
     } catch (err) {
       console.error('[AuthController] Lỗi MSSQL Register/AddUser:', err.message);
-      return res.status(400).json({ message: 'Email đã tồn tại hoặc dữ liệu không hợp lệ' });
+      if (err.message.includes('UNIQUE KEY') || err.message.includes('PRIMARY KEY')) {
+        return res.status(400).json({ message: 'Email đã tồn tại trong hệ thống' });
+      }
+      return res.status(400).json({ message: `Lỗi cơ sở dữ liệu: ${err.message}` });
     }
   }
 
+  // Fallback memory
+  if (usersMemory.some(u => u.email.toLowerCase() === email.trim().toLowerCase())) {
+    return res.status(400).json({ message: `Email "${email.trim()}" đã tồn tại trong hệ thống!` });
+  }
+  if (usersMemory.some(u => u.name.toLowerCase() === name.trim().toLowerCase())) {
+    return res.status(400).json({ message: `Tên người dùng "${name.trim()}" đã tồn tại trong hệ thống!` });
+  }
+
+  const newUser = {
+    id: req.body.id || `usr-cust-${Date.now()}`,
+    name: name.trim(),
+    email: email.trim(),
+    phone: cleanPhone,
+    role: role || 'customer',
+    status: status || 'active',
+    password: password || '123456',
+    avatarUrl: finalAvatar,
+    address: (address || '').trim(),
+    createdAt: new Date().toLocaleDateString('vi-VN')
+  };
   usersMemory.push(newUser);
   return res.status(201).json({ message: 'Thêm tài khoản thành công', user: newUser });
 };

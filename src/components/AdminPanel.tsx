@@ -216,7 +216,7 @@ export default function AdminPanel({
     setUserFormRole("customer");
     setUserFormStatus("active");
     setUserFormAddress("");
-    setUserFormAvatar("/default-avatar.png");
+    setUserFormAvatar("/images/default-avatar.png");
     setIsUserModalOpen(true);
   };
 
@@ -230,41 +230,85 @@ export default function AdminPanel({
     setUserFormRole(user.role);
     setUserFormStatus(user.status);
     setUserFormAddress(user.address || "");
-    setUserFormAvatar(user.avatarUrl || "/default-avatar.png");
+    setUserFormAvatar(user.avatarUrl || "/images/default-avatar.png");
     setIsUserModalOpen(true);
   };
 
   // Submit User Form (Create or Edit)
   const handleSubmitUserForm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userFormName.trim() || !userFormEmail.trim()) return;
+    const cleanName = userFormName.trim();
+    const cleanEmail = userFormEmail.trim();
+    const cleanPhone = userFormPhone.trim();
+    let cleanAvatar = userFormAvatar.trim();
+    if (!cleanAvatar) {
+      cleanAvatar = "/images/default-avatar.png";
+    }
+
+    if (!cleanName) {
+      alert("Vui lòng nhập Họ và tên!");
+      return;
+    }
+    if (!cleanEmail) {
+      alert("Vui lòng nhập Email đăng nhập!");
+      return;
+    }
+
+    // 1. Kiểm tra Số điện thoại bắt buộc và đúng 10 số
+    const phoneRegex = /^0\d{9}$/;
+    if (!cleanPhone) {
+      alert("Số điện thoại là bắt buộc, vui lòng nhập đủ 10 số!");
+      return;
+    }
+    if (!phoneRegex.test(cleanPhone)) {
+      alert("Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0 (Ví dụ: 0905123456).");
+      return;
+    }
+
+    // 2. Kiểm tra trùng Email
+    const isEmailDuplicate = users.some(
+      (u) => u.email.toLowerCase() === cleanEmail.toLowerCase() && (!editingUser || u.id !== editingUser.id)
+    );
+    if (isEmailDuplicate) {
+      alert(`Email "${cleanEmail}" đã tồn tại trong hệ thống! Vui lòng chọn email khác.`);
+      return;
+    }
+
+    // 3. Kiểm tra trùng Tên người dùng
+    const isNameDuplicate = users.some(
+      (u) => u.name.trim().toLowerCase() === cleanName.toLowerCase() && (!editingUser || u.id !== editingUser.id)
+    );
+    if (isNameDuplicate) {
+      alert(`Tên người dùng "${cleanName}" đã tồn tại trong hệ thống! Vui lòng nhập tên khác.`);
+      return;
+    }
 
     if (editingUser) {
       if (onUpdateUser) {
         onUpdateUser({
           ...editingUser,
-          name: userFormName.trim(),
-          email: userFormEmail.trim(),
-          phone: userFormPhone.trim(),
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
           password: userFormPassword.trim() || editingUser.password,
           role: userFormRole,
           status: userFormStatus,
           address: userFormAddress.trim(),
-          avatarUrl: userFormAvatar.trim() || editingUser.avatarUrl || "/default-avatar.png",
+          avatarUrl: cleanAvatar,
         });
       }
     } else {
       if (onAddUser) {
         onAddUser({
           id: "usr-" + Date.now(),
-          name: userFormName.trim(),
-          email: userFormEmail.trim(),
-          phone: userFormPhone.trim(),
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
           password: userFormPassword.trim() || "123456",
           role: userFormRole,
           status: userFormStatus,
           address: userFormAddress.trim(),
-          avatarUrl: userFormAvatar.trim() || "/default-avatar.png",
+          avatarUrl: cleanAvatar,
           createdAt: new Date().toLocaleDateString("vi-VN"),
         });
       }
@@ -1401,15 +1445,18 @@ export default function AdminPanel({
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Số điện thoại
+                    Số điện thoại (10 số) *
                   </label>
                   <input
                     type="tel"
-                    placeholder="0905 xxx xxx"
+                    required
+                    maxLength={10}
+                    placeholder="Ví dụ: 0905123456"
                     value={userFormPhone}
-                    onChange={(e) => setUserFormPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => setUserFormPhone(e.target.value.replace(/\D/g, ""))}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Bắt buộc nhập đúng 10 chữ số.</p>
                 </div>
               </div>
 
@@ -1479,9 +1526,23 @@ export default function AdminPanel({
                 <label className="block font-semibold text-slate-700 mb-1">
                   Đường dẫn ảnh đại diện (Avatar URL)
                 </label>
+                <div className="flex items-center space-x-3 mb-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                  <img
+                    src={userFormAvatar || "/images/default-avatar.png"}
+                    alt="Avatar Preview"
+                    className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-sm"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/images/default-avatar.png";
+                    }}
+                  />
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-700">Ảnh đại diện xem trước</p>
+                    <p className="text-[10px] text-slate-400">Để trống sẽ tự động lưu Avatar mặc định (/images/default-avatar.png)</p>
+                  </div>
+                </div>
                 <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
+                  type="text"
+                  placeholder="Để trống sẽ dùng /images/default-avatar.png hoặc dán link ảnh"
                   value={userFormAvatar}
                   onChange={(e) => setUserFormAvatar(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"

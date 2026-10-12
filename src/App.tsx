@@ -702,16 +702,31 @@ export default function App() {
   };
 
   // User Management Handlers (Admin CRUD)
-  const handleAddUser = (newUser: UserAccount) => {
-    api.createUser(newUser).catch(console.error);
-    const updated = [newUser, ...users];
-    setUsers(updated);
+  const handleAddUser = async (newUser: UserAccount) => {
     try {
-      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
+      const res = await api.createUser(newUser);
+      if (res && res.error) {
+        alert(res.error);
+        showToast(res.error);
+        return;
+      }
+      if (res && res.message && (res.message.includes("đã tồn tại") || res.message.includes("Lỗi"))) {
+        alert(res.message);
+        showToast(res.message);
+        return;
+      }
+      const created = res && res.user ? { ...newUser, ...res.user } : newUser;
+      const updated = [created, ...users];
+      setUsers(updated);
+      try {
+        localStorage.setItem("dinhbao_users", JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      showToast(`Đã tạo tài khoản "${created.name}" thành công!`);
+    } catch (err: any) {
+      alert("Lỗi khi tạo tài khoản: " + (err.message || "Không thể kết nối máy chủ"));
     }
-    showToast(`Đã tạo tài khoản "${newUser.name}" thành công!`);
   };
 
   const handleUpdateUser = (updatedUser: UserAccount) => {

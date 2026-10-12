@@ -197,10 +197,14 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(user)
       });
-      return await res.json();
-    } catch (err) {
+      const data = await res.json();
+      if (!res.ok) {
+        return { error: data.message || "Lỗi khi thêm người dùng", ...data };
+      }
+      return data;
+    } catch (err: any) {
       console.warn("⚠️ [API] Lỗi tạo user:", err);
-      return { message: "Lỗi kết nối" };
+      return { error: "Lỗi kết nối máy chủ", message: "Lỗi kết nối máy chủ" };
     }
   },
 

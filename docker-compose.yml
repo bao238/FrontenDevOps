@@ -13,7 +13,7 @@ services:
       DB_SERVER: den1.mssql7.gear.host
       DB_DATABASE: devops1
       DB_USER: devops1
-      DB_PASSWORD: "Mz9bX818-~qM"
+      DB_PASSWORD: "Mz9bX818~-qM"
       DB_PORT: 1433
       DB_ENCRYPT: "false"
       DB_TRUST_SERVER_CERTIFICATE: "true"

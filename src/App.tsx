@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { PRODUCTS, CATEGORIES, Product } from "./data/products";
-import { DEFAULT_USERS, UserAccount, DEFAULT_AVATAR } from "./data/users";
+import { CATEGORIES, Product } from "./data/products";
+import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api } from "./services/api";
 import {
   Search,
@@ -76,15 +76,7 @@ export interface OrderRecord {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart">("products");
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem("dinhbao_products");
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return PRODUCTS;
-  });
+  const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
@@ -104,21 +96,7 @@ export default function App() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState<boolean>(false);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [users, setUsers] = useState<UserAccount[]>(() => {
-    try {
-      const saved = localStorage.getItem("dinhbao_users");
-      if (saved) {
-        const parsed: UserAccount[] = JSON.parse(saved);
-        return parsed.map((u) => ({
-          ...u,
-          avatarUrl: !u.avatarUrl || u.avatarUrl.includes("unsplash.com") ? DEFAULT_AVATAR : u.avatarUrl,
-        }));
-      }
-    } catch {
-      // fallback
-    }
-    return DEFAULT_USERS;
-  });
+  const [users, setUsers] = useState<UserAccount[]>([]);
 
   // Form states
   const [loginEmail, setLoginEmail] = useState<string>("");
@@ -259,19 +237,19 @@ export default function App() {
       // ignore
     }
 
-    // Tự động đồng bộ từ Backend REST API (GearHost MS SQL)
+    // Tự động đồng bộ 100% từ Backend REST API (MS SQL Server)
     api.getProducts().then((res) => {
-      if (res && res.data && res.data.length > 0) {
+      if (res && res.data) {
         setProducts(res.data);
       }
     });
     api.getOrders().then((ordList) => {
-      if (ordList && ordList.length > 0) {
+      if (ordList && Array.isArray(ordList)) {
         setOrders(ordList);
       }
     });
     api.getUsers().then((userList) => {
-      if (userList && userList.length > 0) {
+      if (userList && Array.isArray(userList)) {
         setUsers(userList);
       }
     });
@@ -371,7 +349,16 @@ export default function App() {
     }
 
     if (isFallbackAdmin) {
-      const adminAcc = users.find((u) => u.role === "admin") || DEFAULT_USERS[0];
+      const adminAcc = users.find((u) => u.role === "admin") || {
+        id: "usr-admin-1",
+        name: "Quản Trị Viên (Đình Bảo)",
+        email: "admin@dinhbao.vn",
+        phone: "0905 888 999",
+        role: "admin" as const,
+        status: "active" as const,
+        avatarUrl: "/default-avatar.png",
+        createdAt: "01/01/2024"
+      };
       const loggedUser: UserProfile = {
         id: adminAcc.id,
         name: adminAcc.name,
@@ -440,13 +427,9 @@ export default function App() {
       createdAt: new Date().toLocaleDateString("vi-VN"),
     };
 
+    api.createUser(newAccount).catch(console.error);
     const updatedUsers = [newAccount, ...users];
     setUsers(updatedUsers);
-    try {
-      localStorage.setItem("dinhbao_users", JSON.stringify(updatedUsers));
-    } catch (err) {
-      console.error(err);
-    }
 
     const newUser: UserProfile = {
       id: newAccount.id,
@@ -624,11 +607,6 @@ export default function App() {
     api.createProduct(newProd).catch(console.error);
     const updated = [newProd, ...products];
     setProducts(updated);
-    try {
-      localStorage.setItem("dinhbao_products", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
     showToast(`Đã thêm sản phẩm "${newProd.name}" thành công!`);
   };
 
@@ -636,11 +614,6 @@ export default function App() {
     api.updateProduct(updatedProd.id, updatedProd).catch(console.error);
     const updated = products.map((p) => (p.id === updatedProd.id ? updatedProd : p));
     setProducts(updated);
-    try {
-      localStorage.setItem("dinhbao_products", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
     setCart((prev) =>
       prev.map((item) =>
         item.product.id === updatedProd.id ? { ...item, product: updatedProd } : item
@@ -653,23 +626,15 @@ export default function App() {
     api.deleteProduct(productId).catch(console.error);
     const updated = products.filter((p) => p.id !== productId);
     setProducts(updated);
-    try {
-      localStorage.setItem("dinhbao_products", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
     showToast("Đã xóa sản phẩm khỏi hệ thống!");
   };
 
   const handleResetDefaultProducts = () => {
-    setProducts(PRODUCTS);
-    try {
-      localStorage.setItem("dinhbao_products", JSON.stringify(PRODUCTS));
-    } catch (e) {
-      console.error(e);
-    }
-    showToast("Đã khôi phục danh sách sản phẩm mẫu ban đầu!");
+    api.getProducts().then((res) => {
+      if (res && res.data) setProducts(res.data);
+    });
+    showToast("Đã đồng bộ lại danh sách sản phẩm từ SQL Server!");
   };
 
   const handleUpdateOrderStatus = (
@@ -681,11 +646,6 @@ export default function App() {
       ord.id === orderId ? { ...ord, status: newStatus } : ord
     );
     setOrders(updated);
-    try {
-      localStorage.setItem("dinhbao_orders", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
     showToast(`Đã đổi trạng thái đơn #${orderId} thành "${newStatus}"!`);
   };
 
@@ -693,11 +653,6 @@ export default function App() {
     api.deleteOrder(orderId).catch(console.error);
     const updated = orders.filter((ord) => ord.id !== orderId);
     setOrders(updated);
-    try {
-      localStorage.setItem("dinhbao_orders", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
     showToast(`Đã xóa đơn hàng #${orderId}!`);
   };
 
@@ -718,11 +673,6 @@ export default function App() {
       const created = res && res.user ? { ...newUser, ...res.user } : newUser;
       const updated = [created, ...users];
       setUsers(updated);
-      try {
-        localStorage.setItem("dinhbao_users", JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
       showToast(`Đã tạo tài khoản "${created.name}" thành công!`);
     } catch (err: any) {
       alert("Lỗi khi tạo tài khoản: " + (err.message || "Không thể kết nối máy chủ"));
@@ -733,11 +683,6 @@ export default function App() {
     api.updateUser(updatedUser.id, updatedUser).catch(console.error);
     const updated = users.map((u) => (u.id === updatedUser.id ? updatedUser : u));
     setUsers(updated);
-    try {
-      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
     showToast(`Đã cập nhật tài khoản "${updatedUser.name}"!`);
   };
 
@@ -746,11 +691,6 @@ export default function App() {
     const target = users.find((u) => u.id === userId);
     const updated = users.filter((u) => u.id !== userId);
     setUsers(updated);
-    try {
-      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
     showToast(`Đã xóa tài khoản "${target ? target.name : userId}"!`);
   };
 
@@ -773,21 +713,13 @@ export default function App() {
       return u;
     });
     setUsers(updated);
-    try {
-      localStorage.setItem("dinhbao_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   const handleResetDefaultUsers = () => {
-    setUsers(DEFAULT_USERS);
-    try {
-      localStorage.setItem("dinhbao_users", JSON.stringify(DEFAULT_USERS));
-    } catch (e) {
-      console.error(e);
-    }
-    showToast("Đã khôi phục danh sách người dùng mặc định!");
+    api.getUsers().then((userList) => {
+      if (userList) setUsers(userList);
+    });
+    showToast("Đã đồng bộ lại danh sách người dùng từ SQL Server!");
   };
 
   // Admin Login Handlers
@@ -844,7 +776,16 @@ export default function App() {
       (u === "admin" || u === "bao@gmail.com" || u === "admin@dinhbao.vn") &&
       (p === "admin123" || p === "admin")
     ) {
-      const adminAcc = users.find((acc) => acc.role === "admin") || DEFAULT_USERS[0];
+      const adminAcc = users.find((acc) => acc.role === "admin") || {
+        id: "usr-admin-1",
+        name: "Quản Trị Viên (Đình Bảo)",
+        email: "admin@dinhbao.vn",
+        phone: "0905 888 999",
+        role: "admin" as const,
+        status: "active" as const,
+        avatarUrl: "/default-avatar.png",
+        createdAt: "01/01/2024"
+      };
       const loggedUser: UserProfile = {
         id: adminAcc.id,
         name: adminAcc.name,

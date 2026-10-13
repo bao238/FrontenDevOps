@@ -1,21 +1,34 @@
 const sql = require('mssql');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 require('dotenv').config();
 
 let pool = null;
 let isConnected = false;
 
+let serverHost = process.env.DB_SERVER || 'localhost';
+let instanceName = process.env.DB_INSTANCE;
+if (serverHost.includes('\\')) {
+  const parts = serverHost.split('\\');
+  serverHost = parts[0];
+  instanceName = parts[1];
+} else if (!instanceName && (serverHost.toLowerCase() === 'localhost' || serverHost === '127.0.0.1')) {
+  instanceName = 'SQLEXPRESS';
+}
+
 const config = {
-  user: process.env.DB_USER || 'techstore_admin',
-  password: process.env.DB_PASSWORD || 'your_password',
-  server: process.env.DB_SERVER || 'den1.mssql8.gear.host',
-  database: process.env.DB_DATABASE || 'techstore_devops',
+  user: process.env.DB_USER || 'devops1',
+  password: process.env.DB_PASSWORD || 'Mz9bX818-~qM',
+  server: serverHost,
+  database: process.env.DB_DATABASE || 'devops1',
   port: parseInt(process.env.DB_PORT || '1433', 10),
   options: {
+    ...(instanceName ? { instanceName } : {}),
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE !== 'false',
     enableArithAbort: true,
-    connectTimeout: 7000,
-    requestTimeout: 10000
+    connectTimeout: 10000,
+    requestTimeout: 15000
   },
   pool: {
     max: 10,
@@ -25,23 +38,17 @@ const config = {
 };
 
 async function connectDB() {
-  if (process.env.DB_PASSWORD === 'your_password_here' || !process.env.DB_PASSWORD) {
-    console.log('⚠️ [Database] Chưa cấu hình DB_PASSWORD thực tế từ GearHost trong backend/.env');
-    console.log('💡 [Database] Backend sẽ tự động dùng Dữ liệu Dự phòng (Mock Memory) để bạn test web trước!');
-    return null;
-  }
-
   try {
-    console.log(`🔌 [Database] Đang kết nối tới MS SQL Server: ${config.server}/${config.database}...`);
+    const target = instanceName ? `${serverHost}\\${instanceName}` : serverHost;
+    console.log(`🔌 [Database] Đang kết nối tới MS SQL Server: ${target}/${config.database}...`);
     pool = await new sql.ConnectionPool(config).connect();
     isConnected = true;
-    console.log('✅ [Database] Kết nối thành công tới Microsoft SQL Server (GearHost)!');
+    console.log(`✅ [Database] Kết nối thành công 100% tới MS SQL Server (${config.database})!`);
     await initTables(pool);
     return pool;
   } catch (err) {
     isConnected = false;
-    console.warn(`⚠️ [Database] Không thể kết nối tới GearHost (${err.message}).`);
-    console.log('💡 [Database] Tự động chuyển sang chế độ Dữ liệu Dự phòng (Mock Memory) để server hoạt động bình thường.');
+    console.error(`❌ [Database] Lỗi kết nối MS SQL Server: ${err.message}`);
     return null;
   }
 }
@@ -103,9 +110,9 @@ async function initTables(p) {
         quantity INT NOT NULL DEFAULT 1
       );
     `);
-    console.log('📦 [Database] Tự động khởi tạo/kiểm tra bảng Users, Products, Orders thành công!');
+    console.log('📦 [Database] Kiểm tra bảng Users, Products, Orders, OrderItems thành công!');
   } catch (initErr) {
-    console.warn('⚠️ [Database] Lỗi khi tạo bảng tự động:', initErr.message);
+    console.warn('⚠️ [Database] Lỗi khi kiểm tra bảng:', initErr.message);
   }
 }
 

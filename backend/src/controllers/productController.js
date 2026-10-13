@@ -1,7 +1,4 @@
 const { getPool, isDbConnected, sql } = require('../config/db');
-const { initialProducts } = require('../data/initialData');
-
-let productsMemory = [...initialProducts];
 
 function mapDbProduct(row) {
   let specsObj = {};
@@ -35,47 +32,50 @@ function mapDbProduct(row) {
 // GET /api/products
 exports.getProducts = async (req, res) => {
   const pool = getPool();
-  if (isDbConnected() && pool) {
-    try {
-      const result = await pool.request().query('SELECT * FROM dbo.Products ORDER BY created_at DESC');
-      const products = result.recordset.map(mapDbProduct);
-      return res.json({ source: 'mssql-gearhost', count: products.length, data: products });
-    } catch (err) {
-      console.error('[ProductController] Lỗi truy vấn MSSQL:', err.message);
-    }
+  if (!isDbConnected() || !pool) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
   }
 
-  // Fallback memory
-  return res.json({ source: 'memory-fallback', count: productsMemory.length, data: productsMemory });
+  try {
+    const result = await pool.request().query('SELECT * FROM dbo.Products ORDER BY created_at DESC');
+    const products = result.recordset.map(mapDbProduct);
+    return res.json({ source: 'mssql', count: products.length, data: products });
+  } catch (err) {
+    console.error('[ProductController] Lỗi truy vấn MSSQL:', err.message);
+    return res.status(500).json({ error: 'Lỗi truy vấn SQL Server', message: err.message });
+  }
 };
 
 // GET /api/products/:id
 exports.getProductById = async (req, res) => {
   const { id } = req.params;
   const pool = getPool();
-
-  if (isDbConnected() && pool) {
-    try {
-      const result = await pool.request()
-        .input('id', sql.NVarChar(50), id)
-        .query('SELECT * FROM dbo.Products WHERE id = @id');
-
-      if (result.recordset.length > 0) {
-        return res.json({ source: 'mssql-gearhost', data: mapDbProduct(result.recordset[0]) });
-      }
-      return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-    } catch (err) {
-      console.error('[ProductController] Lỗi truy vấn:', err.message);
-    }
+  if (!isDbConnected() || !pool) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
   }
 
-  const p = productsMemory.find(item => item.id === id);
-  if (!p) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-  return res.json({ source: 'memory-fallback', data: p });
+  try {
+    const result = await pool.request()
+      .input('id', sql.NVarChar(50), id)
+      .query('SELECT * FROM dbo.Products WHERE id = @id');
+
+    if (result.recordset.length > 0) {
+      return res.json({ source: 'mssql', data: mapDbProduct(result.recordset[0]) });
+    }
+    return res.status(404).json({ message: 'Không tìm thấy sản phẩm trong cơ sở dữ liệu' });
+  } catch (err) {
+    console.error('[ProductController] Lỗi truy vấn MSSQL:', err.message);
+    return res.status(500).json({ error: 'Lỗi truy vấn SQL Server', message: err.message });
+  }
 };
 
 // POST /api/products
 exports.createProduct = async (req, res) => {
+  const pool = getPool();
+  if (!isDbConnected() || !pool) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
+  }
+
   const newProduct = {
     id: req.body.id || `prod-${Date.now()}`,
     name: req.body.name,
@@ -92,90 +92,87 @@ exports.createProduct = async (req, res) => {
     featured: Boolean(req.body.featured)
   };
 
-  const pool = getPool();
-  if (isDbConnected() && pool) {
-    try {
-      await pool.request()
-        .input('id', sql.NVarChar(50), newProduct.id)
-        .input('name', sql.NVarChar(255), newProduct.name)
-        .input('category', sql.NVarChar(100), newProduct.category)
-        .input('price', sql.Decimal(18, 0), newProduct.price)
-        .input('original_price', sql.Decimal(18, 0), newProduct.originalPrice)
-        .input('discount_percent', sql.Int, newProduct.discountPercent)
-        .input('rating', sql.Decimal(3, 1), newProduct.rating)
-        .input('reviews_count', sql.Int, newProduct.reviewsCount)
-        .input('image_url', sql.NVarChar(500), newProduct.imageUrl)
-        .input('description', sql.NVarChar(sql.MAX), newProduct.description)
-        .input('specs', sql.NVarChar(sql.MAX), JSON.stringify(newProduct.specs))
-        .input('in_stock', sql.Bit, newProduct.inStock ? 1 : 0)
-        .input('featured', sql.Bit, newProduct.featured ? 1 : 0)
-        .query(`
-          INSERT INTO dbo.Products (id, name, category, price, original_price, discount_percent, rating, reviews_count, image_url, description, specs, in_stock, featured)
-          VALUES (@id, @name, @category, @price, @original_price, @discount_percent, @rating, @reviews_count, @image_url, @description, @specs, @in_stock, @featured)
-        `);
+  try {
+    await pool.request()
+      .input('id', sql.NVarChar(50), newProduct.id)
+      .input('name', sql.NVarChar(255), newProduct.name)
+      .input('category', sql.NVarChar(100), newProduct.category)
+      .input('price', sql.Decimal(18, 0), newProduct.price)
+      .input('original_price', sql.Decimal(18, 0), newProduct.originalPrice)
+      .input('discount_percent', sql.Int, newProduct.discountPercent)
+      .input('rating', sql.Decimal(3, 1), newProduct.rating)
+      .input('reviews_count', sql.Int, newProduct.reviewsCount)
+      .input('image_url', sql.NVarChar(500), newProduct.imageUrl)
+      .input('description', sql.NVarChar(sql.MAX), newProduct.description)
+      .input('specs', sql.NVarChar(sql.MAX), JSON.stringify(newProduct.specs))
+      .input('in_stock', sql.Bit, newProduct.inStock ? 1 : 0)
+      .input('featured', sql.Bit, newProduct.featured ? 1 : 0)
+      .query(`
+        INSERT INTO dbo.Products (id, name, category, price, original_price, discount_percent, rating, reviews_count, image_url, description, specs, in_stock, featured)
+        VALUES (@id, @name, @category, @price, @original_price, @discount_percent, @rating, @reviews_count, @image_url, @description, @specs, @in_stock, @featured)
+      `);
 
-      return res.status(201).json({ message: 'Tạo sản phẩm thành công trên GearHost', data: newProduct });
-    } catch (err) {
-      console.error('[ProductController] Lỗi INSERT MSSQL:', err.message);
-    }
+    return res.status(201).json({ message: 'Tạo sản phẩm thành công trên SQL Server', data: newProduct });
+  } catch (err) {
+    console.error('[ProductController] Lỗi INSERT MSSQL:', err.message);
+    return res.status(500).json({ error: 'Lỗi thêm sản phẩm vào SQL Server', message: err.message });
   }
-
-  productsMemory.unshift(newProduct);
-  return res.status(201).json({ message: 'Tạo sản phẩm thành công (bộ nhớ tạm)', data: newProduct });
 };
 
 // PUT /api/products/:id
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
-
   const pool = getPool();
-  if (isDbConnected() && pool) {
-    try {
-      await pool.request()
-        .input('id', sql.NVarChar(50), id)
-        .input('name', sql.NVarChar(255), updateData.name)
-        .input('category', sql.NVarChar(100), updateData.category)
-        .input('price', sql.Decimal(18, 0), updateData.price)
-        .input('in_stock', sql.Bit, updateData.inStock ? 1 : 0)
-        .query(`
-          UPDATE dbo.Products
-          SET name = COALESCE(@name, name),
-              category = COALESCE(@category, category),
-              price = COALESCE(@price, price),
-              in_stock = COALESCE(@in_stock, in_stock)
-          WHERE id = @id
-        `);
-      return res.json({ message: 'Cập nhật sản phẩm thành công trên GearHost' });
-    } catch (err) {
-      console.error('[ProductController] Lỗi UPDATE MSSQL:', err.message);
-    }
+  if (!isDbConnected() || !pool) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
   }
 
-  const idx = productsMemory.findIndex(p => p.id === id);
-  if (idx !== -1) {
-    productsMemory[idx] = { ...productsMemory[idx], ...updateData };
-    return res.json({ message: 'Cập nhật sản phẩm thành công', data: productsMemory[idx] });
+  try {
+    const result = await pool.request()
+      .input('id', sql.NVarChar(50), id)
+      .input('name', sql.NVarChar(255), updateData.name)
+      .input('category', sql.NVarChar(100), updateData.category)
+      .input('price', sql.Decimal(18, 0), updateData.price)
+      .input('in_stock', sql.Bit, updateData.inStock !== undefined ? (updateData.inStock ? 1 : 0) : null)
+      .query(`
+        UPDATE dbo.Products
+        SET name = COALESCE(@name, name),
+            category = COALESCE(@category, category),
+            price = COALESCE(@price, price),
+            in_stock = COALESCE(@in_stock, in_stock)
+        WHERE id = @id
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy sản phẩm trong cơ sở dữ liệu' });
+    }
+    return res.json({ message: 'Cập nhật sản phẩm thành công trên SQL Server' });
+  } catch (err) {
+    console.error('[ProductController] Lỗi UPDATE MSSQL:', err.message);
+    return res.status(500).json({ error: 'Lỗi cập nhật sản phẩm', message: err.message });
   }
-  return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
 };
 
 // DELETE /api/products/:id
 exports.deleteProduct = async (req, res) => {
   const { id } = req.params;
   const pool = getPool();
-
-  if (isDbConnected() && pool) {
-    try {
-      await pool.request()
-        .input('id', sql.NVarChar(50), id)
-        .query('DELETE FROM dbo.Products WHERE id = @id');
-      return res.json({ message: 'Xóa sản phẩm thành công trên GearHost' });
-    } catch (err) {
-      console.error('[ProductController] Lỗi DELETE MSSQL:', err.message);
-    }
+  if (!isDbConnected() || !pool) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
   }
 
-  productsMemory = productsMemory.filter(p => p.id !== id);
-  return res.json({ message: 'Xóa sản phẩm thành công' });
+  try {
+    const result = await pool.request()
+      .input('id', sql.NVarChar(50), id)
+      .query('DELETE FROM dbo.Products WHERE id = @id');
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy sản phẩm cần xóa' });
+    }
+    return res.json({ message: 'Xóa sản phẩm thành công trên SQL Server' });
+  } catch (err) {
+    console.error('[ProductController] Lỗi DELETE MSSQL:', err.message);
+    return res.status(500).json({ error: 'Lỗi xóa sản phẩm', message: err.message });
+  }
 };

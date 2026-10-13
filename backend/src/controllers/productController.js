@@ -218,4 +218,44 @@ exports.deleteReview = async (req, res) => {
   }
 };
 
+// PUT /api/reviews/:id (Admin chỉnh sửa đánh giá)
+exports.updateReview = async (req, res) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+  }
+
+  try {
+    const { author, rating, content } = req.body;
+    const review = await Review.findOne({ id: req.params.id });
+    if (!review) {
+      return res.status(404).json({ message: 'Không tìm thấy đánh giá trong MongoDB' });
+    }
+
+    if (author) review.author = String(author).trim();
+    if (rating !== undefined) review.rating = Math.min(5, Math.max(1, Number(rating)));
+    if (content) review.content = String(content).trim();
+    await review.save();
+
+    // Cập nhật lại rating và reviewsCount cho sản phẩm liên quan
+    const allReviews = await Review.find({ productId: review.productId }).lean();
+    const product = await Product.findOne({ id: review.productId });
+    if (product) {
+      product.reviewsCount = allReviews.length;
+      if (allReviews.length > 0) {
+        const totalRating = allReviews.reduce((sum, r) => sum + (r.rating || 5), 0);
+        product.rating = Number((totalRating / allReviews.length).toFixed(1));
+      } else {
+        product.rating = 5.0;
+      }
+      await product.save();
+    }
+
+    return res.json({ message: 'Cập nhật đánh giá thành công trên MongoDB', data: review });
+  } catch (err) {
+    console.error('[ProductController] Lỗi cập nhật đánh giá:', err.message);
+    return res.status(500).json({ error: 'Lỗi cập nhật đánh giá', message: err.message });
+  }
+};
+
+
 

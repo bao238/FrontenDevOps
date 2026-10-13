@@ -118,7 +118,16 @@ export default function AdminPanel({
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | "all">("all");
+  const [selectedProductReviewFilter, setSelectedProductReviewFilter] = useState<string>("all");
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+
+  // Edit Review Modal State
+  const [isEditReviewModalOpen, setIsEditReviewModalOpen] = useState(false);
+  const [editingReview, setEditingReview] = useState<ReviewItem | null>(null);
+  const [editReviewAuthor, setEditReviewAuthor] = useState("");
+  const [editReviewRating, setEditReviewRating] = useState(5);
+  const [editReviewContent, setEditReviewContent] = useState("");
+  const [isSavingReview, setIsSavingReview] = useState(false);
 
   // Tải danh sách đánh giá từ MongoDB
   const fetchReviews = async () => {
@@ -137,6 +146,50 @@ export default function AdminPanel({
     fetchReviews();
   }, []);
 
+  // Mở modal chỉnh sửa đánh giá
+  const handleOpenEditReview = (rev: ReviewItem) => {
+    setEditingReview(rev);
+    setEditReviewAuthor(rev.author);
+    setEditReviewRating(rev.rating);
+    setEditReviewContent(rev.content);
+    setIsEditReviewModalOpen(true);
+  };
+
+  // Lưu chỉnh sửa đánh giá lên MongoDB
+  const handleSaveEditReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReview || !editReviewAuthor.trim() || !editReviewContent.trim() || isSavingReview) return;
+
+    setIsSavingReview(true);
+    try {
+      const res = await api.updateReview(editingReview.id, {
+        author: editReviewAuthor.trim(),
+        rating: editReviewRating,
+        content: editReviewContent.trim()
+      });
+
+      if (res && res.data) {
+        setReviewsList((prev) =>
+          prev.map((r) => (r.id === editingReview.id ? res.data : r))
+        );
+      } else {
+        setReviewsList((prev) =>
+          prev.map((r) =>
+            r.id === editingReview.id
+              ? { ...r, author: editReviewAuthor.trim(), rating: editReviewRating, content: editReviewContent.trim() }
+              : r
+          )
+        );
+      }
+      setIsEditReviewModalOpen(false);
+      setEditingReview(null);
+    } catch (err) {
+      console.error("Lỗi khi lưu chỉnh sửa đánh giá:", err);
+    } finally {
+      setIsSavingReview(false);
+    }
+  };
+
   // Xóa đánh giá trên MongoDB
   const handleDeleteReview = async (reviewId: string) => {
     try {
@@ -148,7 +201,7 @@ export default function AdminPanel({
     }
   };
 
-  // Lọc đánh giá
+  // Lọc đánh giá theo tìm kiếm, số sao và từng sản phẩm
   const filteredReviews = useMemo(() => {
     return reviewsList.filter((rev) => {
       const q = reviewSearchQuery.toLowerCase();
@@ -157,20 +210,26 @@ export default function AdminPanel({
         rev.content.toLowerCase().includes(q) ||
         (rev.productId && rev.productId.toLowerCase().includes(q));
       const matchRating = reviewRatingFilter === "all" || rev.rating === reviewRatingFilter;
-      return matchSearch && matchRating;
+      const matchProduct =
+        selectedProductReviewFilter === "all" || rev.productId === selectedProductReviewFilter;
+      return matchSearch && matchRating && matchProduct;
     });
-  }, [reviewsList, reviewSearchQuery, reviewRatingFilter]);
+  }, [reviewsList, reviewSearchQuery, reviewRatingFilter, selectedProductReviewFilter]);
 
   // Thống kê đánh giá
   const reviewStats = useMemo(() => {
-    const total = reviewsList.length;
-    const fiveStar = reviewsList.filter((r) => r.rating === 5).length;
+    const list =
+      selectedProductReviewFilter === "all"
+        ? reviewsList
+        : reviewsList.filter((r) => r.productId === selectedProductReviewFilter);
+    const total = list.length;
+    const fiveStar = list.filter((r) => r.rating === 5).length;
     const avg =
       total > 0
-        ? (reviewsList.reduce((acc, cur) => acc + (cur.rating || 5), 0) / total).toFixed(1)
+        ? (list.reduce((acc, cur) => acc + (cur.rating || 5), 0) / total).toFixed(1)
         : "5.0";
     return { total, fiveStar, avg };
-  }, [reviewsList]);
+  }, [reviewsList, selectedProductReviewFilter]);
 
   // User Management State
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -786,6 +845,18 @@ export default function AdminPanel({
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end space-x-2">
                           <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedProductReviewFilter(p.id);
+                              setAdminTab("reviews");
+                            }}
+                            className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                            title={`Xem đánh giá của ${p.name}`}
+                          >
+                            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleOpenEdit(p)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Chỉnh sửa sản phẩm"
@@ -793,6 +864,7 @@ export default function AdminPanel({
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
+                            type="button"
                             onClick={() => setDeletingProductId(p.id)}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Xóa sản phẩm"
@@ -1267,7 +1339,21 @@ export default function AdminPanel({
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Lọc theo từng sản phẩm */}
+                <select
+                  value={selectedProductReviewFilter}
+                  onChange={(e) => setSelectedProductReviewFilter(e.target.value)}
+                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 max-w-[200px] truncate font-medium"
+                >
+                  <option value="all">📦 Tất cả sản phẩm ({products.length})</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+
                 <select
                   value={reviewRatingFilter}
                   onChange={(e) =>
@@ -1295,6 +1381,49 @@ export default function AdminPanel({
                 </button>
               </div>
             </div>
+
+            {/* Banner hiển thị khi đang lọc theo 1 sản phẩm cụ thể */}
+            {selectedProductReviewFilter !== "all" && (() => {
+              const currentProd = products.find((p) => p.id === selectedProductReviewFilter);
+              if (!currentProd) return null;
+              return (
+                <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+                  <div className="flex items-center space-x-3.5">
+                    <img
+                      src={currentProd.imageUrl}
+                      alt={currentProd.name}
+                      className="w-12 h-12 object-cover rounded-xl border border-slate-200 bg-white shadow-sm"
+                    />
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
+                          {currentProd.id}
+                        </span>
+                        <span className="text-xs text-slate-500">{currentProd.category}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-sm mt-0.5">{currentProd.name}</h4>
+                      <p className="text-xs text-blue-700 font-bold">{formatVND(currentProd.price)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-right">
+                      <div className="text-[11px] text-slate-500 font-medium">Đánh giá sản phẩm này:</div>
+                      <div className="font-black text-amber-500 text-sm flex items-center justify-end space-x-1">
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        <span>{currentProd.rating} / 5 ({filteredReviews.length} nhận xét)</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProductReviewFilter("all")}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+                    >
+                      Xem tất cả
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Reviews List */}
             {isLoadingReviews ? (
@@ -1375,14 +1504,24 @@ export default function AdminPanel({
                           </td>
 
                           <td className="py-3.5 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setDeletingReviewId(rev.id)}
-                              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-                              title="Xóa đánh giá khỏi MongoDB"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center justify-end space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditReview(rev)}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                title="Chỉnh sửa đánh giá này"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingReviewId(rev.id)}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Xóa đánh giá khỏi MongoDB"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1424,6 +1563,116 @@ export default function AdminPanel({
                 Xóa ngay
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT REVIEW MODAL */}
+      {isEditReviewModalOpen && editingReview && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-base">Chỉnh Sửa Đánh Giá</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditReviewModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditReview} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Mã Đánh Giá &amp; Mã Sản Phẩm (Chỉ đọc)
+                </label>
+                <div className="flex items-center space-x-2">
+                  <span className="font-mono text-xs px-2.5 py-1.5 bg-slate-100 text-slate-700 rounded-xl font-bold">
+                    {editingReview.id}
+                  </span>
+                  <span className="font-mono text-xs px-2.5 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-bold">
+                    FK: {editingReview.productId || "None"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Người Đánh Giá *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editReviewAuthor}
+                  onChange={(e) => setEditReviewAuthor(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Số Sao Đánh Giá ({editReviewRating} / 5)
+                </label>
+                <div className="flex items-center space-x-2 py-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setEditReviewRating(star)}
+                      className="p-1 hover:scale-110 transition-transform"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= editReviewRating
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-slate-200"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="text-xs font-bold text-slate-600 ml-2">
+                    {editReviewRating} sao
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Nội Dung Nhận Xét *
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={editReviewContent}
+                  onChange={(e) => setEditReviewContent(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditReviewModalOpen(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingReview}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSavingReview ? "Đang lưu lên MongoDB..." : "Lưu Thay Đổi"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

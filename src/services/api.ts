@@ -220,5 +220,15 @@ export const api = {
   async deleteReview(id: string) {
     const res = await fetch(`${API_BASE}/reviews/${id}`, { method: "DELETE" });
     return await res.json();
+  },
+
+  // 20. Chỉnh sửa đánh giá (Admin)
+  async updateReview(id: string, review: { author?: string; rating?: number; content?: string }) {
+    const res = await fetch(`${API_BASE}/reviews/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(review)
+    });
+    return await res.json();
   }
 };

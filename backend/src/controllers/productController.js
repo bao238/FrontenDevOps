@@ -185,3 +185,37 @@ exports.addProductReview = async (req, res) => {
   }
 };
 
+// DELETE /api/reviews/:id (Admin xóa đánh giá)
+exports.deleteReview = async (req, res) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+  }
+
+  try {
+    const deleted = await Review.findOneAndDelete({ id: req.params.id });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Không tìm thấy đánh giá cần xóa' });
+    }
+
+    // Cập nhật lại rating và reviewsCount cho sản phẩm tương ứng
+    const remainingReviews = await Review.find({ productId: deleted.productId }).lean();
+    const product = await Product.findOne({ id: deleted.productId });
+    if (product) {
+      product.reviewsCount = remainingReviews.length;
+      if (remainingReviews.length > 0) {
+        const totalRating = remainingReviews.reduce((sum, r) => sum + (r.rating || 5), 0);
+        product.rating = Number((totalRating / remainingReviews.length).toFixed(1));
+      } else {
+        product.rating = 5.0;
+      }
+      await product.save();
+    }
+
+    return res.json({ message: 'Xóa đánh giá thành công trên MongoDB', data: deleted });
+  } catch (err) {
+    console.error('[ProductController] Lỗi xóa đánh giá:', err.message);
+    return res.status(500).json({ error: 'Lỗi xóa đánh giá', message: err.message });
+  }
+};
+
+

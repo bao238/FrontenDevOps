@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from "react";
-import { Product, CATEGORIES } from "../data/products";
+import React, { useState, useMemo, useEffect } from "react";
+import { Product, CATEGORIES, ReviewItem } from "../data/products";
 import { UserAccount } from "../data/users";
+import { api } from "../services/api";
 import {
   Package,
   Plus,
@@ -37,7 +38,10 @@ import {
   UserPlus,
   Mail,
   ShieldAlert,
-  User
+  User,
+  Star,
+  MessageSquare,
+  ThumbsUp
 } from "lucide-react";
 
 interface CartItem {
@@ -105,9 +109,68 @@ export default function AdminPanel({
   onToggleLockUser,
   onResetDefaultUsers,
 }: AdminPanelProps) {
-  const [adminTab, setAdminTab] = useState<"products" | "orders" | "users">("products");
+  const [adminTab, setAdminTab] = useState<"products" | "orders" | "users" | "reviews">("products");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
+
+  // Reviews Management State (MongoDB)
+  const [reviewsList, setReviewsList] = useState<ReviewItem[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [reviewSearchQuery, setReviewSearchQuery] = useState("");
+  const [reviewRatingFilter, setReviewRatingFilter] = useState<number | "all">("all");
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+
+  // Tải danh sách đánh giá từ MongoDB
+  const fetchReviews = async () => {
+    setIsLoadingReviews(true);
+    try {
+      const data = await api.getAllReviews();
+      setReviewsList(data);
+    } catch (err) {
+      console.error("Lỗi khi tải đánh giá từ MongoDB:", err);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReviews();
+  }, []);
+
+  // Xóa đánh giá trên MongoDB
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      await api.deleteReview(reviewId);
+      setReviewsList((prev) => prev.filter((r) => r.id !== reviewId));
+      setDeletingReviewId(null);
+    } catch (err) {
+      console.error("Lỗi khi xóa đánh giá:", err);
+    }
+  };
+
+  // Lọc đánh giá
+  const filteredReviews = useMemo(() => {
+    return reviewsList.filter((rev) => {
+      const q = reviewSearchQuery.toLowerCase();
+      const matchSearch =
+        rev.author.toLowerCase().includes(q) ||
+        rev.content.toLowerCase().includes(q) ||
+        (rev.productId && rev.productId.toLowerCase().includes(q));
+      const matchRating = reviewRatingFilter === "all" || rev.rating === reviewRatingFilter;
+      return matchSearch && matchRating;
+    });
+  }, [reviewsList, reviewSearchQuery, reviewRatingFilter]);
+
+  // Thống kê đánh giá
+  const reviewStats = useMemo(() => {
+    const total = reviewsList.length;
+    const fiveStar = reviewsList.filter((r) => r.rating === 5).length;
+    const avg =
+      total > 0
+        ? (reviewsList.reduce((acc, cur) => acc + (cur.rating || 5), 0) / total).toFixed(1)
+        : "5.0";
+    return { total, fiveStar, avg };
+  }, [reviewsList]);
 
   // User Management State
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -552,6 +615,17 @@ export default function AdminPanel({
           >
             <Users className="w-4 h-4" />
             <span>Quản Lý Người Dùng ({users.length})</span>
+          </button>
+          <button
+            onClick={() => setAdminTab("reviews")}
+            className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-2 ${
+              adminTab === "reviews"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Star className="w-4 h-4" />
+            <span>Quản Lý Đánh Giá ({reviewsList.length})</span>
           </button>
         </div>
 
@@ -1128,6 +1202,228 @@ export default function AdminPanel({
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: REVIEWS MANAGEMENT (QUẢN LÝ ĐÁNH GIÁ SẢN PHẨM MONGODB) */}
+      {adminTab === "reviews" && (
+        <div className="space-y-6">
+          {/* Review Quick Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
+              <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
+                <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 font-medium">Tổng số đánh giá</p>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900">{reviewStats.total}</h3>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <ThumbsUp className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 font-medium">Đánh giá 5 sao</p>
+                <h3 className="text-xl sm:text-2xl font-black text-emerald-600">{reviewStats.fiveStar}</h3>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
+              <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 font-medium">Điểm trung bình</p>
+                <h3 className="text-xl sm:text-2xl font-black text-blue-600">{reviewStats.avg} / 5</h3>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
+              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-500 font-medium">Cơ sở dữ liệu</p>
+                <h3 className="text-base sm:text-lg font-black text-purple-600">MongoDB Reviews</h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Review Table Card */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-4 sm:p-6">
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo người đánh giá, nội dung hoặc mã sản phẩm..."
+                  value={reviewSearchQuery}
+                  onChange={(e) => setReviewSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <select
+                  value={reviewRatingFilter}
+                  onChange={(e) =>
+                    setReviewRatingFilter(e.target.value === "all" ? "all" : Number(e.target.value))
+                  }
+                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                >
+                  <option value="all">Tất cả số sao</option>
+                  <option value="5">⭐⭐⭐⭐⭐ (5 sao)</option>
+                  <option value="4">⭐⭐⭐⭐ (4 sao)</option>
+                  <option value="3">⭐⭐⭐ (3 sao)</option>
+                  <option value="2">⭐⭐ (2 sao)</option>
+                  <option value="1">⭐ (1 sao)</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={fetchReviews}
+                  disabled={isLoadingReviews}
+                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors disabled:opacity-50"
+                  title="Làm mới dữ liệu từ MongoDB"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isLoadingReviews ? "animate-spin" : ""}`} />
+                  <span className="hidden sm:inline">Làm mới</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Reviews List */}
+            {isLoadingReviews ? (
+              <div className="text-center py-12 text-slate-400 text-sm">
+                Đang tải đánh giá từ MongoDB...
+              </div>
+            ) : filteredReviews.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 space-y-2">
+                <MessageSquare className="w-12 h-12 stroke-1 mx-auto text-slate-300" />
+                <p className="font-semibold text-slate-600 text-sm">Không có đánh giá nào phù hợp</p>
+                <p className="text-xs text-slate-400">
+                  Các đánh giá của khách hàng trên trang chi tiết sản phẩm sẽ xuất hiện ở đây.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Mã &amp; Ngày</th>
+                      <th className="py-3 px-4">Sản Phẩm (Mã FK)</th>
+                      <th className="py-3 px-4">Người Đánh Giá</th>
+                      <th className="py-3 px-4">Số Sao</th>
+                      <th className="py-3 px-4">Nội Dung Nhận Xét</th>
+                      <th className="py-3 px-4 text-right">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {filteredReviews.map((rev) => {
+                      const relatedProduct = products.find((p) => p.id === rev.productId);
+                      return (
+                        <tr key={rev.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3.5 px-4 font-mono text-xs">
+                            <span className="font-bold text-slate-900">{rev.id}</span>
+                            <div className="text-[11px] text-slate-400">{rev.date}</div>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-900 line-clamp-1">
+                              {relatedProduct ? relatedProduct.name : rev.productId || "Chưa gắn mã"}
+                            </div>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              FK: {rev.productId || "None"}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-800">{rev.author}</div>
+                            {rev.userId && (
+                              <div className="text-[10px] font-mono text-slate-400">
+                                FK: {rev.userId}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center space-x-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-3.5 h-3.5 ${
+                                    star <= rev.rating
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-slate-200"
+                                  }`}
+                                />
+                              ))}
+                              <span className="font-bold text-xs ml-1 text-slate-700">
+                                {rev.rating}/5
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4 max-w-xs sm:max-w-md">
+                            <p className="text-xs text-slate-600 leading-relaxed italic">
+                              "{rev.content}"
+                            </p>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setDeletingReviewId(rev.id)}
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Xóa đánh giá khỏi MongoDB"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DELETE REVIEW MODAL */}
+      {deletingReviewId && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">Xóa Đánh Giá Này?</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Hành động này sẽ xóa vĩnh viễn đánh giá khỏi collection <strong>reviews</strong> trên MongoDB và tự động tính lại điểm số trung bình của sản phẩm.
+              </p>
+            </div>
+            <div className="flex space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingReviewId(null)}
+                className="flex-1 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteReview(deletingReviewId)}
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-md shadow-red-500/20"
+              >
+                Xóa ngay
+              </button>
+            </div>
           </div>
         </div>
       )}

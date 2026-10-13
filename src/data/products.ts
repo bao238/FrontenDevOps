@@ -1,5 +1,7 @@
 export interface ReviewItem {
   id: string;
+  productId?: string;
+  userId?: string;
   author: string;
   rating: number;
   date: string;

@@ -200,5 +200,25 @@ export const api = {
       body: JSON.stringify(review)
     });
     return await res.json();
+  },
+
+  // 18. Lấy toàn bộ đánh giá trong hệ thống (Admin)
+  async getAllReviews(): Promise<ReviewItem[]> {
+    try {
+      const res = await fetch(`${API_BASE}/reviews`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || [];
+      }
+    } catch (err) {
+      console.error("❌ [API] Lỗi lấy tất cả đánh giá:", err);
+    }
+    return [];
+  },
+
+  // 19. Xóa đánh giá (Admin)
+  async deleteReview(id: string) {
+    const res = await fetch(`${API_BASE}/reviews/${id}`, { method: "DELETE" });
+    return await res.json();
   }
 };

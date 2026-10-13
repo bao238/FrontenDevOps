@@ -32,6 +32,7 @@ app.get('/api/products/:id', productController.getProductById);
 app.get('/api/products/:id/reviews', productController.getProductReviews);
 app.post('/api/products/:id/reviews', productController.addProductReview);
 app.get('/api/reviews', productController.getAllReviews);
+app.delete('/api/reviews/:id', productController.deleteReview);
 app.post('/api/products', productController.createProduct);
 app.put('/api/products/:id', productController.updateProduct);
 app.delete('/api/products/:id', productController.deleteProduct);

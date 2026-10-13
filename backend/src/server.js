@@ -16,7 +16,7 @@ app.use(express.json());
 
 // 1. Healthcheck Endpoint (Cực kỳ quan trọng trong DevOps)
 app.get('/api/health', (req, res) => {
-  const dbStatus = isDbConnected() ? 'connected (MS SQL Server - devops1)' : 'disconnected';
+  const dbStatus = isDbConnected() ? 'connected (MongoDB)' : 'disconnected';
   res.json({
     status: 'healthy',
     service: 'techstore-backend',

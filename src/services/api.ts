@@ -30,18 +30,18 @@ export const api = {
     }
   },
 
-  // 2. Lấy danh sách sản phẩm từ SQL Server
+  // 2. Lấy danh sách sản phẩm từ MongoDB
   async getProducts(): Promise<{ source: string; data: Product[] }> {
     try {
       const res = await fetch(`${API_BASE}/products`);
       if (res.ok) {
         const json = await res.json();
-        return { source: json.source || "mssql", data: json.data || [] };
+        return { source: json.source || "mongodb", data: json.data || [] };
       }
     } catch (err) {
-      console.error("❌ [API] Lỗi khi kết nối lấy sản phẩm từ SQL Server:", err);
+      console.error("❌ [API] Lỗi khi kết nối lấy sản phẩm từ MongoDB:", err);
     }
-    return { source: "sql-empty", data: [] };
+    return { source: "mongodb-empty", data: [] };
   },
 
   // 3. Thêm sản phẩm mới (Admin)

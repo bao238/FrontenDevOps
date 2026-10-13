@@ -1,6 +1,17 @@
 version: '3.8'
 
 services:
+  # 1. Cơ sở dữ liệu NoSQL MongoDB
+  techstore-mongodb:
+    image: mongo:6.0
+    container_name: techstore-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: always
+
+  # 2. Backend REST API (Node.js & Express & Mongoose)
   techstore-backend:
     build:
       context: ./backend
@@ -10,15 +21,12 @@ services:
       - "5000:5000"
     environment:
       PORT: 5000
-      DB_SERVER: den1.mssql7.gear.host
-      DB_DATABASE: devops1
-      DB_USER: devops1
-      DB_PASSWORD: "Mz9bX818~-qM"
-      DB_PORT: 1433
-      DB_ENCRYPT: "false"
-      DB_TRUST_SERVER_CERTIFICATE: "true"
+      MONGO_URI: mongodb://techstore-mongodb:27017/techstore
+    depends_on:
+      - techstore-mongodb
     restart: always
 
+  # 3. Frontend Web Client (React 18 & Nginx)
   techstore-frontend:
     build:
       context: .
@@ -29,6 +37,10 @@ services:
     depends_on:
       - techstore-backend
     restart: always
+
+volumes:
+  mongo-data:
+    name: techstore-mongo-data
 
 networks:
   default:

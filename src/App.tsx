@@ -237,7 +237,7 @@ export default function App() {
       // ignore
     }
 
-    // Tự động đồng bộ 100% từ Backend REST API (MS SQL Server)
+    // Tự động đồng bộ 100% từ Backend REST API (MongoDB)
     api.getProducts().then((res) => {
       if (res && res.data) {
         setProducts(res.data);
@@ -634,7 +634,7 @@ export default function App() {
     api.getProducts().then((res) => {
       if (res && res.data) setProducts(res.data);
     });
-    showToast("Đã đồng bộ lại danh sách sản phẩm từ SQL Server!");
+    showToast("Đã đồng bộ lại danh sách sản phẩm từ MongoDB!");
   };
 
   const handleUpdateOrderStatus = (
@@ -719,7 +719,7 @@ export default function App() {
     api.getUsers().then((userList) => {
       if (userList) setUsers(userList);
     });
-    showToast("Đã đồng bộ lại danh sách người dùng từ SQL Server!");
+    showToast("Đã đồng bộ lại danh sách người dùng từ MongoDB!");
   };
 
   // Admin Login Handlers

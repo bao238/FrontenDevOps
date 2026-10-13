@@ -1,22 +1,22 @@
-const { getPool, isDbConnected, sql } = require('../config/db');
+const User = require('../models/User');
+const { isDbConnected } = require('../config/db');
 
 // POST /api/auth/login
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
-  const pool = getPool();
-
-  if (!isDbConnected() || !pool) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
-  try {
-    const result = await pool.request()
-      .input('email', sql.NVarChar(255), (email || '').trim().toLowerCase())
-      .input('password', sql.NVarChar(255), password)
-      .query('SELECT * FROM dbo.Users WHERE LOWER(email) = @email AND password = @password');
+  const { email, password } = req.body;
+  const cleanEmail = (email || '').trim().toLowerCase();
 
-    if (result.recordset.length > 0) {
-      const user = result.recordset[0];
+  try {
+    const user = await User.findOne({
+      $or: [{ email: cleanEmail }, { name: (email || '').trim() }],
+      password: password
+    }).lean();
+
+    if (user) {
       if (user.status === 'locked') {
         return res.status(403).json({ message: 'Tài khoản của bạn đã bị tạm khóa' });
       }
@@ -28,26 +28,25 @@ exports.login = async (req, res) => {
           email: user.email,
           phone: user.phone,
           role: user.role,
-          avatarUrl: user.avatar_url,
-          memberSince: user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '2024'
+          avatarUrl: user.avatarUrl || '/default-avatar.png',
+          memberSince: user.createdAtStr || (user.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '2024')
         }
       });
     }
     return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
   } catch (err) {
-    console.error('[AuthController] Lỗi MSSQL Login:', err.message);
-    return res.status(500).json({ error: 'Lỗi đăng nhập SQL Server', message: err.message });
+    console.error('[AuthController] Lỗi đăng nhập MongoDB:', err.message);
+    return res.status(500).json({ error: 'Lỗi đăng nhập MongoDB', message: err.message });
   }
 };
 
 // POST /api/auth/register hoặc POST /api/users
 exports.register = async (req, res) => {
-  const { name, email, phone, password, role, status, address, avatarUrl } = req.body;
-  const pool = getPool();
-
-  if (!isDbConnected() || !pool) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
+
+  const { name, email, phone, password, role, status, address, avatarUrl } = req.body;
 
   if (!name || !name.trim()) {
     return res.status(400).json({ message: 'Họ và tên người dùng là bắt buộc' });
@@ -65,169 +64,133 @@ exports.register = async (req, res) => {
     return res.status(400).json({ message: 'Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0 (Ví dụ: 0905123456)' });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanName = name.trim();
   const finalAvatar = (avatarUrl && avatarUrl.trim()) ? avatarUrl.trim() : '/default-avatar.png';
 
   try {
     // 2. Kiểm tra trùng Email
-    const checkEmail = await pool.request()
-      .input('email', sql.NVarChar(255), email.trim().toLowerCase())
-      .query('SELECT id FROM dbo.Users WHERE LOWER(email) = @email');
-    if (checkEmail.recordset.length > 0) {
-      return res.status(400).json({ message: `Email "${email.trim()}" đã tồn tại trong hệ thống!` });
+    const existEmail = await User.findOne({ email: cleanEmail });
+    if (existEmail) {
+      return res.status(400).json({ message: `Email "${cleanEmail}" đã tồn tại trong hệ thống!` });
     }
 
     // 3. Kiểm tra trùng Tên người dùng
-    const checkName = await pool.request()
-      .input('name', sql.NVarChar(255), name.trim().toLowerCase())
-      .query('SELECT id FROM dbo.Users WHERE LOWER(name) = @name');
-    if (checkName.recordset.length > 0) {
-      return res.status(400).json({ message: `Tên người dùng "${name.trim()}" đã tồn tại trong hệ thống!` });
+    const existName = await User.findOne({ name: cleanName });
+    if (existName) {
+      return res.status(400).json({ message: `Tên người dùng "${cleanName}" đã tồn tại trong hệ thống!` });
     }
 
     const newUser = {
       id: req.body.id || `usr-cust-${Date.now()}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
+      name: cleanName,
+      email: cleanEmail,
       phone: cleanPhone,
       role: role || 'customer',
       status: status || 'active',
       password: password || '123456',
       avatarUrl: finalAvatar,
       address: (address || '').trim(),
-      createdAt: new Date().toLocaleDateString('vi-VN')
+      createdAtStr: new Date().toLocaleDateString('vi-VN')
     };
 
-    await pool.request()
-      .input('id', sql.NVarChar(50), newUser.id)
-      .input('name', sql.NVarChar(255), newUser.name)
-      .input('email', sql.NVarChar(255), newUser.email)
-      .input('phone', sql.NVarChar(50), newUser.phone)
-      .input('role', sql.NVarChar(50), newUser.role)
-      .input('status', sql.NVarChar(50), newUser.status)
-      .input('password', sql.NVarChar(255), newUser.password)
-      .input('avatar_url', sql.NVarChar(500), newUser.avatarUrl)
-      .input('address', sql.NVarChar(500), newUser.address)
-      .query(`
-        INSERT INTO dbo.Users (id, name, email, phone, role, status, password, avatar_url, address)
-        VALUES (@id, @name, @email, @phone, @role, @status, @password, @avatar_url, @address)
-      `);
-
-    return res.status(201).json({ message: 'Thêm tài khoản thành công', user: newUser });
+    const created = await User.create(newUser);
+    return res.status(201).json({ message: 'Thêm tài khoản thành công trên MongoDB', user: created });
   } catch (err) {
-    console.error('[AuthController] Lỗi MSSQL Register/AddUser:', err.message);
-    if (err.message.includes('UNIQUE KEY') || err.message.includes('PRIMARY KEY')) {
-      return res.status(400).json({ message: 'Email đã tồn tại trong hệ thống' });
+    console.error('[AuthController] Lỗi tạo tài khoản MongoDB:', err.message);
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Email hoặc ID đã tồn tại trong hệ thống' });
     }
-    return res.status(500).json({ error: `Lỗi cơ sở dữ liệu: ${err.message}` });
+    return res.status(500).json({ error: `Lỗi cơ sở dữ liệu MongoDB: ${err.message}` });
   }
 };
 
 // GET /api/users
 exports.getUsers = async (req, res) => {
-  const pool = getPool();
-  if (!isDbConnected() || !pool) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
-    const result = await pool.request().query('SELECT id, name, email, phone, role, status, avatar_url, address, created_at FROM dbo.Users ORDER BY created_at DESC');
-    const users = result.recordset.map(u => ({
+    const users = await User.find().sort({ createdAt: -1 }).lean();
+    const formatted = users.map(u => ({
       id: u.id,
       name: u.name,
       email: u.email,
       phone: u.phone,
       role: u.role,
       status: u.status,
-      avatarUrl: u.avatar_url,
-      address: u.address,
-      createdAt: u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : ''
+      avatarUrl: u.avatarUrl || '/default-avatar.png',
+      address: u.address || '',
+      createdAt: u.createdAtStr || (u.createdAt ? new Date(u.createdAt).toLocaleDateString('vi-VN') : '')
     }));
-    return res.json({ source: 'mssql', count: users.length, data: users });
+    return res.json({ source: 'mongodb', count: formatted.length, data: formatted });
   } catch (err) {
-    console.error('[AuthController] Lỗi MSSQL getUsers:', err.message);
+    console.error('[AuthController] Lỗi lấy danh sách user MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi lấy danh sách người dùng', message: err.message });
   }
 };
 
 // PUT /api/users/:id
 exports.updateUser = async (req, res) => {
-  const { id } = req.params;
-  const { name, phone, role, address } = req.body;
-  const pool = getPool();
-  if (!isDbConnected() || !pool) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
-    const result = await pool.request()
-      .input('id', sql.NVarChar(50), id)
-      .input('name', sql.NVarChar(255), name)
-      .input('phone', sql.NVarChar(50), phone)
-      .input('role', sql.NVarChar(50), role)
-      .input('address', sql.NVarChar(500), address)
-      .query(`
-        UPDATE dbo.Users
-        SET name = COALESCE(@name, name),
-            phone = COALESCE(@phone, phone),
-            role = COALESCE(@role, role),
-            address = COALESCE(@address, address)
-        WHERE id = @id
-      `);
+    const updated = await User.findOneAndUpdate(
+      { id: req.params.id },
+      { $set: req.body },
+      { new: true }
+    );
 
-    if (result.rowsAffected[0] === 0) {
+    if (!updated) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản trong cơ sở dữ liệu' });
     }
-    return res.json({ message: 'Cập nhật tài khoản thành công trên SQL Server' });
+    return res.json({ message: 'Cập nhật tài khoản thành công trên MongoDB', user: updated });
   } catch (err) {
-    console.error('[AuthController] Lỗi MSSQL updateUser:', err.message);
+    console.error('[AuthController] Lỗi cập nhật user MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi cập nhật tài khoản', message: err.message });
   }
 };
 
 // PUT /api/users/:id/status
 exports.toggleUserStatus = async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-  const pool = getPool();
-  if (!isDbConnected() || !pool) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
-    const result = await pool.request()
-      .input('id', sql.NVarChar(50), id)
-      .input('status', sql.NVarChar(50), status)
-      .query('UPDATE dbo.Users SET status = @status WHERE id = @id');
+    const updated = await User.findOneAndUpdate(
+      { id: req.params.id },
+      { $set: { status: req.body.status } },
+      { new: true }
+    );
 
-    if (result.rowsAffected[0] === 0) {
+    if (!updated) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản trong cơ sở dữ liệu' });
     }
-    return res.json({ message: `Đã đổi trạng thái tài khoản thành ${status} trên SQL Server` });
+    return res.json({ message: `Đã đổi trạng thái tài khoản thành ${req.body.status} trên MongoDB` });
   } catch (err) {
-    console.error('[AuthController] Lỗi MSSQL toggleUserStatus:', err.message);
+    console.error('[AuthController] Lỗi toggleUserStatus MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi cập nhật trạng thái tài khoản', message: err.message });
   }
 };
 
 // DELETE /api/users/:id
 exports.deleteUser = async (req, res) => {
-  const { id } = req.params;
-  const pool = getPool();
-  if (!isDbConnected() || !pool) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu SQL Server chưa kết nối' });
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
-    const result = await pool.request()
-      .input('id', sql.NVarChar(50), id)
-      .query('DELETE FROM dbo.Users WHERE id = @id');
-
-    if (result.rowsAffected[0] === 0) {
+    const deleted = await User.findOneAndDelete({ id: req.params.id });
+    if (!deleted) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản cần xóa' });
     }
-    return res.json({ message: 'Xóa tài khoản thành công trên SQL Server' });
+    return res.json({ message: 'Xóa tài khoản thành công trên MongoDB' });
   } catch (err) {
-    console.error('[AuthController] Lỗi MSSQL deleteUser:', err.message);
+    console.error('[AuthController] Lỗi xóa user MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi xóa tài khoản', message: err.message });
   }
 };

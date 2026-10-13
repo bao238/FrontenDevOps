@@ -1,8 +1,12 @@
 const mongoose = require('mongoose');
 
+// Bảng Orders (Đơn hàng)
+// Khóa chính: id
+// Khóa ngoại: userId (tham chiếu Users.id)
 const orderSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true, unique: true, index: true },
+    id: { type: String, required: true, unique: true, index: true }, // Khóa chính (PK)
+    userId: { type: String, ref: 'User', index: true, default: null }, // Khóa ngoại (FK -> User.id)
     date: { type: String, default: () => new Date().toISOString().split('T')[0] },
     customerInfo: {
       fullName: { type: String, required: true },

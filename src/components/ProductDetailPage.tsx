@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Product } from "../data/products";
+import { Product, ReviewItem } from "../data/products";
+import { api } from "../services/api";
 import {
   ArrowLeft,
   Star,
@@ -23,16 +24,6 @@ import {
   ChevronRight
 } from "lucide-react";
 
-interface ReviewItem {
-  id: string;
-  author: string;
-  rating: number;
-  date: string;
-  content: string;
-  verified: boolean;
-  likes: number;
-}
-
 interface ProductDetailPageProps {
   product: Product;
   allProducts: Product[];
@@ -55,46 +46,22 @@ export default function ProductDetailPage({
   const [isLiked, setIsLiked] = useState(false);
   const [copyNotification, setCopyNotification] = useState(false);
 
-  // Reviews state with local storage support
+  // Reviews state lấy từ MongoDB
   const [reviews, setReviews] = useState<ReviewItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(`dinhbao_reviews_${product.id}`);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-
-    // Default sample reviews
-    return [
-      {
-        id: "rev-1",
-        author: "Trần Minh Hoàng",
-        rating: 5,
-        date: "3 ngày trước",
-        content: "Hàng nguyên seal chính hãng, đóng gói 3 lớp chống sốc cực kỳ an tâm. Shop tư vấn nhiệt tình, giao trong ngày ở Đà Nẵng. Rất hài lòng!",
-        verified: true,
-        likes: 12
-      },
-      {
-        id: "rev-2",
-        author: "Lê Thị Thu Thảo",
-        rating: 5,
-        date: "1 tuần trước",
-        content: "Máy chạy cực êm, màn hình nét căng đúng chuẩn mô tả. Đã kiểm tra bảo hành kích hoạt chuẩn 12 tháng từ hãng. Giá tốt hơn các chuỗi lớn nhiều!",
-        verified: true,
-        likes: 8
-      },
-      {
-        id: "rev-3",
-        author: "Nguyễn Quốc Bảo",
-        rating: 4,
-        date: "2 tuần trước",
-        content: "Sản phẩm chất lượng tốt trong tầm giá. Giao hàng nhanh, shipper thân thiện. Sẽ tiếp tục ủng hộ DinhBao Store lần sau.",
-        verified: true,
-        likes: 5
-      }
-    ];
+    return product.reviews || [];
   });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Tải đánh giá thực tế từ MongoDB khi xem sản phẩm
+  useEffect(() => {
+    if (product?.id) {
+      api.getProductReviews(product.id).then((data) => {
+        if (data && data.length > 0) {
+          setReviews(data);
+        }
+      });
+    }
+  }, [product?.id]);
 
   // Review Form state
   const [reviewerName, setReviewerName] = useState("");
@@ -115,34 +82,44 @@ export default function ProductDetailPage({
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 4);
 
-  // Handle Review submission
-  const handleAddReview = (e: React.FormEvent) => {
+  // Handle Review submission lưu trực tiếp vào MongoDB
+  const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reviewerName.trim() || !reviewContent.trim()) return;
+    if (!reviewerName.trim() || !reviewContent.trim() || isSubmittingReview) return;
 
-    const newRev: ReviewItem = {
-      id: "rev-" + Date.now(),
-      author: reviewerName.trim(),
-      rating: reviewRating,
-      date: "Vừa xong",
-      content: reviewContent.trim(),
-      verified: true,
-      likes: 0
-    };
-
-    const updated = [newRev, ...reviews];
-    setReviews(updated);
+    setIsSubmittingReview(true);
     try {
-      localStorage.setItem(`dinhbao_reviews_${product.id}`, JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
+      const res = await api.addProductReview(product.id, {
+        author: reviewerName.trim(),
+        rating: reviewRating,
+        content: reviewContent.trim()
+      });
 
-    setReviewerName("");
-    setReviewContent("");
-    setReviewRating(5);
-    setReviewSuccess(true);
-    setTimeout(() => setReviewSuccess(false), 4000);
+      if (res && res.data) {
+        setReviews(res.data);
+      } else {
+        const newRev: ReviewItem = {
+          id: "rev-" + Date.now(),
+          author: reviewerName.trim(),
+          rating: reviewRating,
+          date: "Vừa xong",
+          content: reviewContent.trim(),
+          verified: true,
+          likes: 0
+        };
+        setReviews((prev) => [newRev, ...prev]);
+      }
+
+      setReviewerName("");
+      setReviewContent("");
+      setReviewRating(5);
+      setReviewSuccess(true);
+      setTimeout(() => setReviewSuccess(false), 4000);
+    } catch (err) {
+      console.error("Lỗi khi gửi đánh giá lên MongoDB:", err);
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   // Share link
@@ -638,10 +615,11 @@ export default function ProductDetailPage({
 
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2"
+                  disabled={isSubmittingReview}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Gửi Nhận Xét</span>
+                  <span>{isSubmittingReview ? "Đang gửi lên MongoDB..." : "Gửi Nhận Xét"}</span>
                 </button>
               </form>
             </div>

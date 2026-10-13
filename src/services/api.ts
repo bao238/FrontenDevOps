@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { Product } from "../data/products";
+import { Product, ReviewItem } from "../data/products";
 import { UserAccount } from "../data/users";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
@@ -175,6 +175,30 @@ export const api = {
   // 15. Xóa người dùng (Admin)
   async deleteUser(id: string) {
     const res = await fetch(`${API_BASE}/users/${id}`, { method: "DELETE" });
+    return await res.json();
+  },
+
+  // 16. Lấy đánh giá của sản phẩm từ MongoDB
+  async getProductReviews(productId: string): Promise<ReviewItem[]> {
+    try {
+      const res = await fetch(`${API_BASE}/products/${productId}/reviews`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || [];
+      }
+    } catch (err) {
+      console.error("❌ [API] Lỗi lấy đánh giá sản phẩm:", err);
+    }
+    return [];
+  },
+
+  // 17. Thêm đánh giá cho sản phẩm lưu trực tiếp vào MongoDB
+  async addProductReview(productId: string, review: { author: string; rating: number; content: string }) {
+    const res = await fetch(`${API_BASE}/products/${productId}/reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(review)
+    });
     return await res.json();
   }
 };

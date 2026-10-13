@@ -462,7 +462,7 @@ export default function AdminPanel({
             Quản Lý Sản Phẩm &amp; Đơn Hàng DinhBao
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            CRUD sản phẩm, thay đổi trạng thái tồn kho, xử lý đơn hàng và lưu dữ liệu offline (LocalStorage).
+            CRUD sản phẩm, thay đổi trạng thái tồn kho, xử lý đơn hàng và lưu dữ liệu trên MongoDB.
           </p>
         </div>
 
@@ -743,7 +743,7 @@ export default function AdminPanel({
             <h3 className="text-base font-bold text-slate-900">
               Danh Sách Đơn Hàng Đã Đặt ({orders.length})
             </h3>
-            <span className="text-xs text-slate-400 font-mono">Dữ liệu lưu tự động LocalStorage</span>
+            <span className="text-xs text-slate-400 font-mono">Dữ liệu lưu tự động MongoDB Container</span>
           </div>
 
           {orders.length === 0 ? (

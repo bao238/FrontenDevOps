@@ -1,7 +1,7 @@
 {
   "name": "techstore-backend",
   "version": "1.0.0",
-  "description": "TechStore REST API with Microsoft SQL Server (GearHost) for DevOps Course",
+  "description": "TechStore REST API with MongoDB for DevOps Course",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

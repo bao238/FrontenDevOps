@@ -1,6 +1,8 @@
 const Product = require('../models/Product');
 const User = require('../models/User');
 const Order = require('../models/Order');
+const OrderItem = require('../models/OrderItem');
+const Review = require('../models/Review');
 
 const initialProducts = [
   {
@@ -243,7 +245,8 @@ const initialUsers = [
 
 const initialOrders = [
   {
-    id: 'ORD-2026-001',
+    id: 'ORD-2026-001', // Khóa chính (PK)
+    userId: 'usr-cust-1', // Khóa ngoại (FK -> User.id)
     date: '2026-10-12',
     customerInfo: {
       fullName: 'Nguyễn Văn An',
@@ -266,7 +269,8 @@ const initialOrders = [
     status: 'Hoàn tất'
   },
   {
-    id: 'ORD-2026-002',
+    id: 'ORD-2026-002', // Khóa chính (PK)
+    userId: 'usr-cust-2', // Khóa ngoại (FK -> User.id)
     date: '2026-10-12',
     customerInfo: {
       fullName: 'Lê Thị Hồng',
@@ -290,24 +294,110 @@ const initialOrders = [
   }
 ];
 
+// Dữ liệu mẫu cho bảng riêng OrderItems
+// Khóa chính: id
+// Khóa ngoại: orderId -> Orders.id, productId -> Products.id
+const initialOrderItems = [
+  {
+    id: 'item-1',
+    orderId: 'ORD-2026-001',
+    productId: 'prod-2',
+    productName: 'iPhone 15 Pro Max 256GB - Titan Tự Nhiên',
+    price: 29490000,
+    quantity: 1
+  },
+  {
+    id: 'item-2',
+    orderId: 'ORD-2026-002',
+    productId: 'prod-3',
+    productName: 'Tai nghe Sony WH-1000XM5 Chống Ồn Đỉnh Cao',
+    price: 6990000,
+    quantity: 1
+  }
+];
+
+// Dữ liệu mẫu cho bảng riêng Reviews
+// Khóa chính: id
+// Khóa ngoại: productId -> Products.id, userId -> Users.id
+const initialReviews = [
+  {
+    id: 'rev-1',
+    productId: 'prod-1',
+    userId: 'usr-cust-1',
+    author: 'Trần Minh Hoàng',
+    rating: 5,
+    date: '3 ngày trước',
+    content: 'Hàng nguyên seal chính hãng, đóng gói 3 lớp chống sốc cực kỳ an tâm. Shop tư vấn nhiệt tình, giao trong ngày ở Đà Nẵng. Rất hài lòng!',
+    verified: true,
+    likes: 12
+  },
+  {
+    id: 'rev-2',
+    productId: 'prod-1',
+    userId: 'usr-cust-2',
+    author: 'Lê Thị Thu Thảo',
+    rating: 5,
+    date: '1 tuần trước',
+    content: 'Máy chạy cực êm, màn hình nét căng đúng chuẩn mô tả. Đã kiểm tra bảo hành kích hoạt chuẩn 12 tháng từ hãng. Giá tốt hơn các chuỗi lớn nhiều!',
+    verified: true,
+    likes: 8
+  },
+  {
+    id: 'rev-3',
+    productId: 'prod-2',
+    userId: 'usr-cust-3',
+    author: 'Nguyễn Quốc Bảo',
+    rating: 5,
+    date: '2 tuần trước',
+    content: 'Sản phẩm chất lượng tốt trong tầm giá. Giao hàng nhanh, shipper thân thiện. Sẽ tiếp tục ủng hộ TechStore lần sau.',
+    verified: true,
+    likes: 5
+  },
+  {
+    id: 'rev-4',
+    productId: 'prod-3',
+    userId: 'usr-cust-1',
+    author: 'Hoàng Nam',
+    rating: 5,
+    date: '5 ngày trước',
+    content: 'Chất âm tuyệt vời, chống ồn tốt nhất phân khúc. Đeo lâu không bị cấn tai.',
+    verified: true,
+    likes: 9
+  }
+];
+
 async function seedData() {
   try {
     const pCount = await Product.countDocuments();
     if (pCount === 0) {
       await Product.insertMany(initialProducts);
-      console.log('📦 [MongoDB Seed] Đã tự động nạp 8 sản phẩm công nghệ vào MongoDB!');
+      console.log('📦 [MongoDB Seed] Đã tự động nạp 8 sản phẩm công nghệ vào collection products!');
     }
 
     const uCount = await User.countDocuments();
     if (uCount === 0) {
       await User.insertMany(initialUsers);
-      console.log('📦 [MongoDB Seed] Đã tự động nạp 6 tài khoản người dùng vào MongoDB!');
+      console.log('📦 [MongoDB Seed] Đã tự động nạp 6 tài khoản người dùng vào collection users!');
     }
 
     const oCount = await Order.countDocuments();
     if (oCount === 0) {
       await Order.insertMany(initialOrders);
-      console.log('📦 [MongoDB Seed] Đã tự động nạp 2 đơn hàng mẫu vào MongoDB!');
+      console.log('📦 [MongoDB Seed] Đã tự động nạp 2 đơn hàng mẫu vào collection orders!');
+    }
+
+    // Tự động nạp bảng riêng order_items
+    const oiCount = await OrderItem.countDocuments();
+    if (oiCount === 0) {
+      await OrderItem.insertMany(initialOrderItems);
+      console.log('📦 [MongoDB Seed] Đã tự động nạp bảng riêng order_items vào MongoDB!');
+    }
+
+    // Tự động nạp bảng riêng reviews
+    const rCount = await Review.countDocuments();
+    if (rCount === 0) {
+      await Review.insertMany(initialReviews);
+      console.log('⭐ [MongoDB Seed] Đã tự động nạp bảng riêng reviews vào MongoDB!');
     }
   } catch (err) {
     console.error('⚠️ [MongoDB Seed] Lỗi nạp dữ liệu khởi tạo:', err.message);

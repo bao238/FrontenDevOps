@@ -1,5 +1,18 @@
 const mongoose = require('mongoose');
 
+const reviewSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    author: { type: String, required: true },
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    date: { type: String, default: 'Vừa xong' },
+    content: { type: String, required: true },
+    verified: { type: Boolean, default: true },
+    likes: { type: Number, default: 0 }
+  },
+  { _id: false }
+);
+
 const productSchema = new mongoose.Schema(
   {
     id: { type: String, required: true, unique: true, index: true },
@@ -14,7 +27,8 @@ const productSchema = new mongoose.Schema(
     description: { type: String, default: '' },
     specs: { type: Object, default: {} },
     inStock: { type: Boolean, default: true },
-    featured: { type: Boolean, default: false }
+    featured: { type: Boolean, default: false },
+    reviews: { type: [reviewSchema], default: [] }
   },
   { timestamps: true }
 );

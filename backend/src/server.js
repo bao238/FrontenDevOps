@@ -26,15 +26,20 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 2. Product Routes
+// 2. Product & Review Routes
 app.get('/api/products', productController.getProducts);
 app.get('/api/products/:id', productController.getProductById);
+app.get('/api/products/:id/reviews', productController.getProductReviews);
+app.post('/api/products/:id/reviews', productController.addProductReview);
+app.get('/api/reviews', productController.getAllReviews);
 app.post('/api/products', productController.createProduct);
 app.put('/api/products/:id', productController.updateProduct);
 app.delete('/api/products/:id', productController.deleteProduct);
 
-// 3. Order Routes
+// 3. Order & OrderItem Routes
 app.get('/api/orders', orderController.getOrders);
+app.get('/api/orders/:id/items', orderController.getOrderItems);
+app.get('/api/order-items', orderController.getAllOrderItems);
 app.post('/api/orders', orderController.createOrder);
 app.put('/api/orders/:id/status', orderController.updateOrderStatus);
 app.delete('/api/orders/:id', orderController.deleteOrder);

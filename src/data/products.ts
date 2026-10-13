@@ -1,3 +1,13 @@
+export interface ReviewItem {
+  id: string;
+  author: string;
+  rating: number;
+  date: string;
+  content: string;
+  verified: boolean;
+  likes: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -12,6 +22,7 @@ export interface Product {
   specs: { [key: string]: string };
   inStock: boolean;
   featured?: boolean;
+  reviews?: ReviewItem[];
 }
 
 export const CATEGORIES = [

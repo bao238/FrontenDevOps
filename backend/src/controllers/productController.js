@@ -1,4 +1,5 @@
 const Product = require('../models/Product');
+const Review = require('../models/Review');
 const { isDbConnected } = require('../config/db');
 
 // GET /api/products
@@ -105,3 +106,82 @@ exports.deleteProduct = async (req, res) => {
     return res.status(500).json({ error: 'Lỗi xóa sản phẩm', message: err.message });
   }
 };
+
+// GET /api/reviews (Lấy toàn bộ reviews trong hệ thống)
+exports.getAllReviews = async (req, res) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+  }
+
+  try {
+    const reviews = await Review.find().sort({ createdAt: -1 }).lean();
+    return res.json({ source: 'mongodb', count: reviews.length, data: reviews });
+  } catch (err) {
+    console.error('[ProductController] Lỗi lấy tất cả đánh giá:', err.message);
+    return res.status(500).json({ error: 'Lỗi lấy tất cả đánh giá', message: err.message });
+  }
+};
+
+// GET /api/products/:id/reviews
+exports.getProductReviews = async (req, res) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+  }
+
+  try {
+    const reviews = await Review.find({ productId: req.params.id }).sort({ createdAt: -1 }).lean();
+    return res.json({ source: 'mongodb', count: reviews.length, data: reviews });
+  } catch (err) {
+    console.error('[ProductController] Lỗi lấy đánh giá MongoDB:', err.message);
+    return res.status(500).json({ error: 'Lỗi lấy đánh giá sản phẩm', message: err.message });
+  }
+};
+
+// POST /api/products/:id/reviews
+exports.addProductReview = async (req, res) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+  }
+
+  try {
+    const { author, rating, content, userId } = req.body;
+    if (!author || !content) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp đầy đủ tên người đánh giá và nội dung' });
+    }
+
+    const product = await Product.findOne({ id: req.params.id });
+    if (!product) {
+      return res.status(404).json({ message: 'Không tìm thấy sản phẩm trong cơ sở dữ liệu' });
+    }
+
+    // Tạo bản ghi mới trong bảng riêng Review với Khóa ngoại productId và userId
+    const newReview = await Review.create({
+      id: `rev-${Date.now()}`,
+      productId: product.id, // Khóa ngoại (FK -> Product.id)
+      userId: userId || null, // Khóa ngoại (FK -> User.id)
+      author: String(author).trim(),
+      rating: Math.min(5, Math.max(1, Number(rating) || 5)),
+      date: 'Vừa xong',
+      content: String(content).trim(),
+      verified: true,
+      likes: 0
+    });
+
+    // Lấy tất cả review của sản phẩm để tính lại rating và reviewsCount
+    const allReviews = await Review.find({ productId: product.id }).sort({ createdAt: -1 }).lean();
+    product.reviewsCount = allReviews.length;
+    const totalRating = allReviews.reduce((sum, r) => sum + (r.rating || 5), 0);
+    product.rating = Number((totalRating / allReviews.length).toFixed(1));
+    await product.save();
+
+    return res.status(201).json({
+      message: 'Thêm đánh giá thành công vào collection reviews trên MongoDB',
+      data: allReviews,
+      newReview
+    });
+  } catch (err) {
+    console.error('[ProductController] Lỗi thêm đánh giá MongoDB:', err.message);
+    return res.status(500).json({ error: 'Lỗi thêm đánh giá sản phẩm', message: err.message });
+  }
+};
+

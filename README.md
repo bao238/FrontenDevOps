@@ -1,122 +1,107 @@
-# 🛒 TechStore - Dự án Shop Bán Hàng Online (Next.js & DevOps CI/CD)
+# 🛒 TechStore - Dự án Shop Bán Hàng Online & DevOps CI/CD
 
 > **Môn học**: DevOps - Khoa Công Nghệ Thông Tin - Đại học Đông Á  
-> **Dự án**: `TechStore` (Cửa hàng thiết bị công nghệ trực tuyến & Tự động hóa CI/CD với Docker, GitHub Actions, Render)
+> **Dự án**: `TechStore` (Cửa hàng thiết bị công nghệ trực tuyến & Tự động hóa CI/CD với Docker Compose, GitHub Actions, AWS EC2)
 
 ---
 
 ## 📌 1. Giới thiệu Dự án
 
-**TechStore** là ứng dụng Web thương mại điện tử chuyên cung cấp thiết bị công nghệ (MacBook, iPhone, Tai nghe, Bàn phím cơ, Smartwatch...), được xây dựng bằng:
-- **Frontend Stack**: Next.js 14 (App Router), React 18, Tailwind CSS, Lucide Icons.
+**TechStore** là ứng dụng Web thương mại điện tử chuyên cung cấp thiết bị công nghệ (MacBook, iPhone, Tai nghe, Bàn phím cơ, Smartwatch...), được kiến trúc theo mô hình Full-Stack hiện đại:
+- **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, TypeScript.
+- **Backend**: Node.js, Express, Mongoose ORM.
+- **Database**: MongoDB (chạy container hóa với Docker Volume lưu trữ dữ liệu vĩnh viễn).
 - **Tính năng nổi bật**:
   - 🛍️ Duyệt sản phẩm theo danh mục (*Điện thoại, Laptop & PC, Phụ kiện, Âm thanh, Smart Home*).
-  - 🔍 Tìm kiếm thời gian thực & Sắp xếp theo giá, đánh giá sao.
-  - 🛒 **Giỏ hàng tương tác (Slide-over drawer)**: Tăng/giảm số lượng, xóa món hàng, nhập coupon `DEVOPS10` giảm 10%.
-  - 💳 **Quy trình Thanh toán (Checkout Modal)**: Nhập thông tin giao hàng, chọn phương thức COD/Chuyển khoản QR, tạo mã đơn hàng tự động.
-  - ⚡ **Xem chi tiết sản phẩm**: Xem bảng thông số kỹ thuật, đánh giá và tình trạng kho.
+  - 🔍 Tìm kiếm thời gian thực & Lọc sản phẩm theo giá, đánh giá sao.
+  - 🛒 **Giỏ hàng tương tác**: Thêm, bớt, xóa sản phẩm, áp dụng mã giảm giá `DEVOPS10`.
+  - 💳 **Quy trình Thanh toán**: Tạo đơn hàng thực tế lưu vào cơ sở dữ liệu MongoDB.
+  - ⚙️ **Trang Quản trị (Admin Panel)**: Quản lý sản phẩm, tài khoản người dùng, đơn hàng với đầy đủ thao tác CRUD và bảo mật.
 - **Hạ tầng DevOps**:
-  - 🐳 **Docker Multi-stage**: Đóng gói container 2 giai đoạn (Builder & Runner) siêu nhẹ, an toàn.
-  - 🔄 **GitHub Actions CI/CD**: Tự động build và push image lên Docker Hub mỗi khi push vào nhánh `main`.
-  - ☁️ **Render Cloud**: Triển khai trực tiếp Web Service miễn phí với HTTPS tự động.
+  - 🐳 **Docker Multi-stage & Compose**: Đóng gói Frontend (Nginx), Backend (Node.js), và MongoDB trong cùng một hệ thống mạng `techstore-network`.
+  - 🔄 **GitHub Actions CI/CD**: Tự động hóa quy trình build Docker image, push lên Docker Hub, và SSH triển khai tự động lên AWS EC2 khi push vào nhánh `main`.
+  - ☁️ **AWS EC2**: Triển khai trực tiếp trên máy chủ đám mây AWS.
 
 ---
 
-## 🛠️ 2. Hướng dẫn Chạy Local (Môi trường phát triển)
+## 🛠️ 2. Hướng dẫn Khởi chạy Local (Môi trường phát triển)
 
-### Cách 1: Chạy trực tiếp với Node.js
+### Cách 1: Chạy bằng Docker Compose (Khuyên dùng)
 ```bash
-# Cài đặt thư viện
-npm install
-
-# Khởi chạy server phát triển
-npm run dev
-```
-Mở trình duyệt tại: [http://localhost:3000](http://localhost:3000)
-
-### Cách 2: Chạy với Docker Compose
-```bash
-# Build và chạy container
+# Khởi động toàn bộ Frontend, Backend, và MongoDB
 docker-compose up -d --build
 
-# Xem logs
+# Xem logs hoạt động
 docker-compose logs -f
 
-# Dừng container
+# Dừng hệ thống container
 docker-compose down
 ```
-Truy cập tại: [http://localhost:3000](http://localhost:3000)
+- Frontend: [http://localhost:3000](http://localhost:3000) (hoặc cổng 80)
+- Backend API: [http://localhost:5000/api](http://localhost:5000/api)
+- MongoDB: `localhost:27017`
 
----
-
-## 🚀 3. Hướng dẫn Triển khai (Deploy) Lên Render Từng Bước
-
-### Bước 1: Khởi tạo Git & Push lên GitHub
-1. Mở terminal tại thư mục dự án (`d:/Nam4/LTDevOps`):
+### Cách 2: Chạy trực tiếp với Node.js & Vite
 ```bash
-git init
-git add .
-git commit -m "feat: techstore e-commerce app with docker and github actions"
-git branch -M main
-git remote add origin https://github.com/<your-username>/<your-repo-name>.git
-git push -u origin main
+# 1. Chạy Backend
+cd backend
+npm install
+npm run dev
+
+# 2. Chạy Frontend (ở terminal khác tại thư mục gốc)
+npm install
+npm run dev
 ```
 
 ---
 
-### Bước 2: Tạo Token trên Docker Hub
-1. Truy cập [Docker Hub](https://hub.docker.com/) và đăng nhập.
-2. Nhấp vào Avatar góc phải ➔ Chọn **Account settings** ➔ Mục **Personal access tokens**.
-3. Chọn **Generate new token**:
-   - **Description**: `GitHub_Actions_TechStore`
-   - **Permissions**: `Read & Write`
-4. Copy mã Access Token vừa tạo.
-
----
-
-### Bước 3: Cấu hình Secrets trên GitHub Repository
-1. Trên GitHub Repo của bạn, vào mục:  
-   **Settings** ➔ **Secrets and variables** ➔ **Actions** ➔ Nhấp **New repository secret**.
-2. Thêm 2 Secrets sau:
-   - `DOCKER_USERNAME`: Tên tài khoản Docker Hub của bạn (ví dụ: `boyka74` hoặc `your_username`).
-   - `DOCKER_PASSWORD`: Personal Access Token vừa lấy ở Bước 2.
-
-> Sau khi cấu hình xong, mỗi khi bạn `git push` lên nhánh `main`, GitHub Actions sẽ tự động kích hoạt workflow build & push Docker image lên Docker Hub!
-
----
-
-### Bước 4: Triển khai trên Render Web Service (Render.com)
-
-1. Đăng nhập vào [Render Dashboard](https://dashboard.render.com/).
-2. Nhấp vào nút **+ New** (góc phải trên cùng) ➔ Chọn **Web Service**.
-3. Chọn phương thức:
-   - **Cách A (Kết nối GitHub Repo - Khuyên dùng)**: Chọn mục **Git Provider** ➔ Chọn repository GitHub bạn vừa push code lên. Render sẽ tự động nhận diện `Dockerfile` và tiến hành build.
-   - **Cách B (Dùng Docker Image)**: Chọn tab **Existing Image** ➔ Điền: `docker.io/<your_docker_username>/vtabs_socibot_front_end:latest`.
-4. Tại mục **Instance Type**: Chọn gói **Free ($0/month)**.
-5. Nhấp nút **Deploy Web Service** (hoặc **Create Web Service**).
-6. Đợi 1-3 phút để Render build & deploy container. Bạn sẽ nhận được đường link web trực tuyến dạng:  
-   `https://techstore-devops.onrender.com`
-
----
-
-## 📂 4. Cấu trúc Thư mục
+## 📂 3. Cấu trúc Thư mục Dự án
 
 ```
 LTDevOps/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml        # Workflow CI/CD GitHub Actions
+│       └── deploy.yml              # Pipeline CI/CD GitHub Actions (Build, Push & SSH Deploy EC2)
+├── backend/
+│   ├── src/
+│   │   ├── config/
+│   │   │   ├── db.js               # Kết nối Mongoose tới MongoDB
+│   │   │   └── seed.js             # Dữ liệu khởi tạo mẫu tự động cho MongoDB
+│   │   ├── controllers/
+│   │   │   ├── authController.js   # Xử lý xác thực & quản lý tài khoản người dùng
+│   │   │   ├── orderController.js  # Xử lý đơn hàng
+│   │   │   └── productController.js# Xử lý danh mục & sản phẩm
+│   │   ├── models/
+│   │   │   ├── Order.js            # Mongoose Schema Đơn hàng (Khóa ngoại: userId -> Users)
+│   │   │   ├── OrderItem.js        # Mongoose Schema Chi tiết đơn hàng (Khóa ngoại: orderId, productId)
+│   │   │   ├── Product.js          # Mongoose Schema Sản phẩm (Khóa chính: id)
+│   │   │   ├── Review.js           # Mongoose Schema Đánh giá sản phẩm (Khóa ngoại: productId, userId)
+│   │   │   └── User.js             # Mongoose Schema Người dùng (Khóa chính: id)
+│   │   └── server.js               # Express Server & REST API endpoints
+│   ├── .dockerignore
+│   ├── .env.example
+│   ├── Dockerfile                  # Dockerfile đóng gói Backend REST API
+│   └── package.json
+├── public/
+│   ├── default-avatar.png
+│   └── images/
 ├── src/
-│   ├── app/
-│   │   ├── layout.tsx        # Giao diện khung, header, footer & metadata TechStore
-│   │   ├── page.tsx          # Trang chủ Shop bán hàng online, Giỏ hàng, Checkout & DevOps Status
-│   │   └── globals.css       # Tailwind CSS style
-│   └── data/
-│       └── products.ts       # Danh sách sản phẩm mẫu & thông số kỹ thuật
-├── Dockerfile                # Multi-stage Dockerfile tối ưu
-├── docker-compose.yml        # Docker compose quản lý container
-├── .dockerignore             # Bỏ qua files không cần thiết khi build image
-├── package.json              # Khai báo thư viện Next.js 14, React 18, Tailwind
-├── tailwind.config.ts        # Cấu hình Tailwind CSS
-└── next.config.mjs           # Cấu hình Next.js
+│   ├── components/
+│   │   ├── AdminPanel.tsx          # Bảng điều khiển quản trị viên
+│   │   ├── CartPage.tsx            # Trang chi tiết giỏ hàng
+│   │   └── ProductDetailPage.tsx   # Trang chi tiết sản phẩm
+│   ├── data/
+│   │   ├── products.ts             # TypeScript Type definitions sản phẩm
+│   │   └── users.ts                # TypeScript Type definitions người dùng
+│   ├── services/
+│   │   └── api.ts                  # Axios/Fetch API client kết nối Backend
+│   ├── App.tsx                     # Component chính ứng dụng
+│   ├── main.tsx                    # Entry point React
+│   └── index.css                   # Tailwind styles
+├── docker-compose.yml              # Cấu hình đa container (Frontend, Backend, MongoDB)
+├── Dockerfile                      # Multi-stage Dockerfile cho Frontend (React + Nginx)
+├── nginx.conf                      # Cấu hình Nginx reverse proxy
+├── package.json                    # Cấu hình Frontend dependencies & scripts
+├── tsconfig.json                   # Cấu hình TypeScript
+└── vite.config.ts                  # Cấu hình Vite & API Proxy
 ```

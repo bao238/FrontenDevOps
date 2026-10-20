@@ -14,19 +14,19 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// 1. Healthcheck Endpoint (Cực kỳ quan trọng trong DevOps)
+// 1. Healthcheck Endpoint (Phục vụ giám sát hệ thống CI/CD & DevOps)
 app.get('/api/health', (req, res) => {
   const dbStatus = isDbConnected() ? 'connected (MongoDB)' : 'disconnected';
   res.json({
     status: 'healthy',
-    service: 'techstore-backend',
+    service: 'bookstore-backend',
     database: dbStatus,
     timestamp: new Date().toISOString(),
     uptime: `${Math.floor(process.uptime())}s`
   });
 });
 
-// 2. Product & Review Routes
+// 2. Product & Review Routes (Quản lý Sách & Đánh giá độc giả)
 app.get('/api/products', productController.getProducts);
 app.get('/api/products/:id', productController.getProductById);
 app.get('/api/products/:id/reviews', productController.getProductReviews);
@@ -38,7 +38,7 @@ app.post('/api/products', productController.createProduct);
 app.put('/api/products/:id', productController.updateProduct);
 app.delete('/api/products/:id', productController.deleteProduct);
 
-// 3. Order & OrderItem Routes
+// 3. Order & OrderItem Routes (Quản lý Đơn mua sách & Chi tiết đơn)
 app.get('/api/orders', orderController.getOrders);
 app.get('/api/orders/:id/items', orderController.getOrderItems);
 app.get('/api/order-items', orderController.getAllOrderItems);
@@ -46,7 +46,7 @@ app.post('/api/orders', orderController.createOrder);
 app.put('/api/orders/:id/status', orderController.updateOrderStatus);
 app.delete('/api/orders/:id', orderController.deleteOrder);
 
-// 4. Auth & User Routes
+// 4. Auth & User Routes (Xác thực tài khoản độc giả, nhân viên và quản trị)
 app.post('/api/auth/login', authController.login);
 app.post('/api/auth/register', authController.register);
 app.get('/api/users', authController.getUsers);
@@ -55,9 +55,9 @@ app.put('/api/users/:id', authController.updateUser);
 app.put('/api/users/:id/status', authController.toggleUserStatus);
 app.delete('/api/users/:id', authController.deleteUser);
 
-// Khởi chạy server
+// Khởi chạy server lắng nghe kết nối
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 [Backend] TechStore API Server đang chạy tại: http://localhost:${PORT}`);
+  console.log(`🚀 [Backend] BookStore API Server đang chạy tại: http://localhost:${PORT}`);
   console.log(`📡 [Healthcheck] http://localhost:${PORT}/api/health`);
-  console.log(`📦 [Products API] http://localhost:${PORT}/api/products`);
+  console.log(`📚 [Books API] http://localhost:${PORT}/api/products`);
 });

@@ -3,6 +3,7 @@ const Review = require('../models/Review');
 const { isDbConnected } = require('../config/db');
 
 // GET /api/products
+// Lấy danh sách toàn bộ sách từ MongoDB, sắp xếp theo thời gian mới nhất
 exports.getProducts = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -18,6 +19,7 @@ exports.getProducts = async (req, res) => {
 };
 
 // GET /api/products/:id
+// Lấy thông tin chi tiết một cuốn sách theo mã định danh id
 exports.getProductById = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -36,6 +38,7 @@ exports.getProductById = async (req, res) => {
 };
 
 // POST /api/products
+// Tạo mới một cuốn sách và lưu trữ vào MongoDB
 exports.createProduct = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -43,16 +46,21 @@ exports.createProduct = async (req, res) => {
 
   try {
     const newProduct = {
-      id: req.body.id || `prod-${Date.now()}`,
+      id: req.body.id || `prod-book-${Date.now()}`,
       name: req.body.name,
-      category: req.body.category || 'Phụ kiện',
+      category: req.body.category || 'Văn học - Tiểu thuyết',
       price: Number(req.body.price) || 0,
       originalPrice: Number(req.body.originalPrice) || Number(req.body.price) || 0,
       discountPercent: Number(req.body.discountPercent) || 0,
       rating: Number(req.body.rating) || 5.0,
       reviewsCount: Number(req.body.reviewsCount) || 0,
-      imageUrl: req.body.imageUrl || 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=800&q=80',
+      imageUrl: req.body.imageUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80',
       description: req.body.description || '',
+      author: req.body.author || req.body.specs?.['Tác giả'] || '',
+      publisher: req.body.publisher || req.body.specs?.['Nhà xuất bản'] || '',
+      publicationYear: Number(req.body.publicationYear) || Number(req.body.specs?.['Năm xuất bản']) || 2024,
+      pages: Number(req.body.pages) || Number(String(req.body.specs?.['Số trang'] || '').replace(/\D/g, '')) || 0,
+      isbn: req.body.isbn || req.body.specs?.['Mã ISBN'] || '',
       specs: req.body.specs || {},
       inStock: req.body.inStock !== false,
       featured: Boolean(req.body.featured)
@@ -67,6 +75,7 @@ exports.createProduct = async (req, res) => {
 };
 
 // PUT /api/products/:id
+// Cập nhật thông tin cuốn sách trong MongoDB
 exports.updateProduct = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -90,6 +99,7 @@ exports.updateProduct = async (req, res) => {
 };
 
 // DELETE /api/products/:id
+// Xóa một cuốn sách khỏi MongoDB
 exports.deleteProduct = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -107,7 +117,8 @@ exports.deleteProduct = async (req, res) => {
   }
 };
 
-// GET /api/reviews (Lấy toàn bộ reviews trong hệ thống)
+// GET /api/reviews
+// Lấy danh sách toàn bộ đánh giá trong hệ thống
 exports.getAllReviews = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -123,6 +134,7 @@ exports.getAllReviews = async (req, res) => {
 };
 
 // GET /api/products/:id/reviews
+// Lấy danh sách đánh giá của một cuốn sách cụ thể
 exports.getProductReviews = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -138,6 +150,7 @@ exports.getProductReviews = async (req, res) => {
 };
 
 // POST /api/products/:id/reviews
+// Thêm đánh giá mới cho một cuốn sách và cập nhật lại điểm đánh giá trung bình
 exports.addProductReview = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -157,8 +170,8 @@ exports.addProductReview = async (req, res) => {
     // Tạo bản ghi mới trong bảng riêng Review với Khóa ngoại productId và userId
     const newReview = await Review.create({
       id: `rev-${Date.now()}`,
-      productId: product.id, // Khóa ngoại (FK -> Product.id)
-      userId: userId || null, // Khóa ngoại (FK -> User.id)
+      productId: product.id,
+      userId: userId || null,
       author: String(author).trim(),
       rating: Math.min(5, Math.max(1, Number(rating) || 5)),
       date: 'Vừa xong',
@@ -185,7 +198,8 @@ exports.addProductReview = async (req, res) => {
   }
 };
 
-// DELETE /api/reviews/:id (Admin xóa đánh giá)
+// DELETE /api/reviews/:id
+// Admin xóa một đánh giá và tính lại điểm trung bình cho cuốn sách
 exports.deleteReview = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -218,7 +232,8 @@ exports.deleteReview = async (req, res) => {
   }
 };
 
-// PUT /api/reviews/:id (Admin chỉnh sửa đánh giá)
+// PUT /api/reviews/:id
+// Admin chỉnh sửa nội dung hoặc điểm số đánh giá
 exports.updateReview = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -256,6 +271,3 @@ exports.updateReview = async (req, res) => {
     return res.status(500).json({ error: 'Lỗi cập nhật đánh giá', message: err.message });
   }
 };
-
-
-

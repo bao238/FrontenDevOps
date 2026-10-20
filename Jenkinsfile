@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_FRONTEND = "techstore-frontend"
-        IMAGE_BACKEND = "techstore-backend"
+        IMAGE_FRONTEND = "bookstore-frontend"
+        IMAGE_BACKEND = "bookstore-backend"
         SERVER_HOST = "103.20.96.174" // Thay bằng IP Server VPS của bạn
         SERVER_USER = "root"
     }

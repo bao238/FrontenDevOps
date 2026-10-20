@@ -212,18 +212,18 @@ export default function ProductDetailPage({
           <div className="grid grid-cols-3 gap-3 pt-2">
             <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-center space-y-1">
               <ShieldCheck className="w-5 h-5 text-blue-600 mx-auto" />
-              <p className="text-[11px] font-bold text-slate-800">100% Chính Hãng</p>
-              <p className="text-[10px] text-slate-400">Bảo hành 12 tháng</p>
+              <p className="text-[11px] font-bold text-slate-800">100% Sách Thật</p>
+              <p className="text-[10px] text-slate-400">Chuẩn NXB 100%</p>
             </div>
             <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-center space-y-1">
               <RotateCcw className="w-5 h-5 text-emerald-600 mx-auto" />
-              <p className="text-[11px] font-bold text-slate-800">Đổi Trả 30 Ngày</p>
-              <p className="text-[10px] text-slate-400">1 đổi 1 miễn phí</p>
+              <p className="text-[11px] font-bold text-slate-800">Đổi Trả 7 Ngày</p>
+              <p className="text-[10px] text-slate-400">Lỗi in ấn đổi ngay</p>
             </div>
             <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-center space-y-1">
               <Truck className="w-5 h-5 text-purple-600 mx-auto" />
-              <p className="text-[11px] font-bold text-slate-800">Giao Hỏa Tốc</p>
-              <p className="text-[10px] text-slate-400">Nhận trong 2 giờ</p>
+              <p className="text-[11px] font-bold text-slate-800">Giao Toàn Quốc</p>
+              <p className="text-[10px] text-slate-400">Đóng gói 3 lớp xốp</p>
             </div>
           </div>
         </div>
@@ -243,7 +243,7 @@ export default function ProductDetailPage({
                   }`}
                 ></span>
                 <span className={`font-bold ${product.inStock ? "text-emerald-700" : "text-red-700"}`}>
-                  {product.inStock ? "Còn hàng tại DinhBao Store" : "Tạm hết hàng"}
+                  {product.inStock ? "Còn hàng tại BookStore" : "Tạm hết hàng"}
                 </span>
               </div>
             </div>
@@ -293,12 +293,12 @@ export default function ProductDetailPage({
             <div className="text-xs text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100 space-y-1.5">
               <p className="font-bold text-slate-800 flex items-center space-x-1.5">
                 <Sparkles className="w-4 h-4 text-blue-600" />
-                <span>Đặc quyền khi mua tại DinhBao:</span>
+                <span>Đặc quyền độc giả tại BookStore:</span>
               </p>
               <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
-                <li>Tặng kèm gói vệ sinh máy &amp; tra keo tản nhiệt trọn đời.</li>
-                <li>Hỗ trợ cài đặt phần mềm, hệ điều hành miễn phí theo yêu cầu.</li>
-                <li>Áp dụng mã voucher <strong className="text-blue-600 font-mono">DINHBAO10</strong> giảm thêm 10% khi đặt hàng.</li>
+                <li>Tặng kèm Bookmark độc quyền &amp; hỗ trợ bọc sách plastic chống bám bẩn miễn phí.</li>
+                <li>Cam kết 100% sách thật chuẩn Nhà Xuất Bản, bồi hoàn 200% nếu phát hiện sách lậu.</li>
+                <li>Áp dụng mã voucher <strong className="text-blue-600 font-mono">BOOKWORM10</strong> hoặc <strong className="text-blue-600 font-mono">DEVOPS10</strong> giảm thêm 10% khi đặt hàng.</li>
               </ul>
             </div>
 
@@ -390,7 +390,7 @@ export default function ProductDetailPage({
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            Thông Số Kỹ Thuật
+            Thông Tin Tác Phẩm
           </button>
           <button
             onClick={() => setActiveTab("reviews")}
@@ -417,21 +417,21 @@ export default function ProductDetailPage({
               {product.description}
             </p>
             <div className="bg-blue-50/60 rounded-2xl p-4 border border-blue-100 space-y-2 mt-4 text-xs">
-              <h4 className="font-bold text-blue-900">Lý do bạn nên sở hữu thiết bị này:</h4>
+              <h4 className="font-bold text-blue-900">Lý do bạn nên sở hữu cuốn sách này:</h4>
               <ul className="space-y-1.5 text-blue-800 list-disc list-inside">
-                <li>Sản phẩm được tuyển chọn kỹ lưỡng, đảm bảo tiêu chuẩn cao nhất về thẩm mỹ và hiệu năng.</li>
-                <li>Chế độ hậu mãi độc quyền: Hỗ trợ kỹ thuật 24/7 từ chuyên viên DinhBao Store.</li>
-                <li>Đầy đủ phụ kiện chính hãng nguyên hộp, sách hướng dẫn và tem bảo hành.</li>
+                <li>Tác phẩm được xuất bản chính thức, bản quyền chuẩn, chất lượng giấy in cao cấp chống lóa mắt.</li>
+                <li>Đóng gói 3 lớp chống sốc, bảo vệ mép bìa và gáy sách nguyên vẹn khi giao hàng.</li>
+                <li>Được đông đảo độc giả và giới phê bình đánh giá cao về giá trị tri thức và cảm xúc nhân văn.</li>
               </ul>
             </div>
           </div>
         )}
 
-        {/* TAB 2: THÔNG SỐ KỸ THUẬT */}
+        {/* TAB 2: THÔNG TIN CHI TIẾT TÁC PHẨM */}
         {activeTab === "specs" && (
           <div className="space-y-4 animate-in fade-in">
             <h3 className="text-base sm:text-lg font-bold text-slate-900">
-              Bảng Thông Số Kỹ Thuật Chi Tiết
+              Bảng Thông Tin Chi Tiết Tác Phẩm
             </h3>
             <div className="overflow-hidden rounded-2xl border border-slate-200">
               <table className="w-full text-left text-xs">

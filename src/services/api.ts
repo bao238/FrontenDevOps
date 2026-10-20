@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { Product, ReviewItem } from "../data/products";
+import { Product, ReviewItem, INITIAL_BOOKS } from "../data/products";
 import { UserAccount } from "../data/users";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
@@ -30,18 +30,20 @@ export const api = {
     }
   },
 
-  // 2. Lấy danh sách sản phẩm từ MongoDB
+  // 2. Lấy danh sách sản phẩm từ MongoDB (có fallback dữ liệu sách chuẩn)
   async getProducts(): Promise<{ source: string; data: Product[] }> {
     try {
       const res = await fetch(`${API_BASE}/products`);
       if (res.ok) {
         const json = await res.json();
-        return { source: json.source || "mongodb", data: json.data || [] };
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          return { source: json.source || "mongodb", data: json.data };
+        }
       }
     } catch (err) {
       console.error("❌ [API] Lỗi khi kết nối lấy sản phẩm từ MongoDB:", err);
     }
-    return { source: "mongodb-empty", data: [] };
+    return { source: "fallback-initial", data: INITIAL_BOOKS };
   },
 
   // 3. Thêm sản phẩm mới (Admin)

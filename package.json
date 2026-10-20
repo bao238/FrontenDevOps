@@ -1,10 +1,12 @@
 {
-  "name": "techstore-frontend-react",
+  "name": "bookstore-frontend-react",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "npm run dev --prefix backend",
+    "seed": "npm run seed --prefix backend",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

@@ -5,12 +5,14 @@ require('dotenv').config();
 
 const { seedData } = require('./seed');
 
+// Chuỗi kết nối MongoDB mặc định cho hệ thống BookStore
 const MONGO_URI =
   process.env.MONGO_URI ||
-  'mongodb://127.0.0.1:27017/techstore';
+  'mongodb://127.0.0.1:27017/bookstore';
 
 let isConnected = false;
 
+// Hàm kết nối cơ sở dữ liệu MongoDB bằng Mongoose
 async function connectDB() {
   try {
     const maskedUri = MONGO_URI.replace(/:([^:@]+)@/, ':****@');

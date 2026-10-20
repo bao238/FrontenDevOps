@@ -1,11 +1,12 @@
 {
-  "name": "techstore-backend",
+  "name": "bookstore-backend",
   "version": "1.0.0",
-  "description": "TechStore REST API with MongoDB for DevOps Course",
+  "description": "BookStore REST API with MongoDB for DevOps Course",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "seed": "node src/scripts/seedDirect.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

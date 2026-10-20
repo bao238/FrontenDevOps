@@ -120,10 +120,10 @@ export default function CartPage({
 
           <div className="space-y-2">
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
-              Giỏ hàng của bạn hiện đang trống!
+              Giỏ sách của bạn hiện đang trống!
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
-              Bạn chưa chọn sản phẩm nào vào giỏ. Hãy khám phá hàng ngàn thiết bị công nghệ chính hãng với ưu đãi hấp dẫn tại DinhBao Store.
+              Bạn chưa chọn cuốn sách nào vào giỏ. Hãy khám phá hàng ngàn tựa sách hấp dẫn chuẩn Nhà xuất bản với ưu đãi đặc biệt tại BookStore.
             </p>
           </div>
 
@@ -133,7 +133,7 @@ export default function CartPage({
               className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-500/25 transition-all transform hover:-translate-y-0.5"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Khám Phá Sản Phẩm Ngay</span>
+              <span>Khám Phá Tủ Sách Ngay</span>
             </button>
           </div>
         </div>
@@ -319,7 +319,7 @@ export default function CartPage({
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    placeholder="VD: DINHBAO10"
+                    placeholder="VD: BOOKWORM10 hoặc DEVOPS10"
                     className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs uppercase font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
@@ -335,10 +335,17 @@ export default function CartPage({
                   <span className="text-[10px] text-slate-400">Mã gợi ý:</span>
                   <button
                     type="button"
-                    onClick={() => setPromoCode("DINHBAO10")}
+                    onClick={() => setPromoCode("BOOKWORM10")}
                     className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-[10px] font-bold border border-blue-200 transition-colors"
                   >
-                    DINHBAO10 (-10%)
+                    BOOKWORM10 (-10%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPromoCode("DEVOPS10")}
+                    className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[10px] font-bold border border-indigo-200 transition-colors"
+                  >
+                    DEVOPS10 (-10%)
                   </button>
                   <button
                     type="button"
@@ -414,10 +421,10 @@ export default function CartPage({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900">
-                Gợi Ý Sản Phẩm Bạn Có Thể Thích
+                Gợi Ý Tác Phẩm Bestseller Có Thể Bạn Sẽ Thích
               </h3>
               <p className="text-xs text-slate-500">
-                Các sản phẩm công nghệ bán chạy hàng đầu tại DinhBao Store
+                Các đầu sách được độc giả yêu thích và đặt mua nhiều nhất tại BookStore
               </p>
             </div>
             <button

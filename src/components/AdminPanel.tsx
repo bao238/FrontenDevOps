@@ -83,12 +83,12 @@ interface AdminPanelProps {
 }
 
 const SAMPLE_IMAGES = [
-  { label: "Laptop", url: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80" },
-  { label: "iPhone", url: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80" },
-  { label: "Tai nghe", url: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80" },
-  { label: "Bàn phím", url: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80" },
-  { label: "Đồng hồ", url: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=800&q=80" },
-  { label: "Màn hình", url: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=800&q=80" },
+  { label: "Văn học", url: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80" },
+  { label: "Kinh tế", url: "https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&w=800&q=80" },
+  { label: "Kỹ năng", url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80" },
+  { label: "Lập trình", url: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=800&q=80" },
+  { label: "Khoa học", url: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80" },
+  { label: "Thiếu nhi", url: "https://images.unsplash.com/photo-1532012164546-f432f2e3edd4?auto=format&fit=crop&w=800&q=80" },
 ];
 
 export default function AdminPanel({
@@ -255,7 +255,7 @@ export default function AdminPanel({
 
   // Form State
   const [formName, setFormName] = useState("");
-  const [formCategory, setFormCategory] = useState("Điện thoại");
+  const [formCategory, setFormCategory] = useState("Văn học - Tiểu thuyết");
   const [formPrice, setFormPrice] = useState<number>(0);
   const [formOriginalPrice, setFormOriginalPrice] = useState<number>(0);
   const [formImageUrl, setFormImageUrl] = useState("");
@@ -263,8 +263,11 @@ export default function AdminPanel({
   const [formInStock, setFormInStock] = useState(true);
   const [formFeatured, setFormFeatured] = useState(false);
   const [formSpecs, setFormSpecs] = useState<{ [key: string]: string }>({
-    "Bảo hành": "12 tháng chính hãng",
-    "Tình trạng": "Mới 100% nguyên seal",
+    "Tác giả": "Đang cập nhật",
+    "Nhà xuất bản": "NXB Trẻ",
+    "Năm xuất bản": "2024",
+    "Số trang": "300 trang",
+    "Hình thức": "Bìa mềm",
   });
   const [newSpecKey, setNewSpecKey] = useState("");
   const [newSpecVal, setNewSpecVal] = useState("");
@@ -450,16 +453,19 @@ export default function AdminPanel({
   const handleOpenCreate = () => {
     setEditingProduct(null);
     setFormName("");
-    setFormCategory("Điện thoại");
-    setFormPrice(10000000);
-    setFormOriginalPrice(12000000);
+    setFormCategory("Văn học - Tiểu thuyết");
+    setFormPrice(95000);
+    setFormOriginalPrice(120000);
     setFormImageUrl(SAMPLE_IMAGES[0].url);
-    setFormDescription("Sản phẩm công nghệ chính hãng mới nhất tại DinhBao Store.");
+    setFormDescription("Tác phẩm sách bản quyền chính thức, giấy in cao cấp tại BookStore.");
     setFormInStock(true);
     setFormFeatured(false);
     setFormSpecs({
-      "Bảo hành": "12 tháng chính hãng",
-      "Tình trạng": "Mới 100% nguyên seal",
+      "Tác giả": "Đang cập nhật",
+      "Nhà xuất bản": "NXB Trẻ",
+      "Năm xuất bản": "2024",
+      "Số trang": "300 trang",
+      "Hình thức": "Bìa mềm",
     });
     setNewSpecKey("");
     setNewSpecVal("");
@@ -581,7 +587,7 @@ export default function AdminPanel({
             <span>Hệ Thống Quản Trị Cửa Hàng (Admin Panel)</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Quản Lý Sản Phẩm &amp; Đơn Hàng DinhBao
+            Quản Lý Sách &amp; Đơn Hàng BookStore
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             CRUD sản phẩm, thay đổi trạng thái tồn kho, xử lý đơn hàng và lưu dữ liệu trên MongoDB.

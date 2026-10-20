@@ -2,9 +2,9 @@ version: '3.8'
 
 services:
   # 1. Cơ sở dữ liệu NoSQL MongoDB
-  techstore-mongodb:
+  bookstore-mongodb:
     image: mongo:6.0
-    container_name: techstore-mongodb
+    container_name: bookstore-mongodb
     ports:
       - "27017:27017"
     volumes:
@@ -12,36 +12,36 @@ services:
     restart: always
 
   # 2. Backend REST API (Node.js & Express & Mongoose)
-  techstore-backend:
+  bookstore-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: techstore-backend
+    container_name: bookstore-backend
     ports:
       - "5000:5000"
     environment:
       PORT: 5000
-      MONGO_URI: mongodb://techstore-mongodb:27017/techstore
+      MONGO_URI: mongodb://bookstore-mongodb:27017/bookstore
     depends_on:
-      - techstore-mongodb
+      - bookstore-mongodb
     restart: always
 
   # 3. Frontend Web Client (React 18 & Nginx)
-  techstore-frontend:
+  bookstore-frontend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: techstore-frontend
+    container_name: bookstore-frontend
     ports:
       - "80:3000"
     depends_on:
-      - techstore-backend
+      - bookstore-backend
     restart: always
 
 volumes:
   mongo-data:
-    name: techstore-mongo-data
+    name: bookstore-mongo-data
 
 networks:
   default:
-    name: techstore-network
+    name: bookstore-network

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { CATEGORIES, Product } from "./data/products";
+import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api } from "./services/api";
 import {
@@ -76,7 +76,7 @@ export interface OrderRecord {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart">("products");
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(INITIAL_BOOKS);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
@@ -131,7 +131,10 @@ export default function App() {
   // Admin Authentication States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
     try {
-      return localStorage.getItem("dinhbao_admin_session") === "true";
+      return (
+        localStorage.getItem("bookstore_admin_session") === "true" ||
+        localStorage.getItem("dinhbao_admin_session") === "true"
+      );
     } catch {
       return false;
     }
@@ -215,7 +218,7 @@ export default function App() {
   // Load saved user from local storage on mount
   useEffect(() => {
     try {
-      const savedUser = localStorage.getItem("dinhbao_user");
+      const savedUser = localStorage.getItem("bookstore_user") || localStorage.getItem("dinhbao_user");
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
         if (!parsed.avatarUrl || parsed.avatarUrl.includes("unsplash.com")) {
@@ -229,7 +232,7 @@ export default function App() {
         }));
       }
 
-      const savedOrders = localStorage.getItem("dinhbao_orders");
+      const savedOrders = localStorage.getItem("bookstore_orders") || localStorage.getItem("dinhbao_orders");
       if (savedOrders) {
         setOrders(JSON.parse(savedOrders));
       }
@@ -292,9 +295,9 @@ export default function App() {
         u.name.toLowerCase() === inputVal
     );
 
-    // Fallback nếu tài khoản admin hệ thống (admin / admin123 hoặc bao@gmail.com / admin123)
+    // Fallback nếu tài khoản admin hệ thống (admin / admin123 hoặc admin@bookstore.vn / admin)
     const isFallbackAdmin =
-      (inputVal === "admin" || inputVal === "bao@gmail.com" || inputVal === "admin@dinhbao.vn") &&
+      (inputVal === "admin" || inputVal === "admin@bookstore.vn" || inputVal === "manager@bookstore.vn" || inputVal === "bao@gmail.com" || inputVal === "admin@dinhbao.vn") &&
       (inputPass === "admin123" || inputPass === "admin");
 
     if (existing) {
@@ -319,7 +322,7 @@ export default function App() {
         memberSince: existing.createdAt || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
       };
       setCurrentUser(loggedUser);
-      localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
+      localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
       setCustomerInfo((prev) => ({
         ...prev,
         fullName: loggedUser.name,
@@ -334,8 +337,8 @@ export default function App() {
       if (existing.role === "admin" || existing.role === "staff") {
         setIsAdminLoggedIn(true);
         try {
-          localStorage.setItem("dinhbao_admin_session", "true");
-          localStorage.setItem("dinhbao_admin_user", JSON.stringify(existing));
+          localStorage.setItem("bookstore_admin_session", "true");
+          localStorage.setItem("bookstore_admin_user", JSON.stringify(existing));
         } catch (err) {
           console.error(err);
         }
@@ -351,8 +354,8 @@ export default function App() {
     if (isFallbackAdmin) {
       const adminAcc = users.find((u) => u.role === "admin") || {
         id: "usr-admin-1",
-        name: "Quản Trị Viên (Đình Bảo)",
-        email: "admin@dinhbao.vn",
+        name: "Quản Trị Viên (BookStore Admin)",
+        email: "admin@bookstore.vn",
         phone: "0905 888 999",
         role: "admin" as const,
         status: "active" as const,
@@ -368,11 +371,11 @@ export default function App() {
         memberSince: adminAcc.createdAt || "Tháng 01/2024",
       };
       setCurrentUser(loggedUser);
-      localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
+      localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
       setIsAdminLoggedIn(true);
       try {
-        localStorage.setItem("dinhbao_admin_session", "true");
-        localStorage.setItem("dinhbao_admin_user", JSON.stringify(adminAcc));
+        localStorage.setItem("bookstore_admin_session", "true");
+        localStorage.setItem("bookstore_admin_user", JSON.stringify(adminAcc));
       } catch (err) {
         console.error(err);
       }
@@ -441,7 +444,7 @@ export default function App() {
     };
 
     setCurrentUser(newUser);
-    localStorage.setItem("dinhbao_user", JSON.stringify(newUser));
+    localStorage.setItem("bookstore_user", JSON.stringify(newUser));
     setCustomerInfo((prev) => ({
       ...prev,
       fullName: newUser.name,
@@ -457,6 +460,9 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setIsAdminLoggedIn(false);
+    localStorage.removeItem("bookstore_user");
+    localStorage.removeItem("bookstore_admin_session");
+    localStorage.removeItem("bookstore_admin_user");
     localStorage.removeItem("dinhbao_user");
     localStorage.removeItem("dinhbao_admin_session");
     localStorage.removeItem("dinhbao_admin_user");
@@ -508,7 +514,11 @@ export default function App() {
   // Apply Coupon
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
-    if (promoCode.trim().toUpperCase() === "DINHBAO10" || promoCode.trim().toUpperCase() === "DEVOPS10") {
+    if (
+      promoCode.trim().toUpperCase() === "BOOKWORM10" ||
+      promoCode.trim().toUpperCase() === "DEVOPS10" ||
+      promoCode.trim().toUpperCase() === "DINHBAO10"
+    ) {
       setAppliedDiscount(0.1);
       showToast("Áp dụng mã giảm 10% thành công!");
     } else {
@@ -571,7 +581,7 @@ export default function App() {
     const updatedOrders = [newOrder, ...orders];
     setOrders(updatedOrders);
     try {
-      localStorage.setItem("dinhbao_orders", JSON.stringify(updatedOrders));
+      localStorage.setItem("bookstore_orders", JSON.stringify(updatedOrders));
     } catch {
       // ignore
     }
@@ -598,7 +608,7 @@ export default function App() {
       return;
     }
     setContactSubmitted(true);
-    showToast("Cảm ơn bạn! DinhBao Store đã nhận được tin nhắn và sẽ liên hệ lại sớm nhất.");
+    showToast("Cảm ơn bạn! BookStore đã nhận được tin nhắn và sẽ liên hệ lại sớm nhất.");
     setContactForm({ name: "", email: "", phone: "", message: "" });
   };
 
@@ -760,9 +770,9 @@ export default function App() {
       setCurrentUser(loggedUser);
       setIsAdminLoggedIn(true);
       try {
-        localStorage.setItem("dinhbao_admin_session", "true");
-        localStorage.setItem("dinhbao_admin_user", JSON.stringify(found));
-        localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
+        localStorage.setItem("bookstore_admin_session", "true");
+        localStorage.setItem("bookstore_admin_user", JSON.stringify(found));
+        localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
       } catch (err) {
         console.error(err);
       }
@@ -771,15 +781,15 @@ export default function App() {
       return;
     }
 
-    // Fallback credentials for demo: admin / admin123 or bao@gmail.com / admin123
+    // Fallback credentials for demo: admin / admin123 or admin@bookstore.vn / admin
     if (
-      (u === "admin" || u === "bao@gmail.com" || u === "admin@dinhbao.vn") &&
+      (u === "admin" || u === "admin@bookstore.vn" || u === "manager@bookstore.vn" || u === "bao@gmail.com" || u === "admin@dinhbao.vn") &&
       (p === "admin123" || p === "admin")
     ) {
       const adminAcc = users.find((acc) => acc.role === "admin") || {
         id: "usr-admin-1",
-        name: "Quản Trị Viên (Đình Bảo)",
-        email: "admin@dinhbao.vn",
+        name: "Quản Trị Viên (BookStore Admin)",
+        email: "admin@bookstore.vn",
         phone: "0905 888 999",
         role: "admin" as const,
         status: "active" as const,
@@ -797,9 +807,9 @@ export default function App() {
       setCurrentUser(loggedUser);
       setIsAdminLoggedIn(true);
       try {
-        localStorage.setItem("dinhbao_admin_session", "true");
-        localStorage.setItem("dinhbao_admin_user", JSON.stringify(adminAcc));
-        localStorage.setItem("dinhbao_user", JSON.stringify(loggedUser));
+        localStorage.setItem("bookstore_admin_session", "true");
+        localStorage.setItem("bookstore_admin_user", JSON.stringify(adminAcc));
+        localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
       } catch (err) {
         console.error(err);
       }
@@ -817,6 +827,9 @@ export default function App() {
     setCurrentUser(null);
     setIsUserMenuOpen(false);
     try {
+      localStorage.removeItem("bookstore_admin_session");
+      localStorage.removeItem("bookstore_admin_user");
+      localStorage.removeItem("bookstore_user");
       localStorage.removeItem("dinhbao_admin_session");
       localStorage.removeItem("dinhbao_admin_user");
       localStorage.removeItem("dinhbao_user");
@@ -851,10 +864,10 @@ export default function App() {
                     <ShieldCheck className="w-8 h-8" />
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                    DinhBao Admin Portal
+                    BookStore Admin Portal
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Cổng Quản Trị Hệ Thống &bull; Đăng nhập để tiếp tục
+                    Cổng Quản Trị Nhà Sách &bull; Quản lý sách, độc giả &amp; đơn hàng
                   </p>
                 </div>
 
@@ -875,7 +888,7 @@ export default function App() {
                       <input
                         type="text"
                         required
-                        placeholder="admin@dinhbao.vn hoặc admin"
+                        placeholder="admin@bookstore.vn hoặc admin"
                         value={adminUsername}
                         onChange={(e) => setAdminUsername(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -935,16 +948,16 @@ export default function App() {
             <header className="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-xl shadow-md">
-                  D
+                  B
                 </div>
                 <div>
                   <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight flex items-center space-x-2">
-                    <span>DinhBao Admin Console</span>
+                    <span>BookStore Admin Console</span>
                     <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-bold uppercase">
-                      Hệ Thống Quản Trị
+                      Hệ Thống Quản Trị Nhà Sách
                     </span>
                   </h1>
-                  <p className="text-[11px] text-slate-400">Trang quản trị nội bộ &bull; /admin</p>
+                  <p className="text-[11px] text-slate-400">Trang quản trị nội bộ nhà sách &bull; /admin</p>
                 </div>
               </div>
 
@@ -990,7 +1003,7 @@ export default function App() {
 
             {/* Footer riêng của Admin */}
             <footer className="bg-slate-900 border-t border-slate-800 text-slate-500 text-xs py-4 px-6 text-center">
-              DinhBao Store Admin Console &bull; Quản lý sản phẩm &amp; đơn hàng nội bộ
+              BookStore Admin Console &bull; Quản lý sách &amp; đơn hàng nội bộ
             </footer>
           </div>
         )}
@@ -1018,14 +1031,14 @@ export default function App() {
               className="flex items-center space-x-3 cursor-pointer group"
             >
               <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-                D
+                B
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">
-                  DinhBao
+                  <span className="text-blue-600">Book</span><span>Store</span>
                 </h1>
                 <p className="text-xs text-slate-500 font-medium mt-1">
-                  Cửa Hàng Công Nghệ Chính Hãng
+                  Nhà Sách Trực Tuyến &amp; Không Gian Tri Thức
                 </p>
               </div>
             </div>
@@ -1244,13 +1257,13 @@ export default function App() {
               <div className="relative z-10 max-w-2xl space-y-4">
                 <div className="inline-flex items-center space-x-2 bg-white/20 backdrop-blur-md px-3.5 py-1 rounded-full text-xs font-semibold text-white">
                   <Flame className="w-4 h-4 text-amber-300" />
-                  <span>DinhBao Tech Mega Sale</span>
+                  <span>BookStore &bull; Hội Sách Tri Thức 2026</span>
                 </div>
                 <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-                  Trải Nghiệm Thiết Bị Công Nghệ Đỉnh Cao
+                  Khám Phá Thế Giới Tri Thức Qua Từng Trang Sách
                 </h2>
                 <p className="text-blue-100 text-sm sm:text-base leading-relaxed">
-                  Chuyên cung cấp MacBook, iPhone, bàn phím cơ và thiết bị âm thanh chính hãng với chính sách bảo hành 1 đổi 1 trong 30 ngày.
+                  Hàng ngàn tựa sách Bestseller văn học, kinh tế kinh doanh, công nghệ lập trình và kỹ năng sống chính hãng với ưu đãi đến 25% cùng quà tặng bookmark độc quyền.
                 </p>
                 <div className="pt-2 flex flex-wrap items-center gap-3">
                   <button
@@ -1260,12 +1273,12 @@ export default function App() {
                     }}
                     className="bg-white text-blue-700 hover:bg-blue-50 px-6 py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center space-x-2"
                   >
-                    <span>Khám phá sản phẩm</span>
+                    <span>Khám phá tủ sách</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                   <div className="text-xs text-blue-200 flex items-center space-x-1.5">
                     <Tag className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Mã giảm 10%: <strong className="text-white font-mono font-bold">DINHBAO10</strong></span>
+                    <span>Mã giảm 10%: <strong className="text-white font-mono font-bold">BOOKWORM10</strong> / <strong className="text-white font-mono font-bold">DEVOPS10</strong></span>
                   </div>
                 </div>
               </div>
@@ -1278,8 +1291,8 @@ export default function App() {
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">Miễn Phí Giao Hàng</h4>
-                  <p className="text-[11px] text-slate-500">Đơn hàng từ 5.000.000đ</p>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">Miễn Phí Giao Sách</h4>
+                  <p className="text-[11px] text-slate-500">Đơn hàng từ 250.000đ</p>
                 </div>
               </div>
 
@@ -1288,8 +1301,8 @@ export default function App() {
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">Bảo Hành 100%</h4>
-                  <p className="text-[11px] text-slate-500">Chính hãng 12 - 24 tháng</p>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">100% Sách Thật</h4>
+                  <p className="text-[11px] text-slate-500">Chuẩn NXB &amp; Bọc sách free</p>
                 </div>
               </div>
 
@@ -1298,8 +1311,8 @@ export default function App() {
                   <RotateCcw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">Đổi Trả Dễ Dàng</h4>
-                  <p className="text-[11px] text-slate-500">30 ngày miễn phí 1 đổi 1</p>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">Đổi Trả Sách 7 Ngày</h4>
+                  <p className="text-[11px] text-slate-500">Lỗi in ấn đổi mới 100%</p>
                 </div>
               </div>
 
@@ -1308,8 +1321,8 @@ export default function App() {
                   <Headphones className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">Hỗ Trợ 24/7</h4>
-                  <p className="text-[11px] text-slate-500">Hotline 1900 8888</p>
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-800">Tư Vấn Đọc Sách</h4>
+                  <p className="text-[11px] text-slate-500">Đội ngũ thủ thư hỗ trợ 24/7</p>
                 </div>
               </div>
             </section>
@@ -1492,10 +1505,10 @@ export default function App() {
                   <span>Thương Hiệu Uy Tín &amp; Chất Lượng</span>
                 </div>
                 <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight">
-                  Chào mừng bạn đến với DinhBao Store
+                  Chào mừng bạn đến với BookStore
                 </h2>
                 <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                  <strong>DinhBao Store</strong> được thành lập với sứ mệnh mang đến cho cộng đồng yêu công nghệ, lập trình viên và sinh viên những thiết bị điện tử, laptop, điện thoại và phụ kiện chính hãng với mức giá cạnh tranh cùng dịch vụ hậu mãi số 1.
+                  <strong>BookStore</strong> được thành lập với sứ mệnh lan tỏa văn hóa đọc, mang đến cho độc giả, học sinh, sinh viên và cộng đồng yêu tri thức những tựa sách văn học, kinh tế, công nghệ lập trình và phát triển bản thân xuất sắc nhất từ các Nhà xuất bản uy tín hàng đầu.
                 </p>
               </div>
             </section>
@@ -1506,9 +1519,9 @@ export default function App() {
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Award className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">100% Chính Hãng</h3>
+                <h3 className="text-lg font-bold text-slate-900">100% Sách Thật Chuẩn NXB</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Tất cả sản phẩm tại DinhBao Store đều có nguồn gốc xuất xứ rõ ràng, đầy đủ hóa đơn VAT và bảo hành chính hãng theo tiêu chuẩn của nhà sản xuất.
+                  Tất cả tác phẩm tại BookStore đều có bản quyền chính thức từ NXB Trẻ, Kim Đồng, Hội Nhà Văn, Thông Tin Truyền Thông... nói không với sách in lậu.
                 </p>
               </div>
 
@@ -1516,9 +1529,9 @@ export default function App() {
                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                   <RotateCcw className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Đổi Trả 30 Ngày</h3>
+                <h3 className="text-lg font-bold text-slate-900">Đổi Trả Sách 7 Ngày</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Hỗ trợ đổi mới sản phẩm miễn phí trong 30 ngày nếu phát sinh bất kỳ lỗi nào từ nhà sản xuất. Thủ tục nhanh gọn chỉ trong 5 phút.
+                  Hỗ trợ đổi mới cuốn sách miễn phí trong 7 ngày nếu phát sinh lỗi in ấn, nhầm trang hoặc hư hỏng trong quá trình vận chuyển.
                 </p>
               </div>
 
@@ -1526,9 +1539,9 @@ export default function App() {
                 <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
                   <Headphones className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Tư Vấn Chuyên Nghiệp</h3>
+                <h3 className="text-lg font-bold text-slate-900">Tư Vấn Văn Hóa Đọc</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Đội ngũ kỹ thuật viên am hiểu sâu sắc về phần cứng, luôn sẵn sàng hỗ trợ cài đặt phần mềm, tối ưu hóa thiết bị và hỗ trợ kỹ thuật trọn đời.
+                  Đội ngũ thủ thư am hiểu sâu sắc về các dòng sách, luôn sẵn sàng lắng nghe và gợi ý tác phẩm phù hợp nhất với mục tiêu học tập và thư giãn của bạn.
                 </p>
               </div>
             </div>
@@ -1538,19 +1551,19 @@ export default function App() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
                 <div>
                   <div className="text-3xl sm:text-4xl font-black text-blue-600">10,000+</div>
-                  <div className="text-xs text-slate-500 font-semibold mt-1">Khách Hàng Tin Dùng</div>
+                  <div className="text-xs text-slate-500 font-semibold mt-1">Độc Giả Thân Thiết</div>
                 </div>
                 <div>
                   <div className="text-3xl sm:text-4xl font-black text-indigo-600">100%</div>
-                  <div className="text-xs text-slate-500 font-semibold mt-1">Sản Phẩm Chính Hãng</div>
+                  <div className="text-xs text-slate-500 font-semibold mt-1">Sách Thật Chuẩn NXB</div>
                 </div>
                 <div>
-                  <div className="text-3xl sm:text-4xl font-black text-emerald-600">30 Ngày</div>
+                  <div className="text-3xl sm:text-4xl font-black text-emerald-600">7 Ngày</div>
                   <div className="text-xs text-slate-500 font-semibold mt-1">Đổi Trả Miễn Phí</div>
                 </div>
                 <div>
                   <div className="text-3xl sm:text-4xl font-black text-purple-600">24/7</div>
-                  <div className="text-xs text-slate-500 font-semibold mt-1">Hỗ Trợ Khách Hàng</div>
+                  <div className="text-xs text-slate-500 font-semibold mt-1">Tư Vấn Đọc Sách</div>
                 </div>
               </div>
             </div>
@@ -1561,7 +1574,7 @@ export default function App() {
         {activeTab === "contact" && (
           <div className="space-y-8 animate-in fade-in duration-200">
             <div className="text-center max-w-2xl mx-auto space-y-2">
-              <h2 className="text-3xl font-black text-slate-900">Liên Hệ Với DinhBao Store</h2>
+              <h2 className="text-3xl font-black text-slate-900">Liên Hệ Với BookStore</h2>
               <p className="text-xs sm:text-sm text-slate-600">
                 Chúng tôi luôn lắng nghe và sẵn sàng hỗ trợ bạn bất cứ lúc nào.
               </p>
@@ -1602,7 +1615,7 @@ export default function App() {
                       </div>
                       <div>
                         <strong className="block text-slate-800 font-bold">Email hỗ trợ:</strong>
-                        <span className="text-slate-600">contact@dinhbao.vn &middot; support@dinhbao.vn</span>
+                        <span className="text-slate-600">contact@bookstore.vn &middot; support@bookstore.vn</span>
                       </div>
                     </div>
 
@@ -1631,7 +1644,7 @@ export default function App() {
                 <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-slate-900 text-lg mb-1">Gửi Lời Nhắn Trực Tuyến</h3>
                   <p className="text-xs text-slate-500 mb-6">
-                    Điền thông tin bên dưới, nhân viên hỗ trợ của DinhBao sẽ phản hồi bạn trong vòng 15 phút.
+                    Điền thông tin bên dưới, nhân viên hỗ trợ của BookStore sẽ phản hồi bạn trong vòng 15 phút.
                   </p>
 
                   <form onSubmit={handleContactSubmit} className="space-y-4 text-xs">
@@ -1685,7 +1698,7 @@ export default function App() {
                       <textarea
                         rows={4}
                         required
-                        placeholder="Tôi muốn tư vấn về dòng laptop MacBook M3 Pro..."
+                        placeholder="Tôi muốn tư vấn về tựa sách Clean Code hoặc đặt sách số lượng lớn cho thư viện..."
                         value={contactForm.message}
                         onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1697,7 +1710,7 @@ export default function App() {
                       className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center justify-center space-x-2"
                     >
                       <Send className="w-4 h-4" />
-                      <span>Gửi Tin Nhắn Cho DinhBao</span>
+                      <span>Gửi Tin Nhắn Cho BookStore</span>
                     </button>
                   </form>
                 </div>
@@ -1778,7 +1791,7 @@ export default function App() {
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="text-center mb-2">
                       <h3 className="text-lg font-bold text-slate-900">
-                        Chào mừng đến với DinhBao
+                        Chào mừng đến với BookStore
                       </h3>
                       <p className="text-xs text-slate-500">
                         Đăng nhập để theo dõi đơn hàng và nhận ưu đãi
@@ -1802,7 +1815,7 @@ export default function App() {
                           <input
                             type="text"
                             required
-                            placeholder="admin@dinhbao.vn hoặc email của bạn"
+                            placeholder="admin@bookstore.vn hoặc email của bạn"
                             value={loginEmail}
                             onChange={(e) => {
                               setLoginEmail(e.target.value);
@@ -1876,7 +1889,7 @@ export default function App() {
                         Tạo Tài Khoản Mới
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Tham gia cùng hàng ngàn khách hàng của DinhBao
+                        Tham gia cùng hàng ngàn độc giả của BookStore
                       </p>
                     </div>
 
@@ -2256,7 +2269,7 @@ export default function App() {
                     <strong className="text-slate-800">
                       {customerInfo.fullName}
                     </strong>{" "}
-                    đã mua sắm tại DinhBao. Đơn hàng của bạn đang được xử lý.
+                    đã mua sắm tại BookStore. Đơn hàng của bạn đang được xử lý.
                   </p>
 
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs text-left space-y-2 font-mono">
@@ -2307,14 +2320,14 @@ export default function App() {
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                  D
+                  B
                 </div>
                 <span className="font-extrabold text-lg text-slate-900 tracking-tight">
-                  DinhBao Store
+                  BookStore
                 </span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Cửa hàng thiết bị công nghệ chính hãng hàng đầu. Cam kết chất lượng, bảo hành 1 đổi 1 và giao hàng toàn quốc.
+                Nhà sách trực tuyến uy tín hàng đầu. Cam kết 100% sách thật chuẩn Nhà xuất bản, bọc sách miễn phí và giao hàng toàn quốc.
               </p>
               <div className="text-xs text-slate-400">
                 Khoa CNTT - Đại học Đông Á
@@ -2322,20 +2335,20 @@ export default function App() {
             </div>
 
             <div>
-              <h4 className="font-semibold text-slate-900 text-sm mb-3">Chính sách mua hàng</h4>
+              <h4 className="font-semibold text-slate-900 text-sm mb-3">Chính sách mua sách</h4>
               <ul className="space-y-2 text-xs text-slate-500">
-                <li><a href="#" className="hover:text-blue-600">Giao hàng toàn quốc (Freeship từ 500k)</a></li>
-                <li><a href="#" className="hover:text-blue-600">Bảo hành chính hãng 12-24 tháng</a></li>
-                <li><a href="#" className="hover:text-blue-600">Đổi trả miễn phí 30 ngày</a></li>
-                <li><a href="#" className="hover:text-blue-600">Chính sách bảo mật thông tin</a></li>
+                <li><a href="#" className="hover:text-blue-600">Giao sách toàn quốc (Freeship từ 250k)</a></li>
+                <li><a href="#" className="hover:text-blue-600">100% Sách thật chuẩn bản quyền NXB</a></li>
+                <li><a href="#" className="hover:text-blue-600">Đổi trả sách miễn phí trong 7 ngày</a></li>
+                <li><a href="#" className="hover:text-blue-600">Chính sách bảo mật thông tin độc giả</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-semibold text-slate-900 text-sm mb-3">Hỗ trợ khách hàng</h4>
+              <h4 className="font-semibold text-slate-900 text-sm mb-3">Hỗ trợ độc giả</h4>
               <ul className="space-y-2 text-xs text-slate-500">
                 <li>Hotline: <strong className="text-slate-700">1900 8888 &middot; 0905 123 456</strong></li>
-                <li>Email: contact@dinhbao.vn</li>
+                <li>Email: contact@bookstore.vn</li>
                 <li>Địa chỉ: 33 Xô Viết Nghệ Tĩnh, Đà Nẵng</li>
                 <li>Giờ mở cửa: 8:00 - 21:30 hàng ngày</li>
               </ul>
@@ -2343,9 +2356,9 @@ export default function App() {
           </div>
 
           <div className="border-t border-slate-100 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
-            <p>&copy; {new Date().getFullYear()} DinhBao Store. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} BookStore. All rights reserved.</p>
             <p className="font-medium text-slate-500">
-              Thiết kế bởi DinhBao &middot; React 18 &amp; Tailwind CSS
+              Hệ thống Nhà Sách Trực Tuyến BookStore &middot; React 18 &amp; Tailwind CSS
             </p>
           </div>
         </div>

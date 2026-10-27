@@ -9,6 +9,11 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    networks:
+      default:
+        aliases:
+          - techstore-mongodb
+          - bookstore-mongodb
     restart: always
 
   # 2. Backend REST API (Node.js & Express & Mongoose)
@@ -24,6 +29,11 @@ services:
       MONGO_URI: mongodb://bookstore-mongodb:27017/bookstore
     depends_on:
       - bookstore-mongodb
+    networks:
+      default:
+        aliases:
+          - techstore-backend
+          - bookstore-backend
     restart: always
 
   # 3. Frontend Web Client (React 18 & Nginx)

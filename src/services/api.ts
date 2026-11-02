@@ -18,6 +18,99 @@ export interface OrderPayload {
   paymentMethod: string;
 }
 
+// Kiểu dữ liệu Mã giảm giá (Coupons)
+export interface CouponItem {
+  _id?: string;
+  code: string;
+  title: string;
+  discountType: "percent" | "fixed";
+  discountValue: number;
+  minOrderValue: number;
+  maxDiscount?: number | null;
+  usageLimit: number;
+  usedCount: number;
+  expiresAt: string;
+  isActive: boolean;
+  createdAt?: string;
+}
+
+// Kiểu dữ liệu Thể loại sách động (Categories)
+export interface CategoryItem {
+  _id?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  displayOrder: number;
+  isActive: boolean;
+  bookCount?: number;
+  createdAt?: string;
+}
+
+// Kiểu dữ liệu Báo cáo & Thống kê Doanh thu (Analytics Summary)
+export interface AnalyticsSummary {
+  financial: {
+    totalRevenue: number;
+    averageOrderValue: number;
+    completedOrdersCount: number;
+    totalOrdersCount: number;
+  };
+  orderStatusDistribution: {
+    completed: number;
+    shipping: number;
+    pending: number;
+    canceled: number;
+  };
+  inventory: {
+    totalBooks: number;
+    outOfStockBooks: number;
+    totalUsers: number;
+    totalReviews: number;
+  };
+  revenueTrend: Array<{ date: string; revenue: number }>;
+  topSellingBooks: Array<{
+    id: string;
+    name: string;
+    author: string;
+    imageUrl: string;
+    category: string;
+    quantitySold: number;
+    totalSales: number;
+  }>;
+}
+
+// Kiểu dữ liệu Giám sát Hệ thống & DevOps (System Status)
+export interface SystemStatus {
+  status: "healthy" | "warning" | "offline";
+  server: {
+    port: number;
+    nodeVersion: string;
+    platform: string;
+    arch: string;
+    uptimeSeconds: number;
+    memory: {
+      rssMb: number;
+      heapUsedMb: number;
+      heapTotalMb: number;
+    };
+  };
+  database: {
+    type: string;
+    connected: boolean;
+    name: string;
+    pingLatencyMs: number | null;
+    collections: {
+      products: number;
+      orders: number;
+      users: number;
+      reviews: number;
+      coupons: number;
+      categories: number;
+    };
+  };
+  timestamp: string;
+}
+
 export const api = {
   // 1. Kiểm tra Backend Health
   async checkHealth() {
@@ -74,7 +167,7 @@ export const api = {
     return await res.json();
   },
 
-  // 6. Lấy danh sách đơn hàng từ SQL Server
+  // 6. Lấy danh sách đơn hàng
   async getOrders() {
     try {
       const res = await fetch(`${API_BASE}/orders`);
@@ -83,12 +176,12 @@ export const api = {
         return json.data || [];
       }
     } catch (err) {
-      console.error("❌ [API] Lỗi lấy đơn hàng từ SQL Server:", err);
+      console.error("❌ [API] Lỗi lấy đơn hàng từ MongoDB:", err);
     }
     return [];
   },
 
-  // 7. Tạo đơn hàng mới trên SQL Server
+  // 7. Tạo đơn hàng mới
   async createOrder(order: OrderPayload) {
     const res = await fetch(`${API_BASE}/orders`, {
       method: "POST",
@@ -108,7 +201,7 @@ export const api = {
     return await res.json();
   },
 
-  // 9. Đăng nhập qua SQL Server
+  // 9. Đăng nhập qua MongoDB
   async login(email: string, password: string) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
@@ -120,7 +213,7 @@ export const api = {
     return data;
   },
 
-  // 10. Lấy danh sách Users từ SQL Server (cho Admin)
+  // 10. Lấy danh sách Users từ MongoDB (cho Admin)
   async getUsers(): Promise<UserAccount[]> {
     try {
       const res = await fetch(`${API_BASE}/users`);
@@ -129,7 +222,7 @@ export const api = {
         return json.data || [];
       }
     } catch (err) {
-      console.error("❌ [API] Lỗi lấy danh sách user từ SQL Server:", err);
+      console.error("❌ [API] Lỗi lấy danh sách user từ MongoDB:", err);
     }
     return [];
   },
@@ -230,6 +323,139 @@ export const api = {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(review)
+    });
+    return await res.json();
+  },
+
+  // --- MODULE QUẢN LÝ MÃ GIẢM GIÁ (COUPONS) ---
+  // 21. Lấy danh sách tất cả mã giảm giá
+  async getCoupons(): Promise<CouponItem[]> {
+    try {
+      const res = await fetch(`${API_BASE}/coupons`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || [];
+      }
+    } catch (err) {
+      console.error("❌ [API] Lỗi lấy danh sách coupon:", err);
+    }
+    return [];
+  },
+
+  // 22. Tạo mã giảm giá mới
+  async createCoupon(coupon: Partial<CouponItem>) {
+    const res = await fetch(`${API_BASE}/coupons`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(coupon)
+    });
+    return await res.json();
+  },
+
+  // 23. Cập nhật mã giảm giá
+  async updateCoupon(id: string, coupon: Partial<CouponItem>) {
+    const res = await fetch(`${API_BASE}/coupons/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(coupon)
+    });
+    return await res.json();
+  },
+
+  // 24. Xóa mã giảm giá
+  async deleteCoupon(id: string) {
+    const res = await fetch(`${API_BASE}/coupons/${id}`, {
+      method: "DELETE"
+    });
+    return await res.json();
+  },
+
+  // 25. Kiểm tra và áp dụng mã giảm giá khi thanh toán
+  async applyCoupon(code: string, orderTotal: number) {
+    const res = await fetch(`${API_BASE}/coupons/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, orderTotal })
+    });
+    return await res.json();
+  },
+
+  // --- MODULE QUẢN LÝ THỂ LOẠI SÁCH (CATEGORIES) ---
+  // 26. Lấy danh sách thể loại sách kèm số lượng đầu sách
+  async getCategories(): Promise<CategoryItem[]> {
+    try {
+      const res = await fetch(`${API_BASE}/categories`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || [];
+      }
+    } catch (err) {
+      console.error("❌ [API] Lỗi lấy danh sách thể loại sách:", err);
+    }
+    return [];
+  },
+
+  // 27. Tạo thể loại sách mới
+  async createCategory(category: Partial<CategoryItem>) {
+    const res = await fetch(`${API_BASE}/categories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(category)
+    });
+    return await res.json();
+  },
+
+  // 28. Cập nhật thể loại sách
+  async updateCategory(id: string, category: Partial<CategoryItem>) {
+    const res = await fetch(`${API_BASE}/categories/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(category)
+    });
+    return await res.json();
+  },
+
+  // 29. Xóa thể loại sách
+  async deleteCategory(id: string) {
+    const res = await fetch(`${API_BASE}/categories/${id}`, {
+      method: "DELETE"
+    });
+    return await res.json();
+  },
+
+  // --- MODULE BÁO CÁO & THỐNG KÊ DOANH THU (ANALYTICS) ---
+  // 30. Lấy báo cáo thống kê doanh thu và phân tích chuyên sâu
+  async getAnalyticsSummary(): Promise<AnalyticsSummary | null> {
+    try {
+      const res = await fetch(`${API_BASE}/analytics/summary`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || null;
+      }
+    } catch (err) {
+      console.error("❌ [API] Lỗi lấy báo cáo doanh thu:", err);
+    }
+    return null;
+  },
+
+  // --- MODULE GIÁM SÁT HỆ THỐNG & DEVOPS (DEVOPS MONITOR) ---
+  // 31. Lấy thông tin sức khỏe hệ thống và kết nối cơ sở dữ liệu
+  async getSystemStatus(): Promise<SystemStatus | null> {
+    try {
+      const res = await fetch(`${API_BASE}/system/status`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.error("❌ [API] Lỗi lấy trạng thái hệ thống DevOps:", err);
+    }
+    return null;
+  },
+
+  // 32. Kích hoạt nạp lại dữ liệu mẫu vào MongoDB từ giao diện Admin
+  async triggerSystemSeed() {
+    const res = await fetch(`${API_BASE}/system/seed`, {
+      method: "POST"
     });
     return await res.json();
   }

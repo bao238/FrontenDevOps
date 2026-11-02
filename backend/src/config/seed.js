@@ -6,6 +6,8 @@ const User = require('../models/User');
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Review = require('../models/Review');
+const Coupon = require('../models/Coupon');
+const Category = require('../models/Category');
 
 // 1. Danh sách 18 Tác phẩm Sách Bestseller theo 6 thể loại chuẩn
 const initialProducts = [
@@ -739,6 +741,192 @@ const initialReviews = [
     content: 'Kỹ sư phần mềm bắt buộc phải đọc cuốn này! Sách in tiếng Việt dịch chuẩn xác các thuật ngữ lập trình. Đóng gói 3 lớp xốp chống va đập góc sách rất ưng ý.',
     verified: true,
     likes: 9
+  },
+  {
+    id: 'rev-5',
+    productId: 'prod-book-3',
+    userId: 'usr-cust-2',
+    author: 'Phạm Quỳnh Anh',
+    rating: 5,
+    date: '3 ngày trước',
+    content: 'Tác phẩm văn học kinh điển của nhà văn Nguyễn Nhật Ánh. Đọc lại lần thứ ba vẫn bồi hồi với tình yêu đơn phương của Ngạn dành cho Hà Lan.',
+    verified: true,
+    likes: 15
+  },
+  {
+    id: 'rev-6',
+    productId: 'prod-book-4',
+    userId: 'usr-cust-1',
+    author: 'Đặng Văn Lâm',
+    rating: 5,
+    date: '1 tuần trước',
+    content: 'Một kiệt tác về quyền lực, gia đình và nguyên tắc sống. Bản dịch của NXB Văn Học đọc rất cuốn hút và trau chuốt.',
+    verified: true,
+    likes: 19
+  },
+  {
+    id: 'rev-7',
+    productId: 'prod-book-6',
+    userId: 'usr-cust-2',
+    author: 'Ngô Thị Mai',
+    rating: 5,
+    date: '6 ngày trước',
+    content: 'Cuốn sách gối đầu giường về giao tiếp và thấu hiểu lòng người. Giúp mình cải thiện rất nhiều mối quan hệ trong công việc.',
+    verified: true,
+    likes: 27
+  },
+  {
+    id: 'rev-8',
+    productId: 'prod-book-7',
+    userId: 'usr-cust-1',
+    author: 'Hoàng Minh Tuấn',
+    rating: 5,
+    date: '4 ngày trước',
+    content: 'Mở rộng tư duy tài chính, phân biệt rõ ràng giữa tài sản và tiêu sản. Rất đáng đọc cho các bạn trẻ bắt đầu lập nghiệp.',
+    verified: true,
+    likes: 12
+  },
+  {
+    id: 'rev-9',
+    productId: 'prod-book-10',
+    userId: 'usr-cust-2',
+    author: 'Trịnh Hoàng Long',
+    rating: 5,
+    date: '5 ngày trước',
+    content: 'Morgan Housel viết quá hay, giải thích tại sao hành vi tài chính lại quan trọng hơn cả kiến thức toán học.',
+    verified: true,
+    likes: 16
+  },
+  {
+    id: 'rev-10',
+    productId: 'prod-book-11',
+    userId: 'usr-cust-1',
+    author: 'Lê Bảo Châu',
+    rating: 5,
+    date: '2 ngày trước',
+    content: 'Cuốn sách chữa lành tâm hồn sâu sắc của Thầy Minh Niệm. Mỗi khi căng thẳng mình đều mở ra đọc một chương.',
+    verified: true,
+    likes: 31
+  },
+  {
+    id: 'rev-11',
+    productId: 'prod-book-15',
+    userId: 'usr-cust-2',
+    author: 'Nguyễn Duy Cường',
+    rating: 5,
+    date: '1 tuần trước',
+    content: 'Cái nhìn toàn cảnh về lịch sử phát triển loài người. Yuval Noah Harari xâu chuỗi sinh học, nhân chủng học và kinh tế quá đỉnh.',
+    verified: true,
+    likes: 20
+  },
+  {
+    id: 'rev-12',
+    productId: 'prod-book-17',
+    userId: 'usr-cust-1',
+    author: 'Đỗ Thị Lan',
+    rating: 5,
+    date: '3 ngày trước',
+    content: 'Cuốn sách thiếu nhi dành cho người lớn. "Người ta chỉ nhìn thấy thật rõ ràng bằng trái tim, cái cốt yếu thì mắt không thể thấy".',
+    verified: true,
+    likes: 14
+  }
+];
+
+// Danh sách Thể loại sách chuẩn ban đầu cho BookStore
+const initialCategories = [
+  {
+    name: 'Văn học - Tiểu thuyết',
+    slug: 'van-hoc-tieu-thuyet',
+    description: 'Các tác phẩm văn học kinh điển, tiểu thuyết hiện đại và truyện ngắn chọn lọc',
+    icon: 'BookOpen',
+    displayOrder: 1,
+    isActive: true
+  },
+  {
+    name: 'Kinh tế - Kinh doanh',
+    slug: 'kinh-te-kinh-doanh',
+    description: 'Tài chính, khởi nghiệp, quản trị doanh nghiệp và bài học làm giàu',
+    icon: 'TrendingUp',
+    displayOrder: 2,
+    isActive: true
+  },
+  {
+    name: 'Kỹ năng sống',
+    slug: 'ky-nang-song',
+    description: 'Phát triển bản thân, tư duy tích cực, quản lý thời gian và giao tiếp',
+    icon: 'Sparkles',
+    displayOrder: 3,
+    isActive: true
+  },
+  {
+    name: 'Công nghệ - Lập trình',
+    slug: 'cong-nghe-lap-trinh',
+    description: 'Kiến trúc phần mềm, DevOps, AI, Python, JavaScript và thiết kế hệ thống',
+    icon: 'Laptop',
+    displayOrder: 4,
+    isActive: true
+  },
+  {
+    name: 'Khoa học - Triết học',
+    slug: 'khoa-hoc-triet-hoc',
+    description: 'Vũ trụ học, lịch sử loài người, triết lý nhân sinh và nghiên cứu tự nhiên',
+    icon: 'Compass',
+    displayOrder: 5,
+    isActive: true
+  },
+  {
+    name: 'Thiếu nhi',
+    slug: 'thieu-nhi',
+    description: 'Truyện tranh, cổ tích, sách khám phá thế giới bổ ích cho các bé',
+    icon: 'Heart',
+    displayOrder: 6,
+    isActive: true
+  }
+];
+
+// Danh sách Mã giảm giá khởi tạo ban đầu cho BookStore
+const initialCoupons = [
+  {
+    code: 'BOOKWORM10',
+    title: 'Giảm 10% cho mọt sách đam mê',
+    discountType: 'percent',
+    discountValue: 10,
+    minOrderValue: 100000,
+    maxDiscount: 50000,
+    usageLimit: 200,
+    usedCount: 15,
+    isActive: true
+  },
+  {
+    code: 'DEVOPS10',
+    title: 'Ưu đãi độc quyền học phần DevOps',
+    discountType: 'percent',
+    discountValue: 10,
+    minOrderValue: 50000,
+    maxDiscount: 30000,
+    usageLimit: 100,
+    usedCount: 8,
+    isActive: true
+  },
+  {
+    code: 'TRIAN50K',
+    title: 'Tri ân khách hàng thân thiết mua sách',
+    discountType: 'fixed',
+    discountValue: 50000,
+    minOrderValue: 300000,
+    usageLimit: 50,
+    usedCount: 5,
+    isActive: true
+  },
+  {
+    code: 'FREESHIP',
+    title: 'Mã miễn phí vận chuyển toàn quốc',
+    discountType: 'fixed',
+    discountValue: 30000,
+    minOrderValue: 150000,
+    usageLimit: 150,
+    usedCount: 22,
+    isActive: true
   }
 ];
 
@@ -761,6 +949,8 @@ async function seedData() {
       await Order.deleteMany({});
       await OrderItem.deleteMany({});
       await Review.deleteMany({});
+      await Category.deleteMany({});
+      await Coupon.deleteMany({});
     }
 
     // 2. Nạp sách vào collection products
@@ -792,10 +982,38 @@ async function seedData() {
     }
 
     // 6. Nạp đánh giá vào collection reviews
-    const rCount = await Review.countDocuments();
-    if (rCount === 0) {
-      await Review.insertMany(initialReviews);
-      console.log('⭐ [MongoDB Seed] Đã tự động nạp đánh giá độc giả vào collection reviews!');
+    for (const rev of initialReviews) {
+      await Review.updateOne({ id: rev.id }, { $set: rev }, { upsert: true });
+    }
+    console.log('⭐ [MongoDB Seed] Đã đồng bộ danh sách đánh giá độc giả vào collection reviews!');
+
+    // 7. Đồng bộ chuẩn xác reviewsCount và rating của từng cuốn sách với collection reviews
+    const allProducts = await Product.find();
+    for (const prod of allProducts) {
+      const prodReviews = await Review.find({ productId: prod.id });
+      prod.reviewsCount = prodReviews.length;
+      if (prodReviews.length > 0) {
+        const total = prodReviews.reduce((sum, r) => sum + (r.rating || 5), 0);
+        prod.rating = Number((total / prodReviews.length).toFixed(1));
+      } else {
+        prod.rating = 0;
+      }
+      await prod.save();
+    }
+    console.log('🔄 [MongoDB Seed] Đã tính toán và đồng bộ chuẩn xác rating & reviewsCount cho toàn bộ sách!');
+
+    // 7. Nạp danh mục thể loại vào collection categories
+    const catCount = await Category.countDocuments();
+    if (catCount === 0) {
+      await Category.insertMany(initialCategories);
+      console.log('📂 [MongoDB Seed] Đã tự động nạp 6 thể loại sách mẫu vào collection categories!');
+    }
+
+    // 8. Nạp mã giảm giá vào collection coupons
+    const coupCount = await Coupon.countDocuments();
+    if (coupCount === 0) {
+      await Coupon.insertMany(initialCoupons);
+      console.log('🎟️ [MongoDB Seed] Đã tự động nạp 4 mã giảm giá mẫu vào collection coupons!');
     }
 
     console.log('🎉 [MongoDB Seed] Cơ sở dữ liệu BookStore trên MongoDB đã sẵn sàng!');

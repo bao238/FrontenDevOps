@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
+const Product = require('../models/Product');
 const { isDbConnected } = require('../config/db');
 
 // GET /api/orders
@@ -86,6 +87,21 @@ exports.createOrder = async (req, res) => {
         quantity: Number(it.quantity) || 1
       }));
       await OrderItem.insertMany(orderItemDocs);
+
+      // 3. Tự động trừ số lượng sách tồn kho trong collection products
+      for (const it of items) {
+        if (it.product && it.product.id) {
+          const qty = Number(it.quantity) || 1;
+          const updatedProd = await Product.findOneAndUpdate(
+            { id: it.product.id },
+            { $inc: { stockQuantity: -qty } },
+            { new: true }
+          );
+          if (updatedProd && updatedProd.stockQuantity <= 0) {
+            await Product.updateOne({ id: it.product.id }, { inStock: false, stockQuantity: 0 });
+          }
+        }
+      }
     }
 
     return res.status(201).json({ message: 'Tạo đơn hàng thành công trên MongoDB', data: created });

@@ -16,7 +16,8 @@ import {
   Sparkles,
   ShoppingBag,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Bookmark
 } from "lucide-react";
 
 export interface CartItem {
@@ -70,6 +71,11 @@ export default function CartPage({
   };
 
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Ngưỡng Miễn Phí Vận Chuyển toàn quốc: 250.000₫
+  const FREE_SHIPPING_THRESHOLD = 250000;
+  const shippingProgress = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
+  const remainingForFreeShip = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -142,6 +148,53 @@ export default function CartPage({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT: CART ITEMS LIST (8 COLS) */}
           <div className="lg:col-span-8 space-y-4">
+            {/* Thanh tiến trình Miễn Phí Vận Chuyển (Freeship Progress Bar) */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between text-xs sm:text-sm font-semibold">
+                <div className="flex items-center space-x-2.5">
+                  <div
+                    className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                      shippingProgress >= 100
+                        ? "bg-emerald-100 text-emerald-600 shadow-sm shadow-emerald-500/20"
+                        : "bg-blue-100 text-blue-600 shadow-sm shadow-blue-500/20"
+                    }`}
+                  >
+                    <Truck className="w-4 h-4" />
+                  </div>
+                  {shippingProgress >= 100 ? (
+                    <span className="text-emerald-700 font-bold">
+                      🎉 Tuyệt vời! Bạn đã đủ điều kiện được <strong className="text-emerald-800">Miễn Phí Vận Chuyển</strong> toàn quốc!
+                    </span>
+                  ) : (
+                    <span className="text-slate-700">
+                      Mua thêm <strong className="text-blue-600 font-bold">{formatVND(remainingForFreeShip)}</strong> để được <strong className="text-emerald-600 font-bold">Freeship toàn quốc</strong>!
+                    </span>
+                  )}
+                </div>
+                <span
+                  className={`font-mono text-xs sm:text-sm font-black px-2 py-0.5 rounded-lg ${
+                    shippingProgress >= 100
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-blue-50 text-blue-700 border border-blue-200"
+                  }`}
+                >
+                  {shippingProgress}%
+                </span>
+              </div>
+
+              {/* Progress track */}
+              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/50">
+                <div
+                  className={`h-full transition-all duration-500 rounded-full ${
+                    shippingProgress >= 100
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                      : "bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600"
+                  }`}
+                  style={{ width: `${shippingProgress}%` }}
+                />
+              </div>
+            </div>
+
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
               {/* Table Top Bar */}
               <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
@@ -173,12 +226,20 @@ export default function CartPage({
                     >
                       {/* Product Thumbnail & Details */}
                       <div className="flex items-center space-x-4 flex-1 min-w-0">
-                        <img
-                          src={item.product.imageUrl}
-                          alt={item.product.name}
+                        {/* Bìa sách tỷ lệ 3:4 với hiệu ứng gáy sách 3D */}
+                        <div
                           onClick={() => onSelectProduct(item.product)}
-                          className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-2xl border border-slate-200 shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
-                        />
+                          className="relative aspect-[3/4] w-16 sm:w-20 rounded-xl overflow-hidden border border-slate-200 shrink-0 cursor-pointer hover:opacity-90 transition-opacity bg-slate-100 shadow-sm"
+                        >
+                          <img
+                            src={item.product.imageUrl}
+                            alt={item.product.name}
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Hiệu ứng gáy sách chiều sâu */}
+                          <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/25 via-black/5 to-transparent pointer-events-none" />
+                        </div>
+
                         <div className="space-y-1.5 min-w-0 flex-1">
                           <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
                             {item.product.category}
@@ -190,6 +251,11 @@ export default function CartPage({
                           >
                             {item.product.name}
                           </h4>
+                          {item.product.author && (
+                            <p className="text-[11px] text-slate-500 font-medium truncate">
+                              Tác giả: <span className="text-slate-700 font-semibold">{item.product.author}</span>
+                            </p>
+                          )}
                           <div className="flex items-center space-x-2 text-xs">
                             <span className="font-extrabold text-blue-600">
                               {formatVND(item.product.price)}
@@ -263,20 +329,20 @@ export default function CartPage({
 
                 <div className="flex items-center space-x-2 text-xs text-emerald-600 font-medium">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Miễn phí vận chuyển toàn quốc cho đơn từ 500.000₫</span>
+                  <span>Miễn phí vận chuyển toàn quốc cho đơn từ 250.000₫</span>
                 </div>
               </div>
             </div>
 
-            {/* Service Highlights Card */}
+            {/* Service Highlights Card chuẩn Nhà Sách BookStore */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center space-x-3 text-xs">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900">Giao Hàng Siêu Tốc</h5>
-                  <p className="text-[11px] text-slate-500">Chỉ 2H tại nội thành</p>
+                  <h5 className="font-bold text-slate-900">Giao Toàn Quốc Siêu Tốc</h5>
+                  <p className="text-[11px] text-slate-500">Đóng gói 3 lớp xốp chống móp</p>
                 </div>
               </div>
 
@@ -285,8 +351,8 @@ export default function CartPage({
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900">100% Chính Hãng</h5>
-                  <p className="text-[11px] text-slate-500">Bảo hành 12 tháng</p>
+                  <h5 className="font-bold text-slate-900">100% Sách Thật Chuẩn NXB</h5>
+                  <p className="text-[11px] text-slate-500">Tặng kèm bookmark độc quyền</p>
                 </div>
               </div>
 
@@ -295,8 +361,8 @@ export default function CartPage({
                   <RotateCcw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900">Đổi Trả Dễ Dàng</h5>
-                  <p className="text-[11px] text-slate-500">Trong 30 ngày nếu lỗi</p>
+                  <h5 className="font-bold text-slate-900">Đổi Trả Sách 7 Ngày</h5>
+                  <p className="text-[11px] text-slate-500">Lỗi in ấn đổi mới 100%</p>
                 </div>
               </div>
             </div>
@@ -441,36 +507,45 @@ export default function CartPage({
               <div
                 key={p.id}
                 onClick={() => onSelectProduct(p)}
-                className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+                className="bg-white rounded-3xl p-3.5 border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between"
               >
-                <div className="space-y-3">
-                  <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
+                <div className="space-y-2.5">
+                  <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 shadow-inner">
                     <img
                       src={p.imageUrl}
                       alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
+                    {/* Hiệu ứng gáy sách 3D */}
+                    <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/25 via-black/5 to-transparent pointer-events-none" />
                     {p.discountPercent > 0 && (
-                      <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                      <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">
                         -{p.discountPercent}%
                       </span>
                     )}
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 block">{p.category}</span>
-                    <h4 className="font-bold text-xs text-slate-900 group-hover:text-blue-600 line-clamp-2 transition-colors">
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded block w-fit mb-1">
+                      {p.category}
+                    </span>
+                    <h4 className="font-bold text-xs text-slate-900 group-hover:text-blue-600 line-clamp-2 transition-colors leading-snug">
                       {p.name}
                     </h4>
+                    {p.author && (
+                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                        Tác giả: <span className="text-slate-700">{p.author}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="font-bold text-xs text-blue-600">
+                <div className="pt-2.5 mt-2.5 border-t border-slate-100 flex items-center justify-between">
+                  <span className="font-black text-xs text-red-600">
                     {formatVND(p.price)}
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-400 group-hover:text-blue-600 flex items-center space-x-0.5">
-                    <span>Xem</span>
-                    <ChevronRight className="w-3 h-3" />
+                  <span className="text-[11px] font-bold text-slate-500 group-hover:text-blue-600 flex items-center space-x-0.5 transition-colors">
+                    <span>Xem sách</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
               </div>

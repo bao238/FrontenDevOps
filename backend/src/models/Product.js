@@ -36,6 +36,7 @@ const productSchema = new mongoose.Schema(
     // Bảng thông số linh hoạt phục vụ hiển thị động
     specs: { type: Object, default: {} },
     inStock: { type: Boolean, default: true },
+    stockQuantity: { type: Number, default: 25 },
     featured: { type: Boolean, default: false },
     reviews: { type: [reviewSchema], default: [] }
   },

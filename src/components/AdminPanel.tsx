@@ -41,8 +41,16 @@ import {
   User,
   Star,
   MessageSquare,
-  ThumbsUp
+  ThumbsUp,
+  Ticket,
+  BarChart3,
+  Folder,
+  Server
 } from "lucide-react";
+import CouponsTab from "./admin/CouponsTab";
+import AnalyticsTab from "./admin/AnalyticsTab";
+import CategoriesTab from "./admin/CategoriesTab";
+import DevOpsTab from "./admin/DevOpsTab";
 
 interface CartItem {
   product: Product;
@@ -109,7 +117,9 @@ export default function AdminPanel({
   onToggleLockUser,
   onResetDefaultUsers,
 }: AdminPanelProps) {
-  const [adminTab, setAdminTab] = useState<"products" | "orders" | "users" | "reviews">("products");
+  const [adminTab, setAdminTab] = useState<
+    "products" | "orders" | "users" | "reviews" | "coupons" | "analytics" | "categories" | "devops"
+  >("products");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
 
@@ -646,51 +656,95 @@ export default function AdminPanel({
       </div>
 
       {/* Admin Tab Switcher */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-        <div className="flex space-x-2">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-200 pb-3 gap-3">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setAdminTab("products")}
-            className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-2 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
               adminTab === "products"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             <Package className="w-4 h-4" />
-            <span>Quản Lý Sản Phẩm ({products.length})</span>
+            <span>Sản Phẩm ({products.length})</span>
           </button>
           <button
             onClick={() => setAdminTab("orders")}
-            className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-2 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
               adminTab === "orders"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             <ShoppingBag className="w-4 h-4" />
-            <span>Đơn Hàng Khách Đặt ({orders.length})</span>
+            <span>Đơn Hàng ({orders.length})</span>
           </button>
           <button
             onClick={() => setAdminTab("users")}
-            className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-2 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
               adminTab === "users"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Quản Lý Người Dùng ({users.length})</span>
+            <span>Người Dùng ({users.length})</span>
           </button>
           <button
             onClick={() => setAdminTab("reviews")}
-            className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-2 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
               adminTab === "reviews"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             <Star className="w-4 h-4" />
-            <span>Quản Lý Đánh Giá ({reviewsList.length})</span>
+            <span>Đánh Giá ({reviewsList.length})</span>
+          </button>
+          <button
+            onClick={() => setAdminTab("coupons")}
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+              adminTab === "coupons"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Ticket className="w-4 h-4" />
+            <span>Mã Giảm Giá</span>
+          </button>
+          <button
+            onClick={() => setAdminTab("analytics")}
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+              adminTab === "analytics"
+                ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Báo Cáo Doanh Thu</span>
+          </button>
+          <button
+            onClick={() => setAdminTab("categories")}
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+              adminTab === "categories"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Folder className="w-4 h-4" />
+            <span>Thể Loại Sách</span>
+          </button>
+          <button
+            onClick={() => setAdminTab("devops")}
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+              adminTab === "devops"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Server className="w-4 h-4" />
+            <span>DevOps &amp; Giám Sát</span>
           </button>
         </div>
 
@@ -832,19 +886,24 @@ export default function AdminPanel({
                         {formatVND(p.originalPrice)}
                       </td>
 
-                      {/* In Stock toggle */}
+                      {/* In Stock toggle & Stock Quantity */}
                       <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => handleToggleStock(p)}
-                          className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all ${
-                            p.inStock
-                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                              : "bg-red-100 text-red-800 hover:bg-red-200"
-                          }`}
-                          title="Bấm để chuyển trạng thái Còn/Hết"
-                        >
-                          {p.inStock ? "Còn hàng" : "Hết hàng"}
-                        </button>
+                        <div className="flex flex-col items-center space-y-1">
+                          <button
+                            onClick={() => handleToggleStock(p)}
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                              p.inStock
+                                ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                : "bg-red-100 text-red-800 hover:bg-red-200"
+                            }`}
+                            title="Bấm để chuyển trạng thái Còn/Hết"
+                          >
+                            {p.inStock ? "Còn hàng" : "Hết hàng"}
+                          </button>
+                          <span className="text-[11px] font-bold text-slate-600">
+                            Kho: {p.stockQuantity !== undefined ? `${p.stockQuantity} cuốn` : "25 cuốn"}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Actions */}
@@ -1539,6 +1598,18 @@ export default function AdminPanel({
           </div>
         </div>
       )}
+
+      {/* 5. TAB QUẢN LÝ MÃ GIẢM GIÁ (COUPONS) */}
+      {adminTab === "coupons" && <CouponsTab />}
+
+      {/* 6. TAB BÁO CÁO & THỐNG KÊ DOANH THU (ANALYTICS) */}
+      {adminTab === "analytics" && <AnalyticsTab orders={orders} />}
+
+      {/* 7. TAB QUẢN LÝ THỂ LOẠI SÁCH (CATEGORIES) */}
+      {adminTab === "categories" && <CategoriesTab />}
+
+      {/* 8. TAB GIÁM SÁT HỆ THỐNG & DEVOPS (DEVOPS MONITOR) */}
+      {adminTab === "devops" && <DevOpsTab />}
 
       {/* CONFIRM DELETE REVIEW MODAL */}
       {deletingReviewId && (

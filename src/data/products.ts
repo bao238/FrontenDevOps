@@ -31,6 +31,7 @@ export interface Product {
   isbn?: string;
   specs: { [key: string]: string };
   inStock: boolean;
+  stockQuantity?: number;
   featured?: boolean;
   reviews?: ReviewItem[];
 }

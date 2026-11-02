@@ -31,6 +31,8 @@ interface ProductDetailPageProps {
   onBuyNow: (product: Product, quantity?: number) => void;
   onBack: () => void;
   onSelectRelatedProduct: (product: Product) => void;
+  onToggleWishlist?: (product: Product) => void;
+  isWishlisted?: boolean;
 }
 
 export default function ProductDetailPage({
@@ -40,6 +42,8 @@ export default function ProductDetailPage({
   onBuyNow,
   onBack,
   onSelectRelatedProduct,
+  onToggleWishlist,
+  isWishlisted = false
 }: ProductDetailPageProps) {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"specs" | "desc" | "reviews">("desc");
@@ -68,6 +72,12 @@ export default function ProductDetailPage({
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewContent, setReviewContent] = useState("");
   const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (nếu có 0 đánh giá thì trả về 0)
+  const hasReviews = reviews.length > 0;
+  const currentRating = hasReviews
+    ? Number((reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / reviews.length).toFixed(1))
+    : 0;
 
   // Format VND
   const formatVND = (amount: number) => {
@@ -162,30 +172,39 @@ export default function ProductDetailPage({
       {/* Main Product Showcase (2 Columns) */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         {/* Left Column: Big Product Image & Badges */}
-        <div className="lg:col-span-6 space-y-4">
-          <div className="relative aspect-square rounded-3xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner group">
+        <div className="lg:col-span-5 space-y-4">
+          <div className="relative aspect-[3/4] max-w-sm mx-auto rounded-3xl overflow-hidden bg-slate-50 border border-slate-200 shadow-xl shadow-slate-200/50 group">
             <img
               src={product.imageUrl}
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
+            {/* Hiệu ứng gáy sách chiều sâu 3D */}
+            <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/30 via-black/10 to-transparent pointer-events-none z-10" />
+
             {product.discountPercent > 0 && (
-              <div className="absolute top-4 left-4 bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-lg shadow-red-600/30 flex items-center space-x-1">
+              <div className="absolute top-4 left-4 z-20 bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-lg shadow-red-600/30 flex items-center space-x-1">
                 <Tag className="w-3.5 h-3.5" />
                 <span>Tiết kiệm {product.discountPercent}%</span>
               </div>
             )}
-            <div className="absolute top-4 right-4 flex space-x-2">
+            <div className="absolute top-4 right-4 z-20 flex space-x-2">
               <button
-                onClick={() => setIsLiked(!isLiked)}
+                onClick={() => {
+                  if (onToggleWishlist) {
+                    onToggleWishlist(product);
+                  } else {
+                    setIsLiked(!isLiked);
+                  }
+                }}
                 className={`p-2.5 rounded-2xl backdrop-blur-md transition-all shadow-md ${
-                  isLiked
-                    ? "bg-red-500 text-white"
+                  isWishlisted || isLiked
+                    ? "bg-rose-500 text-white shadow-rose-500/30"
                     : "bg-white/80 hover:bg-white text-slate-700"
                 }`}
-                title="Thêm vào yêu thích"
+                title={isWishlisted || isLiked ? "Xóa khỏi yêu thích" : "Thêm vào yêu thích"}
               >
-                <Heart className={`w-4 h-4 ${isLiked ? "fill-white" : ""}`} />
+                <Heart className={`w-4 h-4 ${isWishlisted || isLiked ? "fill-white" : ""}`} />
               </button>
               <button
                 onClick={handleShare}
@@ -202,8 +221,8 @@ export default function ProductDetailPage({
             </div>
 
             {!product.inStock && (
-              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center text-white text-sm font-bold">
-                Sản phẩm tạm hết hàng
+              <div className="absolute inset-0 z-30 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center text-white text-sm font-bold">
+                Sách tạm hết hàng
               </div>
             )}
           </div>
@@ -229,7 +248,7 @@ export default function ProductDetailPage({
         </div>
 
         {/* Right Column: Pricing, Overview & Action Buttons */}
-        <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
+        <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             {/* Category & Status */}
             <div className="flex items-center justify-between">
@@ -243,7 +262,11 @@ export default function ProductDetailPage({
                   }`}
                 ></span>
                 <span className={`font-bold ${product.inStock ? "text-emerald-700" : "text-red-700"}`}>
-                  {product.inStock ? "Còn hàng tại BookStore" : "Tạm hết hàng"}
+                  {product.inStock
+                    ? product.stockQuantity && product.stockQuantity <= 5
+                      ? `⚡ Chỉ còn ${product.stockQuantity} cuốn cuối cùng!`
+                      : `Còn hàng (${product.stockQuantity || 25} cuốn)`
+                    : "Tạm hết hàng"}
                 </span>
               </div>
             </div>
@@ -253,18 +276,59 @@ export default function ProductDetailPage({
               {product.name}
             </h1>
 
+            {/* Author & Publication Information */}
+            <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-600 bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-100">
+              <span className="flex items-center space-x-1">
+                <span className="text-slate-400">Tác giả:</span>
+                <span className="font-bold text-slate-900">{product.author || "Nhiều tác giả"}</span>
+              </span>
+              {product.publisher && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="flex items-center space-x-1">
+                    <span className="text-slate-400">NXB:</span>
+                    <span className="font-semibold text-slate-800">{product.publisher}</span>
+                  </span>
+                </>
+              )}
+              {product.publicationYear && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="flex items-center space-x-1">
+                    <span className="text-slate-400">Năm XB:</span>
+                    <span className="font-semibold text-slate-800">{product.publicationYear}</span>
+                  </span>
+                </>
+              )}
+              {product.pages && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="flex items-center space-x-1">
+                    <span className="text-slate-400">Số trang:</span>
+                    <span className="font-semibold text-slate-800">{product.pages} trang</span>
+                  </span>
+                </>
+              )}
+            </div>
+
             {/* Star Ratings Summary */}
             <div className="flex items-center space-x-3 text-xs pb-2 border-b border-slate-100">
-              <div className="flex items-center space-x-1 text-amber-500 font-bold">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                <span>{product.rating}</span>
-              </div>
+              {hasReviews ? (
+                <div className="flex items-center space-x-1 text-amber-500 font-bold">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <span>{currentRating}</span>
+                </div>
+              ) : (
+                <span className="text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md text-[11px]">
+                  Chưa có đánh giá
+                </span>
+              )}
               <span className="text-slate-300">&bull;</span>
               <button
                 onClick={() => setActiveTab("reviews")}
                 className="text-blue-600 font-semibold hover:underline"
               >
-                {reviews.length} đánh giá thực tế
+                {hasReviews ? `${reviews.length} đánh giá thực tế` : "Viết đánh giá đầu tiên"}
               </button>
               <span className="text-slate-300">&bull;</span>
               <span className="text-slate-500">Mã SP: <strong className="font-mono text-slate-700">{product.id}</strong></span>
@@ -460,27 +524,49 @@ export default function ProductDetailPage({
           <div className="space-y-8 animate-in fade-in">
             {/* Reviews Overview Banner */}
             <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-6">
-              <div className="text-center sm:text-left space-y-1">
-                <div className="flex items-center justify-center sm:justify-start space-x-2">
-                  <span className="text-4xl font-black text-slate-900">{product.rating}</span>
-                  <div className="space-y-1">
-                    <div className="flex text-amber-400">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                      ))}
+              {hasReviews ? (
+                <div className="text-center sm:text-left space-y-1">
+                  <div className="flex items-center justify-center sm:justify-start space-x-2">
+                    <span className="text-4xl font-black text-slate-900">{currentRating}</span>
+                    <div className="space-y-1">
+                      <div className="flex text-amber-400">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            className={`w-4 h-4 ${
+                              s <= Math.round(currentRating)
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-slate-200"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-400">Dựa trên {reviews.length} đánh giá thực tế</p>
                     </div>
-                    <p className="text-xs text-slate-400">Dựa trên {reviews.length} đánh giá</p>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="text-center sm:text-left space-y-1">
+                  <div className="flex items-center justify-center sm:justify-start space-x-2">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-800">
+                      Chưa có đánh giá nào
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Sản phẩm này hiện chưa có nhận xét từ độc giả. Hãy là người đầu tiên chia sẻ cảm nghĩ!
+                  </p>
+                </div>
+              )}
 
-              <div className="text-center">
-                <p className="text-xs font-bold text-slate-700 mb-1">Bạn đã trải nghiệm sản phẩm này?</p>
+              <div className="text-center shrink-0">
+                <p className="text-xs font-bold text-slate-700 mb-1">
+                  {hasReviews ? "Bạn đã trải nghiệm sản phẩm này?" : "Bạn đã đọc cuốn sách này?"}
+                </p>
                 <a
                   href="#write-review"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors inline-block"
                 >
-                  Viết Đánh Giá Của Bạn
+                  {hasReviews ? "Viết Đánh Giá Của Bạn" : "Viết Đánh Giá Đầu Tiên"}
                 </a>
               </div>
             </div>
@@ -490,7 +576,16 @@ export default function ProductDetailPage({
               <h4 className="font-bold text-slate-900 text-sm">
                 Tất cả nhận xét ({reviews.length})
               </h4>
-              <div className="space-y-3">
+              {!hasReviews ? (
+                <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs space-y-2">
+                  <Star className="w-8 h-8 text-slate-200 mx-auto" />
+                  <p className="font-bold text-slate-700 text-sm">Chưa có nhận xét nào</p>
+                  <p className="max-w-sm mx-auto text-slate-500">
+                    Hãy gửi đánh giá đầu tiên của bạn ở biểu mẫu bên dưới để giúp các độc giả khác có thêm thông tin tham khảo nhé!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
                 {reviews.map((rev) => (
                   <div
                     key={rev.id}
@@ -539,6 +634,7 @@ export default function ProductDetailPage({
                   </div>
                 ))}
               </div>
+            )}
             </div>
 
             {/* Write a Review Form */}
@@ -633,9 +729,9 @@ export default function ProductDetailPage({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-black text-slate-900">
-                Sản Phẩm Cùng Danh Mục
+                Tác Phẩm Cùng Thể Loại Độc Giả Cũng Yêu Thích
               </h3>
-              <p className="text-xs text-slate-500">Khám phá thêm các thiết bị {product.category} khác</p>
+              <p className="text-xs text-slate-500">Khám phá thêm các tựa sách thuộc thể loại {product.category} đặc sắc khác</p>
             </div>
           </div>
 
@@ -647,25 +743,35 @@ export default function ProductDetailPage({
                   onSelectRelatedProduct(rel);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+                className="bg-white rounded-3xl border border-slate-200 p-3.5 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
               >
-                <div className="aspect-square rounded-xl overflow-hidden bg-slate-50 relative">
+                <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-slate-50 relative shadow-inner">
                   <img
                     src={rel.imageUrl}
                     alt={rel.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
+                  {/* Hiệu ứng gáy sách 3D */}
+                  <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/25 via-black/5 to-transparent pointer-events-none" />
                   {rel.discountPercent > 0 && (
-                    <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                    <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">
                       -{rel.discountPercent}%
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-xs text-slate-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded block w-fit mb-1">
+                    {rel.category}
+                  </span>
+                  <h4 className="font-bold text-xs text-slate-900 line-clamp-2 group-hover:text-blue-600 transition-colors leading-snug">
                     {rel.name}
                   </h4>
+                  {rel.author && (
+                    <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                      Tác giả: <span className="text-slate-700">{rel.author}</span>
+                    </p>
+                  )}
                   <div className="flex items-baseline space-x-2 mt-2">
                     <span className="font-black text-red-600 text-sm">
                       {formatVND(rel.price)}

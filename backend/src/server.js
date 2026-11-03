@@ -14,9 +14,10 @@ const analyticsController = require('./controllers/analyticsController');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Cấu hình Middlewares tiếp nhận CORS và JSON payload
+// Cấu hình Middlewares tiếp nhận CORS và JSON payload dung lượng lớn (phục vụ upload ảnh base64 trực tiếp từ máy tính)
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // 1. Healthcheck Endpoint cơ bản (Phục vụ Docker Healthcheck & CI/CD Pipeline)
 app.get('/api/health', (req, res) => {

@@ -45,7 +45,9 @@ import {
   Ticket,
   BarChart3,
   Folder,
-  Server
+  Server,
+  Upload,
+  Link2
 } from "lucide-react";
 import CouponsTab from "./admin/CouponsTab";
 import AnalyticsTab from "./admin/AnalyticsTab";
@@ -269,6 +271,120 @@ export default function AdminPanel({
   const [formPrice, setFormPrice] = useState<number>(0);
   const [formOriginalPrice, setFormOriginalPrice] = useState<number>(0);
   const [formImageUrl, setFormImageUrl] = useState("");
+  // Chế độ nguồn ảnh: 'upload' (tải ảnh từ máy tính) hoặc 'url' (đường link web)
+  const [imageInputMode, setImageInputMode] = useState<"upload" | "url">("upload");
+  // Lưu tên tệp ảnh và dung lượng ước tính khi chọn từ máy tính
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const [uploadedFileSize, setUploadedFileSize] = useState<string>("");
+  // Trạng thái đang xử lý nén ảnh từ máy
+  const [isCompressingImage, setIsCompressingImage] = useState<boolean>(false);
+  // Tham chiếu tới input type="file" ẩn
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Hàm xử lý đọc và nén ảnh trực tiếp từ máy tính bằng Canvas API
+  const handleProcessImageFile = (file: File) => {
+    if (!file) return;
+
+    // Kiểm tra định dạng tệp có phải hình ảnh không
+    if (!file.type.startsWith("image/")) {
+      alert("Vui lòng chọn đúng tệp định dạng hình ảnh (PNG, JPG, JPEG, WEBP, GIF)!");
+      return;
+    }
+
+    setIsCompressingImage(true);
+    setUploadedFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      const img = new Image();
+      img.onload = () => {
+        // Tối ưu hóa kích thước: giới hạn chiều dài/rộng tối đa 1000px để giảm dung lượng tải
+        const canvas = document.createElement("canvas");
+        const MAX_DIMENSION = 1000;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIMENSION) {
+            height = Math.round((height * MAX_DIMENSION) / width);
+            width = MAX_DIMENSION;
+          }
+        } else {
+          if (height > MAX_DIMENSION) {
+            width = Math.round((width * MAX_DIMENSION) / height);
+            height = MAX_DIMENSION;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Xuất Data URL định dạng JPEG chất lượng 85%
+          const compressedData = canvas.toDataURL("image/jpeg", 0.85);
+          setFormImageUrl(compressedData);
+          // Ước tính dung lượng sau nén (base64 length * 0.75)
+          const sizeInKb = Math.round((compressedData.length * 0.75) / 1024);
+          setUploadedFileSize(`${sizeInKb} KB`);
+        } else {
+          // Dự phòng nếu trình duyệt không hỗ trợ Canvas context 2D
+          const fallbackData = loadEvent.target?.result as string;
+          setFormImageUrl(fallbackData);
+          setUploadedFileSize(`${Math.round(file.size / 1024)} KB`);
+        }
+        setIsCompressingImage(false);
+      };
+
+      img.onerror = () => {
+        alert("Không thể đọc tệp ảnh này. Vui lòng thử chọn tệp ảnh khác!");
+        setIsCompressingImage(false);
+      };
+
+      img.src = loadEvent.target?.result as string;
+    };
+
+    reader.onerror = () => {
+      alert("Đã xảy ra lỗi trong quá trình đọc ảnh từ máy tính!");
+      setIsCompressingImage(false);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  // Sự kiện khi người dùng chọn tệp từ hộp thoại duyệt file máy tính
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleProcessImageFile(file);
+    }
+    // Xóa giá trị input để có thể chọn lại cùng một file nếu cần
+    e.target.value = "";
+  };
+
+  // Sự kiện kéo thả tệp hình ảnh vào vùng thả
+  const handleDropImage = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleProcessImageFile(file);
+    }
+  };
+
+  const handleDragOverImage = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Hàm xóa ảnh đã chọn
+  const handleRemoveImage = () => {
+    setFormImageUrl("");
+    setUploadedFileName("");
+    setUploadedFileSize("");
+  };
+
   const [formDescription, setFormDescription] = useState("");
   const [formInStock, setFormInStock] = useState(true);
   const [formFeatured, setFormFeatured] = useState(false);
@@ -466,7 +582,11 @@ export default function AdminPanel({
     setFormCategory("Văn học - Tiểu thuyết");
     setFormPrice(95000);
     setFormOriginalPrice(120000);
-    setFormImageUrl(SAMPLE_IMAGES[0].url);
+    // Để trống ảnh ban đầu và ưu tiên chế độ tải ảnh từ máy tính của người dùng
+    setFormImageUrl("");
+    setImageInputMode("upload");
+    setUploadedFileName("");
+    setUploadedFileSize("");
     setFormDescription("Tác phẩm sách bản quyền chính thức, giấy in cao cấp tại BookStore.");
     setFormInStock(true);
     setFormFeatured(false);
@@ -490,6 +610,11 @@ export default function AdminPanel({
     setFormPrice(product.price);
     setFormOriginalPrice(product.originalPrice || product.price);
     setFormImageUrl(product.imageUrl);
+    // Nhận diện xem ảnh hiện tại là ảnh base64 từ máy tính hay URL
+    const isBase64 = product.imageUrl?.startsWith("data:");
+    setImageInputMode("upload");
+    setUploadedFileName(isBase64 ? "Ảnh đã lưu từ máy tính" : "Ảnh từ đường dẫn URL");
+    setUploadedFileSize("");
     setFormDescription(product.description);
     setFormInStock(product.inStock);
     setFormFeatured(Boolean(product.featured));
@@ -504,6 +629,11 @@ export default function AdminPanel({
     e.preventDefault();
     if (!formName.trim() || formPrice <= 0) {
       alert("Vui lòng nhập tên sản phẩm và giá hợp lệ!");
+      return;
+    }
+
+    if (!formImageUrl.trim()) {
+      alert("Vui lòng chọn ảnh từ máy tính hoặc nhập đường link ảnh cho sản phẩm!");
       return;
     }
 
@@ -1868,33 +1998,188 @@ export default function AdminPanel({
                 </div>
               </div>
 
-              {/* Image URL & Quick Sample Picker */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Đường dẫn hình ảnh (Image URL) *
-                </label>
+              {/* Image Selection Section: Hỗ trợ chọn ảnh trực tiếp từ máy tính hoặc link URL */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-slate-700">
+                    Hình ảnh sản phẩm <span className="text-red-500">*</span>
+                  </label>
+
+                  {/* Switch giữa chế độ tải ảnh từ máy tính và link URL */}
+                  <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode("upload")}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                        imageInputMode === "upload"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Ảnh từ máy tính</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode("url")}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                        imageInputMode === "url"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      <span>Nhập link URL</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input file ẩn dùng để kích hoạt hộp thoại chọn file trên máy tính */}
                 <input
-                  type="url"
-                  required
-                  placeholder="https://images.unsplash.com/..."
-                  value={formImageUrl}
-                  onChange={(e) => setFormImageUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                  onChange={handleFileInputChange}
+                  className="hidden"
                 />
 
-                <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                  <span className="text-[11px] text-slate-400">Chọn ảnh mẫu nhanh:</span>
-                  {SAMPLE_IMAGES.map((sample) => (
-                    <button
-                      key={sample.label}
-                      type="button"
-                      onClick={() => setFormImageUrl(sample.url)}
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-medium text-slate-700 border"
-                    >
-                      {sample.label}
-                    </button>
-                  ))}
-                </div>
+                {/* Giao diện Chế độ 1: Tải ảnh từ máy tính (Mặc định) */}
+                {imageInputMode === "upload" ? (
+                  <div>
+                    {!formImageUrl ? (
+                      /* Khung kéo thả khi chưa có ảnh */
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDrop={handleDropImage}
+                        onDragOver={handleDragOverImage}
+                        className="group border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-2.5"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-blue-100/70 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">
+                            Bấm vào đây để chọn ảnh từ máy tính của bạn
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            hoặc kéo thả ảnh vào khung này (PNG, JPG, WEBP, GIF)
+                          </p>
+                        </div>
+                        <span className="inline-block px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-medium shadow-sm">
+                          Tự động nén tối ưu hóa dung lượng lưu trữ
+                        </span>
+                      </div>
+                    ) : (
+                      /* Khung hiển thị xem trước khi ĐÃ CÓ ẢNH */
+                      <div className="flex items-center space-x-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                        <div className="relative w-20 h-24 sm:w-24 sm:h-28 rounded-xl overflow-hidden bg-slate-200 flex-shrink-0 border border-slate-300 shadow-sm">
+                          <img
+                            src={formImageUrl}
+                            alt="Ảnh sản phẩm xem trước"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Ảnh từ máy tính
+                            </span>
+                            {uploadedFileSize && (
+                              <span className="text-[10px] text-slate-400">
+                                ({uploadedFileSize})
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-semibold text-slate-800 truncate">
+                            {uploadedFileName || "Đã chọn ảnh từ máy tính"}
+                          </p>
+                          <div className="flex items-center space-x-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors flex items-center space-x-1"
+                            >
+                              <Upload className="w-3 h-3 text-blue-600" />
+                              <span>Chọn ảnh khác</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[11px] font-semibold transition-colors flex items-center space-x-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Xóa</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {isCompressingImage && (
+                      <p className="text-[11px] text-blue-600 font-medium mt-1 animate-pulse">
+                        Đang tối ưu hóa dung lượng hình ảnh từ máy tính...
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  /* Giao diện Chế độ 2: Nhập đường link URL */
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Dán đường dẫn ảnh: https://images.unsplash.com/..."
+                      value={formImageUrl}
+                      onChange={(e) => setFormImageUrl(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                    />
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] text-slate-400">Chọn ảnh mẫu nhanh:</span>
+                      {SAMPLE_IMAGES.map((sample) => (
+                        <button
+                          key={sample.label}
+                          type="button"
+                          onClick={() => {
+                            setFormImageUrl(sample.url);
+                            setUploadedFileName(sample.label);
+                            setUploadedFileSize("");
+                          }}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-medium text-slate-700 border"
+                        >
+                          {sample.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Xem trước ảnh link URL */}
+                    {formImageUrl && (
+                      <div className="flex items-center space-x-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200 mt-2">
+                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-200 flex-shrink-0">
+                          <img
+                            src={formImageUrl}
+                            alt="Ảnh xem trước"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Xử lý khi link ảnh bị lỗi không tải được
+                              (e.target as HTMLImageElement).src = SAMPLE_IMAGES[0].url;
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-slate-500 font-medium truncate">
+                            {formImageUrl}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            className="text-[10px] text-red-500 hover:text-red-700 font-semibold mt-1"
+                          >
+                            Xóa đường link này
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Description */}

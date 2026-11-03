@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
+// Import createPortal để render modal trực tiếp ra document.body, tránh lỗi cắt ngang header do stacking context hoặc space-y
+import { createPortal } from "react-dom";
 import { Product, CATEGORIES, ReviewItem } from "../data/products";
 import { UserAccount } from "../data/users";
 import { api } from "../services/api";
@@ -400,6 +402,34 @@ export default function AdminPanel({
 
   // Delete Confirmation State
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  // Khóa cuộn trang nền khi có bất kỳ modal/popup nào đang mở để triệt tiêu lỗi thanh cuộn kép và lệch vị trí
+  useEffect(() => {
+    const isAnyModalActive =
+      isModalOpen ||
+      isUserModalOpen ||
+      isEditReviewModalOpen ||
+      Boolean(deletingProductId) ||
+      Boolean(deletingUserId) ||
+      Boolean(deletingReviewId);
+
+    if (isAnyModalActive) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [
+    isModalOpen,
+    isUserModalOpen,
+    isEditReviewModalOpen,
+    deletingProductId,
+    deletingUserId,
+    deletingReviewId,
+  ]);
 
   // Format VND
   const formatVND = (amount: number) => {
@@ -1741,9 +1771,9 @@ export default function AdminPanel({
       {/* 8. TAB GIÁM SÁT HỆ THỐNG & DEVOPS (DEVOPS MONITOR) */}
       {adminTab === "devops" && <DevOpsTab />}
 
-      {/* CONFIRM DELETE REVIEW MODAL */}
-      {deletingReviewId && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {/* CONFIRM DELETE REVIEW MODAL (Sử dụng createPortal gắn trực tiếp vào body để che phủ toàn màn hình, không bị cắt ngang header) */}
+      {deletingReviewId && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
@@ -1771,14 +1801,15 @@ export default function AdminPanel({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* EDIT REVIEW MODAL */}
-      {isEditReviewModalOpen && editingReview && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      {/* EDIT REVIEW MODAL (Sử dụng createPortal gắn vào body để backdrop mờ trọn vẹn màn hình) */}
+      {isEditReviewModalOpen && editingReview && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)]">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-3 sm:py-3.5 bg-white shrink-0">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Edit3 className="w-4 h-4" />
@@ -1788,13 +1819,14 @@ export default function AdminPanel({
               <button
                 type="button"
                 onClick={() => setIsEditReviewModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditReview} className="space-y-4">
+            <form onSubmit={handleSaveEditReview} className="flex flex-col flex-1 overflow-hidden text-xs">
+              <div className="overflow-y-auto px-5 sm:px-6 py-4 space-y-4 flex-1 custom-scrollbar">
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
                   Mã Đánh Giá &amp; Mã Sản Phẩm (Chỉ đọc)
@@ -1861,398 +1893,383 @@ export default function AdminPanel({
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white leading-relaxed"
                 />
               </div>
+            </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditReviewModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingReview}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-1.5"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSavingReview ? "Đang lưu lên MongoDB..." : "Lưu Thay Đổi"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CREATE / EDIT PRODUCT MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 sm:p-8 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                {editingProduct ? "Chỉnh Sửa Sản Phẩm" : "Thêm Sản Phẩm Mới"}
-              </h3>
+            <div className="flex items-center justify-end space-x-2 px-5 sm:px-6 py-3 border-t border-slate-200 bg-white shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
               <button
+                type="button"
+                onClick={() => setIsEditReviewModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingReview}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSavingReview ? "Đang lưu lên MongoDB..." : "Lưu Thay Đổi"}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>,
+      document.body
+    )}
+
+      {/* CREATE / EDIT PRODUCT MODAL (Render qua createPortal vào body, giải quyết triệt để lỗi vệt cắt mờ trên header) */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)]">
+            {/* Header cố định */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-2.5 sm:py-3 bg-white shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {editingProduct ? "Chỉnh Sửa Sách / Sản Phẩm" : "Thêm Sách Mới Vào Kho"}
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {editingProduct ? "Cập nhật thông tin chi tiết và giá bán của đầu sách" : "Điền thông tin và tải ảnh sách lên hệ thống"}
+                </p>
+              </div>
+              <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitForm} className="space-y-4 text-xs">
-              {/* Name */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Tên sản phẩm *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: Laptop Dell XPS 15 9530..."
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Category & Stock */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Danh mục *
-                  </label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {CATEGORIES.filter((c) => c !== "Tất cả").map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Trạng thái kho hàng
-                  </label>
-                  <div className="flex items-center space-x-4 pt-2">
-                    <label className="flex items-center space-x-1.5 cursor-pointer">
+            <form onSubmit={handleSubmitForm} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="overflow-y-auto px-5 sm:px-6 py-3.5 flex-1 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* CỘT TRÁI: THÔNG TIN CƠ BẢN VÀ GIÁ BÁN */}
+                  <div className="space-y-3">
+                    {/* Tên sách */}
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Tên sách / sản phẩm *
+                      </label>
                       <input
-                        type="radio"
-                        name="inStock"
-                        checked={formInStock}
-                        onChange={() => setFormInStock(true)}
-                        className="text-blue-600"
+                        type="text"
+                        required
+                        placeholder="Ví dụ: Đắc Nhân Tâm, Nhà Giả Kim..."
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      <span className="font-semibold text-emerald-600">Còn hàng</span>
-                    </label>
-                    <label className="flex items-center space-x-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="inStock"
-                        checked={!formInStock}
-                        onChange={() => setFormInStock(false)}
-                        className="text-blue-600"
-                      />
-                      <span className="font-semibold text-red-600">Hết hàng</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Price & Original Price */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Giá bán (VNĐ) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    step={10000}
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">{formatVND(formPrice)}</p>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Giá gốc niêm yết (VNĐ)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={10000}
-                    value={formOriginalPrice}
-                    onChange={(e) => setFormOriginalPrice(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">{formatVND(formOriginalPrice)}</p>
-                </div>
-              </div>
-
-              {/* Image Selection Section: Hỗ trợ chọn ảnh trực tiếp từ máy tính hoặc link URL */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-slate-700">
-                    Hình ảnh sản phẩm <span className="text-red-500">*</span>
-                  </label>
-
-                  {/* Switch giữa chế độ tải ảnh từ máy tính và link URL */}
-                  <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => setImageInputMode("upload")}
-                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                        imageInputMode === "upload"
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Ảnh từ máy tính</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageInputMode("url")}
-                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                        imageInputMode === "url"
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
-                      <span>Nhập link URL</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Input file ẩn dùng để kích hoạt hộp thoại chọn file trên máy tính */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                />
-
-                {/* Giao diện Chế độ 1: Tải ảnh từ máy tính (Mặc định) */}
-                {imageInputMode === "upload" ? (
-                  <div>
-                    {!formImageUrl ? (
-                      /* Khung kéo thả khi chưa có ảnh */
-                      <div
-                        onClick={() => fileInputRef.current?.click()}
-                        onDrop={handleDropImage}
-                        onDragOver={handleDragOverImage}
-                        className="group border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-2.5"
-                      >
-                        <div className="w-12 h-12 rounded-2xl bg-blue-100/70 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Upload className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">
-                            Bấm vào đây để chọn ảnh từ máy tính của bạn
-                          </p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            hoặc kéo thả ảnh vào khung này (PNG, JPG, WEBP, GIF)
-                          </p>
-                        </div>
-                        <span className="inline-block px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-medium shadow-sm">
-                          Tự động nén tối ưu hóa dung lượng lưu trữ
-                        </span>
-                      </div>
-                    ) : (
-                      /* Khung hiển thị xem trước khi ĐÃ CÓ ẢNH */
-                      <div className="flex items-center space-x-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-                        <div className="relative w-20 h-24 sm:w-24 sm:h-28 rounded-xl overflow-hidden bg-slate-200 flex-shrink-0 border border-slate-300 shadow-sm">
-                          <img
-                            src={formImageUrl}
-                            alt="Ảnh sản phẩm xem trước"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <div className="flex items-center space-x-1.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Ảnh từ máy tính
-                            </span>
-                            {uploadedFileSize && (
-                              <span className="text-[10px] text-slate-400">
-                                ({uploadedFileSize})
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs font-semibold text-slate-800 truncate">
-                            {uploadedFileName || "Đã chọn ảnh từ máy tính"}
-                          </p>
-                          <div className="flex items-center space-x-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors flex items-center space-x-1"
-                            >
-                              <Upload className="w-3 h-3 text-blue-600" />
-                              <span>Chọn ảnh khác</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleRemoveImage}
-                              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[11px] font-semibold transition-colors flex items-center space-x-1"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Xóa</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {isCompressingImage && (
-                      <p className="text-[11px] text-blue-600 font-medium mt-1 animate-pulse">
-                        Đang tối ưu hóa dung lượng hình ảnh từ máy tính...
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  /* Giao diện Chế độ 2: Nhập đường link URL */
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Dán đường dẫn ảnh: https://images.unsplash.com/..."
-                      value={formImageUrl}
-                      onChange={(e) => setFormImageUrl(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                    />
-
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] text-slate-400">Chọn ảnh mẫu nhanh:</span>
-                      {SAMPLE_IMAGES.map((sample) => (
-                        <button
-                          key={sample.label}
-                          type="button"
-                          onClick={() => {
-                            setFormImageUrl(sample.url);
-                            setUploadedFileName(sample.label);
-                            setUploadedFileSize("");
-                          }}
-                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-medium text-slate-700 border"
-                        >
-                          {sample.label}
-                        </button>
-                      ))}
                     </div>
 
-                    {/* Xem trước ảnh link URL */}
-                    {formImageUrl && (
-                      <div className="flex items-center space-x-3 p-2.5 bg-slate-50 rounded-xl border border-slate-200 mt-2">
-                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-200 flex-shrink-0">
-                          <img
-                            src={formImageUrl}
-                            alt="Ảnh xem trước"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Xử lý khi link ảnh bị lỗi không tải được
-                              (e.target as HTMLImageElement).src = SAMPLE_IMAGES[0].url;
-                            }}
-                          />
+                    {/* Danh mục & Kho hàng */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Danh mục *
+                        </label>
+                        <select
+                          value={formCategory}
+                          onChange={(e) => setFormCategory(e.target.value)}
+                          className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px]"
+                        >
+                          {CATEGORIES.filter((c) => c !== "Tất cả").map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Kho hàng
+                        </label>
+                        <div className="flex items-center space-x-2 pt-2">
+                          <label className="flex items-center space-x-1 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="inStock"
+                              checked={formInStock}
+                              onChange={() => setFormInStock(true)}
+                              className="text-blue-600"
+                            />
+                            <span className="font-semibold text-emerald-600 text-[11px]">Còn</span>
+                          </label>
+                          <label className="flex items-center space-x-1 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="inStock"
+                              checked={!formInStock}
+                              onChange={() => setFormInStock(false)}
+                              className="text-blue-600"
+                            />
+                            <span className="font-semibold text-red-600 text-[11px]">Hết</span>
+                          </label>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] text-slate-500 font-medium truncate">
-                            {formImageUrl}
-                          </p>
+                      </div>
+                    </div>
+
+                    {/* Giá bán & Giá gốc */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Giá bán (VNĐ) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          min={0}
+                          step={10000}
+                          value={formPrice}
+                          onChange={(e) => setFormPrice(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-0.5">{formatVND(formPrice)}</p>
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Giá gốc (VNĐ)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={10000}
+                          value={formOriginalPrice}
+                          onChange={(e) => setFormOriginalPrice(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-0.5">{formatVND(formOriginalPrice)}</p>
+                      </div>
+                    </div>
+
+                    {/* Mô tả sách */}
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Mô tả tóm tắt sách
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        placeholder="Tác phẩm sách bản quyền chính thức, tóm tắt nội dung và thông điệp nổi bật..."
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* CỘT PHẢI: HÌNH ẢNH SẢN PHẨM & THÔNG SỐ XUẤT BẢN */}
+                  <div className="space-y-3">
+                    {/* Hình ảnh sản phẩm */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block font-semibold text-slate-700">
+                          Hình ảnh sản phẩm <span className="text-red-500">*</span>
+                        </label>
+
+                        {/* Switch giữa chế độ tải ảnh từ máy tính và link URL */}
+                        <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
                           <button
                             type="button"
-                            onClick={handleRemoveImage}
-                            className="text-[10px] text-red-500 hover:text-red-700 font-semibold mt-1"
+                            onClick={() => setImageInputMode("upload")}
+                            className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                              imageInputMode === "upload"
+                                ? "bg-white text-blue-600 shadow-xs"
+                                : "text-slate-500 hover:text-slate-800"
+                            }`}
                           >
-                            Xóa đường link này
+                            <Upload className="w-3 h-3" />
+                            <span>Từ máy</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImageInputMode("url")}
+                            className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                              imageInputMode === "url"
+                                ? "bg-white text-blue-600 shadow-xs"
+                                : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            <Link2 className="w-3 h-3" />
+                            <span>Link URL</span>
                           </button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
 
-              {/* Description */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Mô tả sản phẩm
-                </label>
-                <textarea
-                  rows={3}
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Mô tả các đặc điểm nổi bật của thiết bị..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                      {/* Input file ẩn */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                        onChange={handleFileInputChange}
+                        className="hidden"
+                      />
 
-              {/* Specifications Manager */}
-              <div className="space-y-2 border-t border-slate-100 pt-3">
-                <label className="block font-bold text-slate-800">
-                  Thông số kỹ thuật:
-                </label>
-                <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                  {Object.entries(formSpecs).map(([key, val]) => (
-                    <div key={key} className="flex items-center justify-between bg-slate-50 px-3 py-1.5 rounded-lg border">
-                      <span className="text-slate-600 font-semibold">{key}: <span className="text-slate-900 font-normal">{val}</span></span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSpec(key)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Giao diện Chế độ 1: Tải ảnh từ máy tính (Mặc định) */}
+                      {imageInputMode === "upload" ? (
+                        <div>
+                          {!formImageUrl ? (
+                            <div
+                              onClick={() => fileInputRef.current?.click()}
+                              onDrop={handleDropImage}
+                              onDragOver={handleDragOverImage}
+                              className="group border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40 rounded-xl p-3 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-1"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Upload className="w-4 h-4" />
+                              </div>
+                              <p className="text-[11px] font-bold text-slate-800">
+                                Bấm chọn ảnh từ máy tính
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                hoặc kéo thả ảnh vào đây (PNG, JPG, WEBP)
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-3 p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                              <div className="relative w-14 h-16 rounded-lg overflow-hidden bg-slate-200 shrink-0 border border-slate-300 shadow-xs">
+                                <img
+                                  src={formImageUrl}
+                                  alt="Ảnh sản phẩm xem trước"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700">
+                                    <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
+                                    Ảnh từ máy
+                                  </span>
+                                  {uploadedFileSize && (
+                                    <span className="text-[9px] text-slate-400">
+                                      ({uploadedFileSize})
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] font-semibold text-slate-800 truncate">
+                                  {uploadedFileName || "Đã chọn ảnh từ máy tính"}
+                                </p>
+                                <div className="flex items-center space-x-1.5 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="px-2 py-0.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[10px] font-semibold transition-colors flex items-center space-x-1"
+                                  >
+                                    <Upload className="w-2.5 h-2.5 text-blue-600" />
+                                    <span>Đổi</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveImage}
+                                    className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-semibold transition-colors flex items-center space-x-1"
+                                  >
+                                    <Trash2 className="w-2.5 h-2.5" />
+                                    <span>Xóa</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {isCompressingImage && (
+                            <p className="text-[10px] text-blue-600 font-medium mt-0.5 animate-pulse">
+                              Đang tối ưu dung lượng ảnh...
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            placeholder="Dán link ảnh: https://..."
+                            value={formImageUrl}
+                            onChange={(e) => setFormImageUrl(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px]"
+                          />
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {SAMPLE_IMAGES.slice(0, 4).map((sample) => (
+                              <button
+                                key={sample.label}
+                                type="button"
+                                onClick={() => {
+                                  setFormImageUrl(sample.url);
+                                  setUploadedFileName(sample.label);
+                                  setUploadedFileSize("");
+                                }}
+                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[9px] font-medium text-slate-700 border"
+                              >
+                                {sample.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
 
-                <div className="flex space-x-2 pt-1">
-                  <input
-                    type="text"
-                    placeholder="Tên thông số (VD: RAM)"
-                    value={newSpecKey}
-                    onChange={(e) => setNewSpecKey(e.target.value)}
-                    className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Giá trị (VD: 16GB DDR5)"
-                    value={newSpecVal}
-                    onChange={(e) => setNewSpecVal(e.target.value)}
-                    className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSpec}
-                    className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700"
-                  >
-                    Thêm
-                  </button>
+                    {/* Thông số xuất bản */}
+                    <div className="space-y-1.5 border-t border-slate-100 pt-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block font-bold text-slate-800 text-[11px]">
+                          Thông số xuất bản:
+                        </label>
+                        <span className="text-[10px] text-slate-400">
+                          ({Object.keys(formSpecs).length} thông số)
+                        </span>
+                      </div>
+                      <div className="space-y-1 max-h-24 overflow-y-auto custom-scrollbar">
+                        {Object.entries(formSpecs).map(([key, val]) => (
+                          <div key={key} className="flex items-center justify-between bg-slate-50 px-2.5 py-1 rounded-md border text-[11px]">
+                            <span className="text-slate-600 font-medium truncate">{key}: <span className="text-slate-900 font-semibold">{val}</span></span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSpec(key)}
+                              className="text-red-500 hover:text-red-700 p-0.5 shrink-0 ml-1"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex space-x-1.5 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Thông số (VD: Tác giả)"
+                          value={newSpecKey}
+                          onChange={(e) => setNewSpecKey(e.target.value)}
+                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Giá trị (VD: Dale Carnegie)"
+                          value={newSpecVal}
+                          onChange={(e) => setNewSpecVal(e.target.value)}
+                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddSpec}
+                          className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-[11px] font-bold hover:bg-slate-700 shrink-0"
+                        >
+                          Thêm
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Submit Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+              {/* Submit Buttons: Cố định ở chân modal, luôn hiển thị rõ ràng */}
+              <div className="flex items-center justify-end space-x-3 px-5 sm:px-6 py-2.5 border-t border-slate-200 bg-white shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 flex items-center space-x-1.5"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 flex items-center space-x-1.5 transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   <span>{editingProduct ? "Lưu Thay Đổi" : "Tạo Sản Phẩm Mới"}</span>
@@ -2260,12 +2277,13 @@ export default function AdminPanel({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* DELETE CONFIRMATION MODAL */}
-      {deletingProductId && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {/* DELETE CONFIRMATION MODAL (createPortal trực tiếp ra body) */}
+      {deletingProductId && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-center animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
@@ -2289,14 +2307,16 @@ export default function AdminPanel({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* CREATE / EDIT USER MODAL */}
-      {isUserModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 sm:p-8 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+      {/* CREATE / EDIT USER MODAL (createPortal trực tiếp ra body) */}
+      {isUserModalOpen && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)]">
+            {/* Header cố định */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-3 sm:py-3.5 bg-white shrink-0">
               <div className="flex items-center space-x-2">
                 <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
                   <UserPlus className="w-5 h-5" />
@@ -2311,14 +2331,16 @@ export default function AdminPanel({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsUserModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitUserForm} className="space-y-4 text-xs">
+            <form onSubmit={handleSubmitUserForm} className="flex flex-col flex-1 overflow-hidden text-xs">
+              <div className="overflow-y-auto px-5 sm:px-6 py-4 space-y-3.5 flex-1 custom-scrollbar">
               {/* Name */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
@@ -2455,32 +2477,34 @@ export default function AdminPanel({
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
 
-              {/* Submit Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsUserModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 flex items-center space-x-1.5"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{editingUser ? "Lưu Thông Tin" : "Tạo Tài Khoản"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
+            {/* Submit Buttons: Cố định chân modal */}
+            <div className="flex items-center justify-end space-x-3 px-5 sm:px-6 py-3 border-t border-slate-200 bg-white shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+              <button
+                type="button"
+                onClick={() => setIsUserModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 flex items-center space-x-1.5 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                <span>{editingUser ? "Lưu Thông Tin" : "Tạo Tài Khoản"}</span>
+              </button>
+            </div>
+          </form>
         </div>
-      )}
+      </div>,
+      document.body
+    )}
 
-      {/* DELETE USER CONFIRMATION MODAL */}
-      {deletingUserId && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {/* DELETE USER CONFIRMATION MODAL (createPortal trực tiếp ra body) */}
+      {deletingUserId && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-center animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <UserX className="w-6 h-6" />
@@ -2504,7 +2528,8 @@ export default function AdminPanel({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

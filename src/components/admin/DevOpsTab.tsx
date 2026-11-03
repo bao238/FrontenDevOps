@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+// Import createPortal để render modal trực tiếp vào body
+import { createPortal } from "react-dom";
 import {
   Server,
   Database,
@@ -415,9 +417,9 @@ export default function DevOpsTab() {
         </div>
       </div>
 
-      {/* MODAL XÁC NHẬN ĐỒNG BỘ SEED DATA */}
-      {isSeedModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {/* MODAL XÁC NHẬN ĐỒNG BỘ SEED DATA (createPortal ra body) */}
+      {isSeedModalOpen && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <RefreshCw className="w-6 h-6" />
@@ -449,7 +451,8 @@ export default function DevOpsTab() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

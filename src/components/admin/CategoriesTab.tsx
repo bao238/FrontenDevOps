@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
+// Import createPortal để đưa modal ra khỏi container space-y, bao phủ toàn vẹn màn hình
+import { createPortal } from "react-dom";
 import {
   Folder,
   Plus,
@@ -293,10 +295,10 @@ export default function CategoriesTab() {
         </div>
       )}
 
-      {/* MODAL THÊM / SỬA THỂ LOẠI */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
+      {/* MODAL THÊM / SỬA THỂ LOẠI (Render qua createPortal vào body) */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)] overflow-y-auto p-5 sm:p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 custom-scrollbar">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base flex items-center space-x-2">
                 <Folder className="w-5 h-5 text-indigo-600" />
@@ -394,13 +396,14 @@ export default function CategoriesTab() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* MODAL XÁC NHẬN XÓA */}
-      {deletingCategory && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95">
+      {/* MODAL XÁC NHẬN XÓA (Render qua createPortal vào body) */}
+      {deletingCategory && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 my-auto">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -432,7 +435,8 @@ export default function CategoriesTab() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

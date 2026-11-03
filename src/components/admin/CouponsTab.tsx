@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
+// Import createPortal để render modal trực tiếp vào body, không bị gián đoạn giao diện hoặc cắt mờ header
+import { createPortal } from "react-dom";
 import {
   Ticket,
   Plus,
@@ -394,10 +396,10 @@ export default function CouponsTab() {
         </div>
       )}
 
-      {/* MODAL THÊM / CHỈNH SỬA VOUCHER */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+      {/* MODAL THÊM / CHỈNH SỬA VOUCHER (createPortal ra body) */}
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base flex items-center space-x-2">
                 <Ticket className="w-5 h-5 text-blue-600" />
@@ -572,13 +574,14 @@ export default function CouponsTab() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* MODAL XÁC NHẬN XÓA VOUCHER */}
-      {deletingId && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95">
+      {/* MODAL XÁC NHẬN XÓA VOUCHER (createPortal ra body) */}
+      {deletingId && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 my-auto">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -605,7 +608,8 @@ export default function CouponsTab() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

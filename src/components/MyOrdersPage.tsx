@@ -17,10 +17,17 @@ import {
   CreditCard,
   Sparkles,
   BookOpen,
-  Filter
+  Filter,
+  Printer,
+  QrCode
 } from "lucide-react";
 import { Product } from "../data/products";
 import { UserProfile, OrderRecord } from "../App";
+
+// Hàm kiểm tra đơn hàng đã thanh toán thành công hay chưa
+const isOrderPaid = (order: OrderRecord): boolean => {
+  return Boolean(order.isPaid || order.status === "Hoàn tất");
+};
 
 interface MyOrdersPageProps {
   orders: OrderRecord[];
@@ -29,6 +36,9 @@ interface MyOrdersPageProps {
   onTrackOrder: (order: OrderRecord) => void;
   onReorder: (order: OrderRecord) => void;
   onOpenAuth: () => void;
+  onPrintInvoice?: (order: OrderRecord) => void;
+  // Callback mở modal thanh toán lại khi đơn hàng chưa thanh toán
+  onPayOrder?: (order: OrderRecord) => void;
 }
 
 export default function MyOrdersPage({
@@ -37,7 +47,9 @@ export default function MyOrdersPage({
   onContinueShopping,
   onTrackOrder,
   onReorder,
-  onOpenAuth
+  onOpenAuth,
+  onPrintInvoice,
+  onPayOrder
 }: MyOrdersPageProps) {
   // Trạng thái bộ lọc đơn hàng
   const [selectedStatus, setSelectedStatus] = useState<string>("Tất cả");
@@ -346,8 +358,21 @@ export default function MyOrdersPage({
                     </span>
                   </div>
 
-                  {/* Badge Trạng Thái */}
-                  <div className="flex items-center space-x-2 self-start sm:self-auto">
+                  {/* Badge Trạng Thái & Trạng Thái Thanh Toán */}
+                  <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                    {/* Badge Thanh Toán */}
+                    {isOrderPaid(ord) ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Đã thanh toán</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Chờ thanh toán</span>
+                      </span>
+                    )}
+
                     <span
                       className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border ${badge.bg}`}
                     >
@@ -357,6 +382,106 @@ export default function MyOrdersPage({
                     </span>
                   </div>
                 </div>
+
+                {/* Thanh Tiến Trình Đơn Hàng 5 Bước (Order Progress Timeline) */}
+                {ord.status !== "Đã hủy" && (
+                  <div className="px-4 sm:px-6 py-4 bg-slate-50/60 border-b border-slate-100">
+                    <div className="relative">
+                      {/* Đường line tiến trình nền */}
+                      <div className="absolute top-3.5 left-4 right-4 h-0.5 bg-slate-200" />
+                      {/* Đường line tiến trình thực tế */}
+                      <div
+                        className="absolute top-3.5 left-4 h-0.5 bg-emerald-500 transition-all duration-500"
+                        style={{
+                          width: `${
+                            ord.status === "Hoàn tất"
+                              ? "calc(100% - 2rem)"
+                              : ord.status === "Đang giao"
+                              ? "70%"
+                              : isOrderPaid(ord)
+                              ? "45%"
+                              : "20%"
+                          }`
+                        }}
+                      />
+
+                      <div className="grid grid-cols-4 sm:grid-cols-5 text-center relative z-10 gap-1">
+                        {/* Bước 1: Đặt hàng thành công */}
+                        <div className="flex flex-col items-center">
+                          <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                            ✓
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-800 mt-1">Đã Đặt Hàng</span>
+                          <span className="text-[10px] text-slate-400 hidden sm:inline">{ord.date}</span>
+                        </div>
+
+                        {/* Bước 2: Thanh toán */}
+                        <div className="flex flex-col items-center">
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shadow-xs ${
+                              isOrderPaid(ord)
+                                ? "bg-emerald-500 text-white"
+                                : "bg-amber-400 text-white animate-pulse"
+                            }`}
+                          >
+                            {isOrderPaid(ord) ? "✓" : "2"}
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-800 mt-1">
+                            {isOrderPaid(ord) ? "Đã Thanh Toán" : "Chờ Thanh Toán"}
+                          </span>
+                          <span className="text-[10px] text-slate-400 hidden sm:inline uppercase">{ord.paymentMethod}</span>
+                        </div>
+
+                        {/* Bước 3: Đóng gói */}
+                        <div className="flex flex-col items-center">
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shadow-xs ${
+                              ord.status === "Đang giao" || ord.status === "Hoàn tất"
+                                ? "bg-emerald-500 text-white"
+                                : "bg-blue-600 text-white"
+                            }`}
+                          >
+                            {ord.status === "Đang giao" || ord.status === "Hoàn tất" ? "✓" : "3"}
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-800 mt-1">Chuẩn Bị Sách</span>
+                          <span className="text-[10px] text-slate-400 hidden sm:inline">Thủ thư đóng gói</span>
+                        </div>
+
+                        {/* Bước 4: Vận chuyển */}
+                        <div className="flex flex-col items-center">
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shadow-xs ${
+                              ord.status === "Hoàn tất"
+                                ? "bg-emerald-500 text-white"
+                                : ord.status === "Đang giao"
+                                ? "bg-blue-600 text-white animate-bounce"
+                                : "bg-slate-200 text-slate-500"
+                            }`}
+                          >
+                            {ord.status === "Hoàn tất" ? "✓" : "4"}
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-800 mt-1">Đang Giao Hàng</span>
+                          <span className="text-[10px] text-slate-400 hidden sm:inline">Giao tận nơi</span>
+                        </div>
+
+                        {/* Bước 5: Hoàn tất */}
+                        <div className="hidden sm:flex flex-col items-center">
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shadow-xs ${
+                              ord.status === "Hoàn tất"
+                                ? "bg-emerald-500 text-white"
+                                : "bg-slate-200 text-slate-500"
+                            }`}
+                          >
+                            {ord.status === "Hoàn tất" ? "✓" : "5"}
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-800 mt-1">Giao Thành Công</span>
+                          <span className="text-[10px] text-slate-400">Hoàn tất</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Danh Sách Tác Phẩm Trong Đơn Hàng */}
                 <div className="p-4 sm:p-6 divide-y divide-slate-100">
@@ -428,11 +553,37 @@ export default function MyOrdersPage({
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Nút In Hóa Đơn - CHỈ HIỂN THỊ KHI ĐƠN ĐÃ THANH TOÁN THEO YÊU CẦU */}
+                      {onPrintInvoice && isOrderPaid(ord) && (
+                        <button
+                          type="button"
+                          onClick={() => onPrintInvoice(ord)}
+                          className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
+                          title="In hóa đơn bán lẻ hoặc lưu PDF"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>In Hóa Đơn</span>
+                        </button>
+                      )}
+
+                      {/* Nếu CHƯA thanh toán và không phải đơn hủy, hiển thị nút Thanh Toán Ngay để quét mã MBBank */}
+                      {!isOrderPaid(ord) && ord.status !== "Đã hủy" && onPayOrder && (
+                        <button
+                          type="button"
+                          onClick={() => onPayOrder(ord)}
+                          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
+                          title="Quét mã QR để hoàn tất thanh toán đơn hàng này"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span>Thanh Toán Ngay</span>
+                        </button>
+                      )}
+
                       {/* Nút Tra cứu hành trình đơn */}
                       <button
                         onClick={() => onTrackOrder(ord)}
-                        className="px-3.5 py-2 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5"
+                        className="px-3.5 py-2 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
                       >
                         <Truck className="w-3.5 h-3.5" />
                         <span>Tra Cứu Lộ Trình</span>
@@ -441,7 +592,7 @@ export default function MyOrdersPage({
                       {/* Nút Mua lại đơn này */}
                       <button
                         onClick={() => onReorder(ord)}
-                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5"
+                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>Mua Lại Đơn Này</span>

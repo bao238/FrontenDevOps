@@ -57,17 +57,25 @@ import {
   QrCode,
   Menu,
   BookOpen,
-  Bookmark
+  Bookmark,
+  Filter,
+  DollarSign,
+  Wallet,
+  Printer,
+  Newspaper
 } from "lucide-react";
 
 import AdminPanel from "./components/AdminPanel";
 import ProductDetailPage from "./components/ProductDetailPage";
 import CartPage from "./components/CartPage";
 import PaymentQRModal from "./components/PaymentQRModal";
+import PaymentSimulatorModal from "./components/PaymentSimulatorModal";
 import WishlistModal from "./components/WishlistModal";
 import OrderTrackingModal from "./components/OrderTrackingModal";
 import MyOrdersPage from "./components/MyOrdersPage";
 import ProfilePage from "./components/ProfilePage";
+import InvoiceModal from "./components/InvoiceModal";
+import BlogPage from "./components/BlogPage";
 
 interface CartItem {
   product: Product;
@@ -96,11 +104,14 @@ export interface OrderRecord {
     fullName: string;
     phone: string;
     address: string;
+    note?: string;
   };
+  // Trạng thái đã thanh toán hay chưa (Chỉ khi đã thanh toán mới được xem/in hóa đơn)
+  isPaid?: boolean;
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile" | "blog">("products");
   const [products, setProducts] = useState<Product[]>(INITIAL_BOOKS);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -139,6 +150,21 @@ export default function App() {
   const [selectedTrackingOrder, setSelectedTrackingOrder] = useState<OrderRecord | null>(null);
   const [isPaymentQROpen, setIsPaymentQROpen] = useState<boolean>(false);
 
+  // Trạng thái Cổng thanh toán mô phỏng VNPAY & MoMo Sandbox
+  const [isPaymentSimulatorOpen, setIsPaymentSimulatorOpen] = useState<boolean>(false);
+  const [simulatorMethod, setSimulatorMethod] = useState<"vnpay" | "momo">("vnpay");
+
+  // Trạng thái Bộ lọc sách nâng cao (Advanced Filters)
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState<boolean>(false);
+  const [selectedPriceRange, setSelectedPriceRange] = useState<string>("all");
+  const [selectedAuthor, setSelectedAuthor] = useState<string>("all");
+  const [selectedPublisher, setSelectedPublisher] = useState<string>("all");
+  const [selectedMinRating, setSelectedMinRating] = useState<number>(0);
+  const [onlyInStock, setOnlyInStock] = useState<boolean>(false);
+
+  // Trạng thái Modal In Hóa Đơn Bán Lẻ
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<OrderRecord | null>(null);
+
   // Form states
   const [loginEmail, setLoginEmail] = useState<string>("");
   const [loginPassword, setLoginPassword] = useState<string>("");
@@ -161,6 +187,8 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
   const [orderSuccess, setOrderSuccess] = useState<boolean>(false);
   const [currentOrderId, setCurrentOrderId] = useState<string>("");
+  // Lưu số tiền của đơn hàng vừa tạo để hiển thị chính xác trên Modal thanh toán (tránh lỗi 0 đ khi xóa giỏ hàng)
+  const [paymentOrderTotal, setPaymentOrderTotal] = useState<number>(0);
   const [customerInfo, setCustomerInfo] = useState({
     fullName: "",
     phone: "",
@@ -204,6 +232,9 @@ export default function App() {
       } else if (path === "/profile" || path.startsWith("/profile")) {
         setActiveTab("profile");
         setSelectedProduct(null);
+      } else if (path === "/blog" || path.startsWith("/blog")) {
+        setActiveTab("blog");
+        setSelectedProduct(null);
       } else if (prodId || path.startsWith("/product")) {
         setActiveTab("products");
         if (prodId) {
@@ -220,7 +251,7 @@ export default function App() {
     return () => window.removeEventListener("popstate", handleUrlSync);
   }, [products]);
 
-  const switchTab = (tab: "products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile") => {
+  const switchTab = (tab: "products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile" | "blog") => {
     setActiveTab(tab);
     setSelectedProduct(null);
     setIsUserMenuOpen(false);
@@ -240,6 +271,10 @@ export default function App() {
     } else if (tab === "profile") {
       if (window.location.pathname !== "/profile") {
         window.history.pushState({}, "", "/profile");
+      }
+    } else if (tab === "blog") {
+      if (window.location.pathname !== "/blog") {
+        window.history.pushState({}, "", "/blog");
       }
     } else {
       if (window.location.pathname !== "/" || window.location.search) {
@@ -652,15 +687,100 @@ export default function App() {
     }
   };
 
-  // Filter & Sort Products
+  // Danh sách Tác giả duy nhất trích xuất tự động từ danh mục sách
+  const authorsList = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach((p) => {
+      if (p.author && p.author.trim()) set.add(p.author.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [products]);
+
+  // Danh sách Nhà xuất bản duy nhất
+  const publishersList = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach((p) => {
+      if (p.publisher && p.publisher.trim()) set.add(p.publisher.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [products]);
+
+  // Số lượng bộ lọc nâng cao đang kích hoạt
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedPriceRange !== "all") count++;
+    if (selectedAuthor !== "all") count++;
+    if (selectedPublisher !== "all") count++;
+    if (selectedMinRating > 0) count++;
+    if (onlyInStock) count++;
+    return count;
+  }, [selectedPriceRange, selectedAuthor, selectedPublisher, selectedMinRating, onlyInStock]);
+
+  // Hàm thiết lập lại toàn bộ bộ lọc
+  const handleResetFilters = () => {
+    setSelectedPriceRange("all");
+    setSelectedAuthor("all");
+    setSelectedPublisher("all");
+    setSelectedMinRating(0);
+    setOnlyInStock(false);
+    setSelectedCategory("Tất cả");
+    setSearchQuery("");
+  };
+
+  // Filter & Sort Products (Đã nâng cấp đa tiêu chí nâng cao)
   const filteredProducts = useMemo(() => {
     const result = products.filter((item) => {
+      // 1. Lọc theo danh mục
       const matchCat =
         selectedCategory === "Tất cả" || item.category === selectedCategory;
+
+      // 2. Lọc theo từ khóa tìm kiếm
+      const query = searchQuery.toLowerCase().trim();
       const matchQuery =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchQuery;
+        !query ||
+        item.name.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query) ||
+        (item.author && item.author.toLowerCase().includes(query)) ||
+        (item.publisher && item.publisher.toLowerCase().includes(query)) ||
+        (item.isbn && item.isbn.toLowerCase().includes(query));
+
+      // 3. Lọc theo khoảng giá
+      let matchPrice = true;
+      if (selectedPriceRange === "under-100k") {
+        matchPrice = item.price < 100000;
+      } else if (selectedPriceRange === "100k-250k") {
+        matchPrice = item.price >= 100000 && item.price <= 250000;
+      } else if (selectedPriceRange === "250k-500k") {
+        matchPrice = item.price > 250000 && item.price <= 500000;
+      } else if (selectedPriceRange === "over-500k") {
+        matchPrice = item.price > 500000;
+      }
+
+      // 4. Lọc theo tác giả
+      const matchAuthor =
+        selectedAuthor === "all" || item.author === selectedAuthor;
+
+      // 5. Lọc theo nhà xuất bản
+      const matchPublisher =
+        selectedPublisher === "all" || item.publisher === selectedPublisher;
+
+      // 6. Lọc theo đánh giá tối thiểu
+      const matchRating =
+        selectedMinRating === 0 || item.rating >= selectedMinRating;
+
+      // 7. Lọc theo trạng thái còn hàng trong kho
+      const stock = item.stockQuantity ?? (item.inStock ? 25 : 0);
+      const matchStock = !onlyInStock || (item.inStock && stock > 0);
+
+      return (
+        matchCat &&
+        matchQuery &&
+        matchPrice &&
+        matchAuthor &&
+        matchPublisher &&
+        matchRating &&
+        matchStock
+      );
     });
 
     if (sortBy === "price-asc") {
@@ -672,12 +792,32 @@ export default function App() {
     }
 
     return result;
-  }, [products, selectedCategory, searchQuery, sortBy]);
+  }, [
+    products,
+    selectedCategory,
+    searchQuery,
+    sortBy,
+    selectedPriceRange,
+    selectedAuthor,
+    selectedPublisher,
+    selectedMinRating,
+    onlyInStock,
+  ]);
 
-  // Tự động reset trang về 1 khi người dùng đổi bộ lọc danh mục, tìm kiếm hoặc sắp xếp
+  // Tự động reset trang về 1 khi người dùng đổi bất kỳ bộ lọc nào
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, searchQuery, sortBy, itemsPerPage]);
+  }, [
+    selectedCategory,
+    searchQuery,
+    sortBy,
+    itemsPerPage,
+    selectedPriceRange,
+    selectedAuthor,
+    selectedPublisher,
+    selectedMinRating,
+    onlyInStock,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
 
@@ -704,9 +844,15 @@ export default function App() {
   const shippingFee = subtotal > 5000000 || subtotal === 0 ? 0 : 30000;
   const finalTotal = Math.max(0, subtotal - discountAmount + shippingFee);
 
-  // Handle Checkout Submit
+  // Xử lý tạo đơn hàng & điều hướng thanh toán chính xác
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Ngăn chặn tạo đơn hàng khi giỏ rỗng
+    if (cart.length === 0) {
+      showToast("Giỏ hàng của bạn đang trống! Vui lòng chọn sách trước khi đặt hàng.");
+      setIsCheckoutOpen(false);
+      return;
+    }
     if (!customerInfo.fullName || !customerInfo.phone || !customerInfo.address) {
       showToast("Vui lòng điền đầy đủ họ tên, số điện thoại và địa chỉ giao hàng!");
       return;
@@ -714,14 +860,19 @@ export default function App() {
     const generatedId = "DB-" + Math.floor(100000 + Math.random() * 900000);
     setCurrentOrderId(generatedId);
 
+    // Ghi nhận chính xác số tiền cần thanh toán trước khi dọn giỏ hàng
+    const orderTotalToPay = finalTotal;
+    setPaymentOrderTotal(orderTotalToPay);
+
     const newOrder: OrderRecord = {
       id: generatedId,
       date: new Date().toLocaleDateString("vi-VN"),
       items: [...cart],
-      totalAmount: finalTotal,
+      totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod,
       status: "Đang xử lý",
       customerInfo: { ...customerInfo },
+      isPaid: false,
     };
 
     const updatedOrders = [newOrder, ...orders];
@@ -732,21 +883,33 @@ export default function App() {
       // ignore
     }
 
-    // Gửi đơn hàng lên Backend / GearHost MS SQL
+    // Gửi đơn hàng lên Backend / MongoDB
     api.createOrder({
       customerInfo: { ...customerInfo },
       items: [...cart],
-      totalAmount: finalTotal,
+      totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod
     }).catch(console.error);
 
-    setOrderSuccess(true);
-    if (customerInfo.paymentMethod === "banking") {
-      setIsPaymentQROpen(true);
-    }
+    // Xóa giỏ hàng và voucher sau khi đã chuyển thành đơn hàng thành công
     setCart([]);
     setAppliedDiscount(0);
     setPromoCode("");
+
+    // Đóng hoàn toàn Checkout modal để không bị treo modal ngầm với số tiền 0 đ
+    setIsCheckoutOpen(false);
+    setOrderSuccess(false);
+
+    if (customerInfo.paymentMethod === "banking") {
+      setIsPaymentQROpen(true);
+    } else if (customerInfo.paymentMethod === "vnpay" || customerInfo.paymentMethod === "momo") {
+      setSimulatorMethod(customerInfo.paymentMethod as "vnpay" | "momo");
+      setIsPaymentSimulatorOpen(true);
+    } else {
+      // Đơn hàng COD Tiền mặt
+      switchTab("orders");
+      showToast("Đặt hàng thành công! Đơn hàng COD của bạn đang được xử lý.");
+    }
   };
 
   // Handle Contact Submit
@@ -802,9 +965,21 @@ export default function App() {
   ) => {
     api.updateOrderStatus(orderId, newStatus).catch(console.error);
     const updated = orders.map((ord) =>
-      ord.id === orderId ? { ...ord, status: newStatus } : ord
+      ord.id === orderId
+        ? {
+            ...ord,
+            status: newStatus,
+            // Nếu đơn hoàn tất thì đánh dấu đã thanh toán thành công
+            isPaid: newStatus === "Hoàn tất" ? true : ord.isPaid
+          }
+        : ord
     );
     setOrders(updated);
+    try {
+      localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
     showToast(`Đã đổi trạng thái đơn #${orderId} thành "${newStatus}"!`);
   };
 
@@ -1272,6 +1447,19 @@ export default function App() {
                   )}
                 </button>
 
+                {/* Nút Góc Đọc Sách / Blog */}
+                <button
+                  onClick={() => switchTab("blog")}
+                  className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap flex items-center space-x-1.5 cursor-pointer ${
+                    activeTab === "blog"
+                      ? "bg-white text-indigo-700 shadow-sm shadow-slate-200"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                  }`}
+                >
+                  <span>📖</span>
+                  <span>Góc Đọc Sách</span>
+                </button>
+
                 <button
                   onClick={() => switchTab("about")}
                   className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap flex items-center space-x-1.5 ${
@@ -1297,21 +1485,8 @@ export default function App() {
                 </button>
               </nav>
 
-              {/* Khối Tiện Ích Khách Hàng (Tra Cứu, Yêu Thích, Giỏ Hàng, Tài Khoản) */}
+              {/* Khối Tiện Ích Khách Hàng (Yêu Thích, Giỏ Hàng, Tài Khoản) - Gọn gàng và thoáng đãng */}
               <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                {/* Nút Tra cứu đơn hàng */}
-                <button
-                  onClick={() => {
-                    setSelectedTrackingOrder(null);
-                    setIsOrderTrackingOpen(true);
-                  }}
-                  className="hidden xl:flex items-center space-x-1.5 px-2.5 py-2 text-xs font-bold text-slate-700 hover:text-blue-600 bg-slate-100/80 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all whitespace-nowrap shrink-0"
-                  title="Tra cứu lộ trình đơn hàng"
-                >
-                  <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>Tra cứu đơn</span>
-                </button>
-
                 {/* Nút Sách Yêu Thích */}
                 <button
                   onClick={() => setIsWishlistOpen(true)}
@@ -1567,6 +1742,19 @@ export default function App() {
                   )}
                 </button>
 
+                {/* Mobile Nav: Góc Đọc Sách */}
+                <button
+                  onClick={() => switchTab("blog")}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold text-left flex items-center space-x-2 transition-all cursor-pointer ${
+                    activeTab === "blog"
+                      ? "bg-indigo-50 text-indigo-700 font-extrabold"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>📖</span>
+                  <span>Góc Đọc Sách &amp; Cẩm Nang</span>
+                </button>
+
                 <button
                   onClick={() => switchTab("profile")}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold text-left flex items-center space-x-2 transition-all ${
@@ -1790,39 +1978,33 @@ export default function App() {
             {/* Filter & Sorting Controls */}
             <section id="product-grid" className="space-y-4">
               <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-                {/* Category Tabs dạng Icon Pills với số lượng sách */}
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                  {CATEGORIES.map((cat) => {
-                    const icon = CATEGORY_ICONS[cat] || "📚";
-                    const count =
-                      cat === "Tất cả"
-                        ? products.length
-                        : products.filter((p) => p.category === cat).length;
-
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center space-x-1.5 ${
-                          selectedCategory === cat
-                            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/25 scale-[1.02]"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200/80 hover:text-slate-900"
-                        }`}
-                      >
-                        <span>{icon}</span>
-                        <span>{cat}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
-                            selectedCategory === cat
-                              ? "bg-white/20 text-white"
-                              : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
+                {/* Drop List Danh Mục Sách Tinh Gọn (Theo yêu cầu: Thay thế dàn nút tràn dòng bằng Dropdown) */}
+                <div className="flex items-center space-x-2.5 w-full md:w-auto">
+                  <span className="text-xs font-bold text-slate-600 shrink-0 flex items-center space-x-1">
+                    <span>📚</span>
+                    <span>Danh mục:</span>
+                  </span>
+                  <div className="relative w-full sm:w-64">
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-2xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs appearance-none transition-all"
+                    >
+                      {CATEGORIES.map((cat) => {
+                        const icon = CATEGORY_ICONS[cat] || "📚";
+                        const count =
+                          cat === "Tất cả"
+                            ? products.length
+                            : products.filter((p) => p.category === cat).length;
+                        return (
+                          <option key={cat} value={cat}>
+                            {icon} {cat} ({count} cuốn)
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
                 </div>
 
                 {/* Search & Sort */}
@@ -1851,8 +2033,146 @@ export default function App() {
                       <option value="rating">Đánh giá cao</option>
                     </select>
                   </div>
+
+                  {/* Nút bấm mở/đóng Bộ lọc sách nâng cao */}
+                  <button
+                    type="button"
+                    onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
+                    className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all flex items-center space-x-1.5 shrink-0 ${
+                      isAdvancedFilterOpen || activeFiltersCount > 0
+                        ? "bg-blue-50 border-blue-300 text-blue-700 shadow-sm"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Filter className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="hidden sm:inline">Bộ Lọc Nâng Cao</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                  </button>
                 </div>
               </div>
+
+              {/* BẢNG BỘ LỌC ĐA TIÊU CHÍ NÂNG CAO (COLLAPSIBLE ADVANCED FILTER PANEL) */}
+              {(isAdvancedFilterOpen || activeFiltersCount > 0) && (
+                <div className="bg-white p-5 rounded-3xl border border-blue-100 shadow-sm space-y-4 animate-in fade-in zoom-in-98 duration-200">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                        <Filter className="w-4 h-4" />
+                      </div>
+                      <h3 className="font-extrabold text-sm text-slate-900">
+                        Bộ Lọc Đa Tiêu Chí Nhà Sách
+                      </h3>
+                      {activeFiltersCount > 0 && (
+                        <span className="text-[11px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-bold border border-blue-200">
+                          Đang lọc {activeFiltersCount} tiêu chí
+                        </span>
+                      )}
+                    </div>
+                    {activeFiltersCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetFilters}
+                        className="text-xs text-red-600 hover:text-red-700 font-bold hover:underline flex items-center space-x-1"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Đặt lại tất cả</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                    {/* 1. Lọc theo Khoảng giá */}
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 block">
+                        Khoảng giá (VNĐ):
+                      </label>
+                      <select
+                        value={selectedPriceRange}
+                        onChange={(e) => setSelectedPriceRange(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">Tất cả mức giá</option>
+                        <option value="under-100k">Dưới 100.000 đ</option>
+                        <option value="100k-250k">100.000 đ - 250.000 đ</option>
+                        <option value="250k-500k">250.000 đ - 500.000 đ</option>
+                        <option value="over-500k">Trên 500.000 đ</option>
+                      </select>
+                    </div>
+
+                    {/* 2. Lọc theo Tác giả */}
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 block">
+                        Tác giả tác phẩm:
+                      </label>
+                      <select
+                        value={selectedAuthor}
+                        onChange={(e) => setSelectedAuthor(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">Tất cả tác giả ({authorsList.length})</option>
+                        {authorsList.map((author) => (
+                          <option key={author} value={author}>
+                            {author}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 3. Lọc theo Nhà xuất bản */}
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 block">
+                        Nhà xuất bản (NXB):
+                      </label>
+                      <select
+                        value={selectedPublisher}
+                        onChange={(e) => setSelectedPublisher(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">Tất cả NXB ({publishersList.length})</option>
+                        {publishersList.map((pub) => (
+                          <option key={pub} value={pub}>
+                            {pub}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 4. Lọc theo Đánh giá sao */}
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 block">
+                        Đánh giá độc giả:
+                      </label>
+                      <select
+                        value={selectedMinRating}
+                        onChange={(e) => setSelectedMinRating(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value={0}>Tất cả điểm đánh giá</option>
+                        <option value={4.0}>⭐ Từ 4.0 sao trở lên</option>
+                        <option value={4.5}>⭐ Từ 4.5 sao trở lên</option>
+                        <option value={4.8}>⭐ Bestseller từ 4.8 sao</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Tùy chọn Tình trạng hàng */}
+                  <div className="flex items-center space-x-3 pt-1 text-xs">
+                    <label className="inline-flex items-center space-x-2 cursor-pointer font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={onlyInStock}
+                        onChange={(e) => setOnlyInStock(e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      />
+                      <span>Chỉ hiển thị sách còn hàng trong kho</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Product Grid */}
               {filteredProducts.length === 0 ? (
@@ -1878,7 +2198,7 @@ export default function App() {
                   {paginatedProducts.map((prod) => (
                     <div
                       key={prod.id}
-                      className="bg-white rounded-3xl border border-slate-200/80 p-3.5 shadow-sm hover:shadow-2xl hover:border-blue-200 transition-all duration-300 flex flex-col justify-between group"
+                      className="bg-white rounded-3xl border border-slate-200/80 p-3.5 shadow-sm hover:shadow-xl hover:border-blue-300 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group"
                     >
                       {/* Khung Bìa Sách 3D Tỷ Lệ 3:4 Chuẩn NXB */}
                       <div
@@ -1899,6 +2219,13 @@ export default function App() {
                         {prod.discountPercent > 0 && (
                           <div className="absolute top-3 left-3 z-20 bg-gradient-to-r from-red-600 to-rose-600 text-white text-[11px] font-black px-2.5 py-1 rounded-xl shadow-md shadow-red-600/30">
                             -{prod.discountPercent}%
+                          </div>
+                        )}
+
+                        {/* Huy hiệu Bestseller khi rating từ 4.8 hoặc nhiều đánh giá */}
+                        {((prod.rating && prod.rating >= 4.8) || (prod.reviewsCount && prod.reviewsCount >= 8)) && (
+                          <div className="absolute bottom-3 left-3 z-20 bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-lg shadow-md flex items-center space-x-1 border border-amber-300/60 backdrop-blur-xs">
+                            <span>⭐ Bestseller</span>
                           </div>
                         )}
 
@@ -1996,16 +2323,17 @@ export default function App() {
                           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center space-x-2">
                             <button
                               onClick={() => handleSelectProduct(prod)}
-                              className="flex-1 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors text-center"
+                              className="flex-1 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 hover:text-blue-600 rounded-xl transition-all text-center flex items-center justify-center space-x-1"
                             >
-                              Chi tiết
+                              <BookOpen className="w-3.5 h-3.5 opacity-70" />
+                              <span>Chi tiết</span>
                             </button>
                             <button
                               onClick={() => addToCart(prod)}
                               disabled={!prod.inStock}
-                              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 ${
+                              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 active:scale-95 ${
                                 prod.inStock
-                                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 hover:shadow-lg"
+                                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30"
                                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
                               }`}
                             >
@@ -2403,6 +2731,17 @@ export default function App() {
               setAuthTab("login");
               setIsAuthModalOpen(true);
             }}
+            onPrintInvoice={(ord) => setSelectedInvoiceOrder(ord)}
+            onPayOrder={(ord) => {
+              setCurrentOrderId(ord.id);
+              setPaymentOrderTotal(ord.totalAmount);
+              if (ord.paymentMethod === "vnpay" || ord.paymentMethod === "momo") {
+                setSimulatorMethod(ord.paymentMethod as "vnpay" | "momo");
+                setIsPaymentSimulatorOpen(true);
+              } else {
+                setIsPaymentQROpen(true);
+              }
+            }}
           />
         )}
 
@@ -2420,6 +2759,17 @@ export default function App() {
               setIsAuthModalOpen(true);
             }}
             onLogout={handleLogout}
+            onContinueShopping={() => switchTab("products")}
+          />
+        )}
+
+        {/* TAB 7: GÓC ĐỌC SÁCH & BLOG PHÊ BÌNH VĂN HỌC (TRANG RIÊNG BIỆT) */}
+        {activeTab === "blog" && (
+          <BlogPage
+            products={products}
+            onSelectBook={(prod) => {
+              handleSelectProduct(prod);
+            }}
             onContinueShopping={() => switchTab("products")}
           />
         )}
@@ -2753,7 +3103,41 @@ export default function App() {
         {isCheckoutOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 sm:p-8 animate-in fade-in zoom-in-95">
-              {!orderSuccess ? (
+              {cart.length === 0 && !orderSuccess ? (
+                <div className="text-center py-8 space-y-4">
+                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <ShoppingBag className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800">
+                    Giỏ hàng của bạn đang trống
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                    Bạn chưa có sản phẩm nào trong giỏ hàng hoặc đơn hàng trước đó đã được tạo thành công.
+                  </p>
+                  <div className="flex justify-center space-x-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCheckoutOpen(false);
+                        switchTab("orders");
+                      }}
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                    >
+                      Xem đơn hàng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCheckoutOpen(false);
+                        switchTab("products");
+                      }}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                    >
+                      Khám phá sách ngay
+                    </button>
+                  </div>
+                </div>
+              ) : !orderSuccess ? (
                 <form onSubmit={handleCheckoutSubmit} className="space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>
@@ -2832,43 +3216,23 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block font-semibold text-slate-700 mb-1">
-                        Phương thức thanh toán
-                      </label>
-                      <div className="grid grid-cols-2 gap-2 mt-1">
-                        <label
-                          className={`border rounded-xl p-3 flex items-center space-x-2 cursor-pointer transition-all ${
-                            customerInfo.paymentMethod === "cod"
-                              ? "border-blue-600 bg-blue-50 text-blue-900"
-                              : "border-slate-200 text-slate-700"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="cod"
-                            checked={customerInfo.paymentMethod === "cod"}
-                            onChange={(e) =>
-                              setCustomerInfo({
-                                ...customerInfo,
-                                paymentMethod: e.target.value,
-                              })
-                            }
-                            className="text-blue-600"
-                          />
-                          <div className="flex items-center space-x-1.5">
-                            <Truck className="w-4 h-4 text-blue-600" />
-                            <span className="font-semibold text-xs">
-                              COD (Tiền mặt)
-                            </span>
-                          </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block font-bold text-slate-800 text-xs sm:text-sm">
+                          Phương thức thanh toán
                         </label>
+                        <span className="text-[10px] sm:text-[11px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 flex items-center space-x-1">
+                          <ShieldCheck className="w-3 h-3 text-blue-600 inline mr-0.5" />
+                          <span>Bảo mật 100%</span>
+                        </span>
+                      </div>
 
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1">
+                        {/* 1. Chuyển khoản VietQR MBBank (Tài khoản CAO DINH BAO) */}
                         <label
-                          className={`border rounded-xl p-3 flex items-center space-x-2 cursor-pointer transition-all ${
+                          className={`relative border-2 rounded-2xl p-3 flex items-start space-x-3 cursor-pointer transition-all duration-200 select-none ${
                             customerInfo.paymentMethod === "banking"
-                              ? "border-blue-600 bg-blue-50 text-blue-900"
-                              : "border-slate-200 text-slate-700"
+                              ? "border-blue-600 bg-blue-50/70 shadow-md ring-2 ring-blue-500/20"
+                              : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50/60"
                           }`}
                         >
                           <input
@@ -2882,13 +3246,144 @@ export default function App() {
                                 paymentMethod: e.target.value,
                               })
                             }
-                            className="text-blue-600"
+                            className="mt-1 text-blue-600 focus:ring-blue-500"
                           />
-                          <div className="flex items-center space-x-1.5">
-                            <CreditCard className="w-4 h-4 text-indigo-600" />
-                            <span className="font-semibold text-xs">
-                              Chuyển khoản QR
-                            </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-1.5">
+                                <CreditCard className="w-4 h-4 text-blue-700" />
+                                <span className="font-black text-xs text-blue-900">VietQR MBBank</span>
+                              </div>
+                              <span className="text-[9px] font-black bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-900 px-1.5 py-0.5 rounded-md shadow-xs">
+                                Khuyên dùng ⭐
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                              CAO DINH BAO
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              0347934359 • Quét QR nhanh
+                            </p>
+                          </div>
+                        </label>
+
+                        {/* 2. Cổng thanh toán VNPAY */}
+                        <label
+                          className={`relative border-2 rounded-2xl p-3 flex items-start space-x-3 cursor-pointer transition-all duration-200 select-none ${
+                            customerInfo.paymentMethod === "vnpay"
+                              ? "border-sky-600 bg-sky-50/70 shadow-md ring-2 ring-sky-500/20"
+                              : "border-slate-200 bg-white hover:border-sky-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMethod"
+                            value="vnpay"
+                            checked={customerInfo.paymentMethod === "vnpay"}
+                            onChange={(e) =>
+                              setCustomerInfo({
+                                ...customerInfo,
+                                paymentMethod: e.target.value,
+                              })
+                            }
+                            className="mt-1 text-sky-600 focus:ring-sky-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-1.5">
+                                <QrCode className="w-4 h-4 text-sky-700" />
+                                <span className="font-black text-xs text-sky-900">VNPAY-QR</span>
+                              </div>
+                              <span className="text-[9px] font-bold bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-md">
+                                Cổng VNPAY
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-semibold text-slate-700 mt-1">
+                              40+ App Ngân Hàng
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              VCB, BIDV, Agribank...
+                            </p>
+                          </div>
+                        </label>
+
+                        {/* 3. Ví điện tử MoMo */}
+                        <label
+                          className={`relative border-2 rounded-2xl p-3 flex items-start space-x-3 cursor-pointer transition-all duration-200 select-none ${
+                            customerInfo.paymentMethod === "momo"
+                              ? "border-[#a50064] bg-pink-50/70 shadow-md ring-2 ring-pink-500/20"
+                              : "border-slate-200 bg-white hover:border-pink-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMethod"
+                            value="momo"
+                            checked={customerInfo.paymentMethod === "momo"}
+                            onChange={(e) =>
+                              setCustomerInfo({
+                                ...customerInfo,
+                                paymentMethod: e.target.value,
+                              })
+                            }
+                            className="mt-1 text-[#a50064] focus:ring-pink-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-1.5">
+                                <Wallet className="w-4 h-4 text-[#a50064]" />
+                                <span className="font-black text-xs text-[#a50064]">Ví MoMo</span>
+                              </div>
+                              <span className="text-[9px] font-bold bg-pink-100 text-[#a50064] px-1.5 py-0.5 rounded-md">
+                                Siêu tốc
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-semibold text-slate-700 mt-1">
+                              Quét App MoMo
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              Xác nhận giao dịch tức thì
+                            </p>
+                          </div>
+                        </label>
+
+                        {/* 4. Tiền mặt COD */}
+                        <label
+                          className={`relative border-2 rounded-2xl p-3 flex items-start space-x-3 cursor-pointer transition-all duration-200 select-none ${
+                            customerInfo.paymentMethod === "cod"
+                              ? "border-emerald-600 bg-emerald-50/70 shadow-md ring-2 ring-emerald-500/20"
+                              : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMethod"
+                            value="cod"
+                            checked={customerInfo.paymentMethod === "cod"}
+                            onChange={(e) =>
+                              setCustomerInfo({
+                                ...customerInfo,
+                                paymentMethod: e.target.value,
+                              })
+                            }
+                            className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-1.5">
+                                <Truck className="w-4 h-4 text-emerald-600" />
+                                <span className="font-black text-xs text-emerald-900">COD Tiền mặt</span>
+                              </div>
+                              <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md">
+                                Nhận hàng
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-semibold text-slate-700 mt-1">
+                              Thanh toán khi nhận
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              Kiểm tra sách trước khi trả
+                            </p>
                           </div>
                         </label>
                       </div>
@@ -2980,15 +3475,43 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setIsCheckoutOpen(false);
-                      setOrderSuccess(false);
-                    }}
-                    className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
-                  >
-                    Tiếp Tục Mua Sắm
-                  </button>
+                  <div className="space-y-2.5">
+                    {/* Nút Xem & In Hóa Đơn Bán Lẻ */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const found = orders.find((o) => o.id === currentOrderId);
+                        if (found) {
+                          setSelectedInvoiceOrder(found);
+                        } else {
+                          // Nếu đơn mới vừa tạo, tạo đối tượng tạm thời để in ngay
+                          setSelectedInvoiceOrder({
+                            id: currentOrderId,
+                            date: new Date().toLocaleDateString("vi-VN"),
+                            items: [...cart],
+                            totalAmount: finalTotal,
+                            paymentMethod: customerInfo.paymentMethod,
+                            status: "Đang xử lý",
+                            customerInfo: { ...customerInfo },
+                          });
+                        }
+                      }}
+                      className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-2 cursor-pointer shadow-xs"
+                    >
+                      <Printer className="w-4 h-4 text-blue-600" />
+                      <span>Xem &amp; In Hóa Đơn Mua Sách (PDF)</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsCheckoutOpen(false);
+                        setOrderSuccess(false);
+                      }}
+                      className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      Tiếp Tục Mua Sắm
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -2998,14 +3521,66 @@ export default function App() {
         {/* MODAL THANH TOÁN VIETQR */}
         <PaymentQRModal
           isOpen={isPaymentQROpen}
-          onClose={() => setIsPaymentQROpen(false)}
+          onClose={() => {
+            setIsPaymentQROpen(false);
+            switchTab("orders");
+            showToast("Đơn hàng đã được lưu. Bạn có thể quét mã thanh toán trong mục Đơn Hàng bất cứ lúc nào!");
+          }}
           orderId={currentOrderId}
-          totalAmount={finalTotal}
+          totalAmount={paymentOrderTotal || finalTotal}
           customerName={customerInfo.fullName}
           onConfirmPaid={() => {
             setIsPaymentQROpen(false);
-            showToast("Xác nhận thanh toán thành công! BookStore đang xử lý đơn hàng của bạn.");
+            setOrders((prev) => {
+              const updated = prev.map((o) =>
+                o.id === currentOrderId ? { ...o, isPaid: true } : o
+              );
+              try {
+                localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+            switchTab("orders");
+            showToast("Xác nhận thanh toán thành công! Hóa đơn bán lẻ đã sẵn sàng để xem & in.");
           }}
+        />
+
+        {/* MODAL GIẢ LẬP CỔNG THANH TOÁN VNPAY & VÍ MOMO (SANDBOX) */}
+        <PaymentSimulatorModal
+          isOpen={isPaymentSimulatorOpen}
+          method={simulatorMethod}
+          amount={paymentOrderTotal || finalTotal}
+          orderId={currentOrderId}
+          onClose={() => {
+            setIsPaymentSimulatorOpen(false);
+            switchTab("orders");
+            showToast("Đơn hàng đã được lưu. Bạn có thể bấm 'Thanh Toán Ngay' trong mục Đơn Hàng bất cứ lúc nào!");
+          }}
+          onSuccess={() => {
+            setIsPaymentSimulatorOpen(false);
+            setOrders((prev) => {
+              const updated = prev.map((o) =>
+                o.id === currentOrderId ? { ...o, isPaid: true } : o
+              );
+              try {
+                localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+            switchTab("orders");
+            showToast(
+              `Thanh toán qua ${
+                simulatorMethod === "vnpay" ? "VNPAY-QR" : "Ví MoMo"
+              } thành công! Hóa đơn bán lẻ đã sẵn sàng để xem & in.`
+            );
+          }}
+        />
+
+        {/* MODAL IN HÓA ĐƠN BÁN LẺ (RETAIL INVOICE VIEWER & PRINT) */}
+        <InvoiceModal
+          isOpen={Boolean(selectedInvoiceOrder)}
+          order={selectedInvoiceOrder}
+          onClose={() => setSelectedInvoiceOrder(null)}
         />
 
         {/* MODAL SÁCH YÊU THÍCH (WISHLIST) */}

@@ -11,6 +11,8 @@ export interface ReviewItem {
   content: string;
   verified: boolean;
   likes: number;
+  imageUrl?: string;
+  userLiked?: boolean;
 }
 
 export interface Product {

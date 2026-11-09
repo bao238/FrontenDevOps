@@ -21,7 +21,11 @@ import {
   Tag,
   Clock,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Camera,
+  Image,
+  X,
+  Filter
 } from "lucide-react";
 
 interface ProductDetailPageProps {
@@ -71,13 +75,59 @@ export default function ProductDetailPage({
   const [reviewerName, setReviewerName] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewContent, setReviewContent] = useState("");
+  const [reviewImage, setReviewImage] = useState<string>("");
   const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  // Bộ lọc đánh giá theo số sao hoặc có ảnh
+  const [reviewFilter, setReviewFilter] = useState<"all" | 5 | 4 | 3 | "has_photo">("all");
+
+  // Xử lý tải ảnh chụp trang sách thực tế từ máy tính
+  const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Vui lòng chọn ảnh có kích thước dưới 5MB!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setReviewImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Xử lý bấm thích nhận xét (Hữu ích)
+  const handleToggleLikeReview = (reviewId: string) => {
+    setReviews((prev) =>
+      prev.map((r) => {
+        if (r.id === reviewId) {
+          const isLiked = Boolean(r.userLiked);
+          return {
+            ...r,
+            userLiked: !isLiked,
+            likes: isLiked ? Math.max(0, (r.likes || 1) - 1) : (r.likes || 0) + 1,
+          };
+        }
+        return r;
+      })
+    );
+  };
 
   // Tính toán số sao trung bình thực tế từ danh sách nhận xét (nếu có 0 đánh giá thì trả về 0)
   const hasReviews = reviews.length > 0;
   const currentRating = hasReviews
     ? Number((reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / reviews.length).toFixed(1))
     : 0;
+
+  // Lọc danh sách nhận xét theo tiêu chí
+  const filteredReviewsList = reviews.filter((r) => {
+    if (reviewFilter === "all") return true;
+    if (reviewFilter === 5) return r.rating === 5;
+    if (reviewFilter === 4) return r.rating === 4;
+    if (reviewFilter === 3) return r.rating <= 3;
+    if (reviewFilter === "has_photo") return Boolean(r.imageUrl);
+    return true;
+  });
 
   // Format VND
   const formatVND = (amount: number) => {
@@ -102,7 +152,8 @@ export default function ProductDetailPage({
       const res = await api.addProductReview(product.id, {
         author: reviewerName.trim(),
         rating: reviewRating,
-        content: reviewContent.trim()
+        content: reviewContent.trim(),
+        imageUrl: reviewImage || undefined
       });
 
       if (res && res.data) {
@@ -115,13 +166,15 @@ export default function ProductDetailPage({
           date: "Vừa xong",
           content: reviewContent.trim(),
           verified: true,
-          likes: 0
+          likes: 0,
+          imageUrl: reviewImage || undefined
         };
         setReviews((prev) => [newRev, ...prev]);
       }
 
       setReviewerName("");
       setReviewContent("");
+      setReviewImage("");
       setReviewRating(5);
       setReviewSuccess(true);
       setTimeout(() => setReviewSuccess(false), 4000);
@@ -571,11 +624,77 @@ export default function ProductDetailPage({
               </div>
             </div>
 
-            {/* Reviews List */}
+            {/* Reviews List & Filter Bar */}
             <div className="space-y-4">
-              <h4 className="font-bold text-slate-900 text-sm">
-                Tất cả nhận xét ({reviews.length})
-              </h4>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <h4 className="font-bold text-slate-900 text-sm">
+                  Tất cả nhận xét ({reviews.length})
+                </h4>
+
+                {/* Thanh lọc nhận xét theo tiêu chí */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-slate-400 text-[11px] font-medium mr-1 flex items-center">
+                    <Filter className="w-3 h-3 mr-1" /> Lọc:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilter("all")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                      reviewFilter === "all"
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilter(5)}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                      reviewFilter === 5
+                        ? "bg-amber-500 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    5 ⭐ ({reviews.filter((r) => r.rating === 5).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilter(4)}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                      reviewFilter === 4
+                        ? "bg-amber-500 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    4 ⭐ ({reviews.filter((r) => r.rating === 4).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilter(3)}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                      reviewFilter === 3
+                        ? "bg-amber-500 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    ≤ 3 ⭐ ({reviews.filter((r) => r.rating <= 3).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilter("has_photo")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer flex items-center space-x-1 ${
+                      reviewFilter === "has_photo"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>Có ảnh ({reviews.filter((r) => Boolean(r.imageUrl)).length})</span>
+                  </button>
+                </div>
+              </div>
+
               {!hasReviews ? (
                 <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs space-y-2">
                   <Star className="w-8 h-8 text-slate-200 mx-auto" />
@@ -584,12 +703,16 @@ export default function ProductDetailPage({
                     Hãy gửi đánh giá đầu tiên của bạn ở biểu mẫu bên dưới để giúp các độc giả khác có thêm thông tin tham khảo nhé!
                   </p>
                 </div>
+              ) : filteredReviewsList.length === 0 ? (
+                <div className="p-6 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-500 text-xs">
+                  Không có nhận xét nào phù hợp với bộ lọc đã chọn.
+                </div>
               ) : (
                 <div className="space-y-3">
-                {reviews.map((rev) => (
+                {filteredReviewsList.map((rev) => (
                   <div
                     key={rev.id}
-                    className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200 text-xs space-y-2"
+                    className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200 text-xs space-y-2.5 transition-shadow hover:shadow-xs"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
@@ -601,7 +724,8 @@ export default function ProductDetailPage({
                         <div>
                           <span className="font-bold text-slate-900">{rev.author}</span>
                           {rev.verified && (
-                            <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
+                            <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px] inline-flex items-center">
+                              <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
                               Đã mua hàng
                             </span>
                           )}
@@ -625,9 +749,33 @@ export default function ProductDetailPage({
                       {rev.content}
                     </p>
 
-                    <div className="flex items-center space-x-4 text-[11px] text-slate-400 pt-1">
-                      <button className="flex items-center space-x-1 hover:text-blue-600">
-                        <ThumbsUp className="w-3.5 h-3.5" />
+                    {/* Hiển thị ảnh chụp sách thực tế nếu có */}
+                    {rev.imageUrl && (
+                      <div className="pt-1">
+                        <img
+                          src={rev.imageUrl}
+                          alt="Ảnh thực tế từ độc giả"
+                          className="w-24 h-24 object-cover rounded-xl border border-slate-200 shadow-xs cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(rev.imageUrl, "_blank")}
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1 italic">
+                          (Ảnh chụp sản phẩm thực tế từ người mua)
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Nút bấm Hữu ích tương tác */}
+                    <div className="flex items-center space-x-4 text-[11px] pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLikeReview(rev.id)}
+                        className={`flex items-center space-x-1.5 transition-colors cursor-pointer px-2.5 py-1 rounded-lg border ${
+                          rev.userLiked
+                            ? "bg-blue-50 border-blue-200 text-blue-600 font-bold"
+                            : "bg-white border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <ThumbsUp className={`w-3.5 h-3.5 ${rev.userLiked ? "fill-blue-600" : ""}`} />
                         <span>Hữu ích ({rev.likes})</span>
                       </button>
                     </div>
@@ -677,7 +825,7 @@ export default function ProductDetailPage({
                           key={num}
                           type="button"
                           onClick={() => setReviewRating(num)}
-                          className="p-1 hover:scale-110 transition-transform"
+                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
                         >
                           <Star
                             className={`w-6 h-6 ${
@@ -702,17 +850,56 @@ export default function ProductDetailPage({
                   <textarea
                     rows={3}
                     required
-                    placeholder="Chia sẻ cảm nhận về chất lượng sản phẩm, đóng gói, tốc độ giao hàng..."
+                    placeholder="Chia sẻ cảm nhận về nội dung sách, chất lượng in ấn, tốc độ giao hàng..."
                     value={reviewContent}
                     onChange={(e) => setReviewContent(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
+                {/* Tải ảnh chụp thực tế */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Đính kèm ảnh chụp sách thực tế (Tùy chọn)
+                  </label>
+                  {reviewImage ? (
+                    <div className="flex items-center space-x-3 p-2 bg-white rounded-xl border border-slate-200">
+                      <img
+                        src={reviewImage}
+                        alt="Ảnh đính kèm"
+                        className="w-16 h-16 object-cover rounded-lg border border-slate-200"
+                      />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-slate-800">Ảnh đã tải lên</p>
+                        <p className="text-[10px] text-slate-400">Ảnh sẽ hiển thị cùng nhận xét của bạn</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReviewImage("")}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Xóa ảnh"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="inline-flex items-center space-x-2 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl cursor-pointer text-slate-700 font-semibold transition-colors">
+                      <Camera className="w-4 h-4 text-blue-600" />
+                      <span>Chọn ảnh từ máy tính (Dưới 5MB)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReviewImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <button
                   type="submit"
                   disabled={isSubmittingReview}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2 cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>{isSubmittingReview ? "Đang gửi lên MongoDB..." : "Gửi Nhận Xét"}</span>

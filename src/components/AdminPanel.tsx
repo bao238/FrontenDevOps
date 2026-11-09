@@ -47,14 +47,15 @@ import {
   Ticket,
   BarChart3,
   Folder,
-  Server,
   Upload,
-  Link2
+  Link2,
+  AlertTriangle,
+  Printer
 } from "lucide-react";
 import CouponsTab from "./admin/CouponsTab";
 import AnalyticsTab from "./admin/AnalyticsTab";
 import CategoriesTab from "./admin/CategoriesTab";
-import DevOpsTab from "./admin/DevOpsTab";
+import InvoiceModal from "./InvoiceModal";
 
 interface CartItem {
   product: Product;
@@ -72,7 +73,9 @@ export interface OrderRecord {
     fullName: string;
     phone: string;
     address: string;
+    note?: string;
   };
+  isPaid?: boolean;
 }
 
 interface AdminPanelProps {
@@ -122,10 +125,14 @@ export default function AdminPanel({
   onResetDefaultUsers,
 }: AdminPanelProps) {
   const [adminTab, setAdminTab] = useState<
-    "products" | "orders" | "users" | "reviews" | "coupons" | "analytics" | "categories" | "devops"
+    "products" | "orders" | "users" | "reviews" | "coupons" | "analytics" | "categories"
   >("products");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
+  // Quản lý Bộ lọc Kho sách (Stock Filter: Tất cả, Còn hàng, Sắp hết <=5, Hết hàng)
+  const [selectedStockFilter, setSelectedStockFilter] = useState<
+    "all" | "in_stock" | "low_stock" | "out_of_stock"
+  >("all");
 
   // Reviews Management State (MongoDB)
   const [reviewsList, setReviewsList] = useState<ReviewItem[]>([]);
@@ -142,6 +149,8 @@ export default function AdminPanel({
   const [editReviewRating, setEditReviewRating] = useState(5);
   const [editReviewContent, setEditReviewContent] = useState("");
   const [isSavingReview, setIsSavingReview] = useState(false);
+  // Modal In Hóa Đơn trong Admin
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<OrderRecord | null>(null);
 
   // Tải danh sách đánh giá từ MongoDB
   const fetchReviews = async () => {
@@ -389,6 +398,7 @@ export default function AdminPanel({
 
   const [formDescription, setFormDescription] = useState("");
   const [formInStock, setFormInStock] = useState(true);
+  const [formStockQuantity, setFormStockQuantity] = useState<number>(25);
   const [formFeatured, setFormFeatured] = useState(false);
   const [formSpecs, setFormSpecs] = useState<{ [key: string]: string }>({
     "Tác giả": "Đang cập nhật",
@@ -439,7 +449,7 @@ export default function AdminPanel({
     }).format(amount);
   };
 
-  // Filtered Products for Admin Table
+  // Filtered Products for Admin Table (Đã kết hợp Bộ lọc Kho hàng)
   const filteredProducts = useMemo(() => {
     return products.filter((item) => {
       const matchCat =
@@ -448,9 +458,20 @@ export default function AdminPanel({
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.id.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchQuery;
+
+      const stock = item.stockQuantity ?? (item.inStock ? 25 : 0);
+      let matchStock = true;
+      if (selectedStockFilter === "in_stock") {
+        matchStock = item.inStock && stock > 5;
+      } else if (selectedStockFilter === "low_stock") {
+        matchStock = item.inStock && stock > 0 && stock <= 5;
+      } else if (selectedStockFilter === "out_of_stock") {
+        matchStock = !item.inStock || stock === 0;
+      }
+
+      return matchCat && matchQuery && matchStock;
     });
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery, selectedStockFilter]);
 
   // Statistics
   const totalRevenue = useMemo(() => {
@@ -459,8 +480,16 @@ export default function AdminPanel({
       .reduce((sum, o) => sum + o.totalAmount, 0);
   }, [orders]);
 
-  const inStockCount = products.filter((p) => p.inStock).length;
-  const outOfStockCount = products.filter((p) => !p.inStock).length;
+  // Thống kê chi tiết tình trạng kho sách
+  const inStockCount = products.filter(
+    (p) => p.inStock && (p.stockQuantity ?? 25) > 5
+  ).length;
+  const lowStockCount = products.filter(
+    (p) => p.inStock && (p.stockQuantity ?? 25) > 0 && (p.stockQuantity ?? 25) <= 5
+  ).length;
+  const outOfStockCount = products.filter(
+    (p) => !p.inStock || (p.stockQuantity ?? 25) === 0
+  ).length;
 
   // Filtered Users for Admin Table
   const filteredUsers = useMemo(() => {
@@ -619,6 +648,7 @@ export default function AdminPanel({
     setUploadedFileSize("");
     setFormDescription("Tác phẩm sách bản quyền chính thức, giấy in cao cấp tại BookStore.");
     setFormInStock(true);
+    setFormStockQuantity(25);
     setFormFeatured(false);
     setFormSpecs({
       "Tác giả": "Đang cập nhật",
@@ -647,6 +677,7 @@ export default function AdminPanel({
     setUploadedFileSize("");
     setFormDescription(product.description);
     setFormInStock(product.inStock);
+    setFormStockQuantity(product.stockQuantity ?? (product.inStock ? 25 : 0));
     setFormFeatured(Boolean(product.featured));
     setFormSpecs(product.specs || {});
     setNewSpecKey("");
@@ -672,6 +703,8 @@ export default function AdminPanel({
         ? Math.round(((formOriginalPrice - formPrice) / formOriginalPrice) * 100)
         : 0;
 
+    const qty = Number(formStockQuantity) || 0;
+
     if (editingProduct) {
       // Update
       const updated: Product = {
@@ -683,7 +716,8 @@ export default function AdminPanel({
         discountPercent,
         imageUrl: formImageUrl || SAMPLE_IMAGES[0].url,
         description: formDescription,
-        inStock: formInStock,
+        inStock: qty > 0 ? formInStock : false,
+        stockQuantity: qty,
         featured: formFeatured,
         specs: formSpecs,
       };
@@ -701,7 +735,8 @@ export default function AdminPanel({
         reviewsCount: 1,
         imageUrl: formImageUrl || SAMPLE_IMAGES[0].url,
         description: formDescription,
-        inStock: formInStock,
+        inStock: qty > 0 ? formInStock : false,
+        stockQuantity: qty,
         featured: formFeatured,
         specs: formSpecs,
       };
@@ -709,6 +744,17 @@ export default function AdminPanel({
     }
 
     setIsModalOpen(false);
+  };
+
+  // Cập nhật nhanh số lượng tồn kho trực tiếp từ bảng sản phẩm
+  const handleUpdateStockQuantity = (product: Product, deltaOrAbsolute: number, isAbsolute = false) => {
+    const currentStock = product.stockQuantity ?? (product.inStock ? 25 : 0);
+    const newQty = Math.max(0, isAbsolute ? deltaOrAbsolute : currentStock + deltaOrAbsolute);
+    onUpdateProduct({
+      ...product,
+      stockQuantity: newQty,
+      inStock: newQty > 0,
+    });
   };
 
   // Add Specification row
@@ -770,57 +816,68 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Package className="w-6 h-6" />
+      {/* Statistics Cards (Bổ sung Cảnh báo Kho sách sắp hết hàng) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
+          <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <Package className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Tổng sản phẩm</p>
-            <h3 className="text-2xl font-black text-slate-900">{products.length}</h3>
+            <p className="text-[11px] text-slate-500 font-medium">Tổng đầu sách</p>
+            <h3 className="text-xl font-black text-slate-900">{products.length}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <CheckCircle2 className="w-6 h-6" />
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Đang còn hàng</p>
-            <h3 className="text-2xl font-black text-emerald-600">{inStockCount}</h3>
+            <p className="text-[11px] text-slate-500 font-medium">Còn hàng (&gt;5)</p>
+            <h3 className="text-xl font-black text-emerald-600">{inStockCount}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-            <AlertCircle className="w-6 h-6" />
+        {/* THẺ CẢNH BÁO SẮP HẾT HÀNG */}
+        <div className="bg-white p-4.5 rounded-2xl border border-amber-200 shadow-sm flex items-center space-x-3.5 bg-gradient-to-br from-white to-amber-50/40">
+          <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+            <AlertTriangle className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Tạm hết hàng</p>
-            <h3 className="text-2xl font-black text-red-600">{outOfStockCount}</h3>
+            <p className="text-[11px] text-amber-800 font-bold">Sắp hết (≤ 5)</p>
+            <h3 className="text-xl font-black text-amber-600">{lowStockCount}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-            <DollarSign className="w-6 h-6" />
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
+          <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+            <AlertCircle className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Doanh thu đơn</p>
-            <h3 className="text-lg sm:text-xl font-black text-purple-600 truncate">
+            <p className="text-[11px] text-slate-500 font-medium">Hết hàng (0)</p>
+            <h3 className="text-xl font-black text-red-600">{outOfStockCount}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5 col-span-2 sm:col-span-1">
+          <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+            <DollarSign className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[11px] text-slate-500 font-medium">Doanh thu đơn</p>
+            <h3 className="text-base sm:text-lg font-black text-purple-600 truncate">
               {formatVND(totalRevenue)}
             </h3>
           </div>
         </div>
       </div>
 
-      {/* Admin Tab Switcher */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-200 pb-3 gap-3">
-        <div className="flex flex-wrap gap-2">
+      {/* Admin Tab Switcher - Thanh chuyển tab chuyên dụng, tinh gọn, không rớt dòng */}
+      <div className="border-b border-slate-200 pb-3">
+        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-0.5">
           <button
             onClick={() => setAdminTab("products")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "products"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -831,7 +888,7 @@ export default function AdminPanel({
           </button>
           <button
             onClick={() => setAdminTab("orders")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "orders"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -842,7 +899,7 @@ export default function AdminPanel({
           </button>
           <button
             onClick={() => setAdminTab("users")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "users"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -853,7 +910,7 @@ export default function AdminPanel({
           </button>
           <button
             onClick={() => setAdminTab("reviews")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "reviews"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -864,7 +921,7 @@ export default function AdminPanel({
           </button>
           <button
             onClick={() => setAdminTab("coupons")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "coupons"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -875,7 +932,7 @@ export default function AdminPanel({
           </button>
           <button
             onClick={() => setAdminTab("analytics")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "analytics"
                 ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -886,7 +943,7 @@ export default function AdminPanel({
           </button>
           <button
             onClick={() => setAdminTab("categories")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "categories"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -895,99 +952,80 @@ export default function AdminPanel({
             <Folder className="w-4 h-4" />
             <span>Thể Loại Sách</span>
           </button>
-          <button
-            onClick={() => setAdminTab("devops")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 ${
-              adminTab === "devops"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <Server className="w-4 h-4" />
-            <span>DevOps &amp; Giám Sát</span>
-          </button>
         </div>
-
-        {adminTab === "products" && (
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                if (window.confirm("Bạn có chắc muốn khôi phục về danh sách sản phẩm mẫu ban đầu không?")) {
-                  onResetDefaultProducts();
-                }
-              }}
-              className="text-xs text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-red-50 flex items-center space-x-1 transition-colors"
-              title="Khôi phục dữ liệu gốc"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Khôi phục mặc định</span>
-            </button>
-            <button
-              onClick={handleOpenCreate}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Thêm Sản Phẩm</span>
-            </button>
-          </div>
-        )}
-
-        {adminTab === "users" && (
-          <div className="flex items-center space-x-2">
-            {onResetDefaultUsers && (
-              <button
-                onClick={() => {
-                  if (window.confirm("Bạn có chắc muốn khôi phục về danh sách tài khoản người dùng mặc định ban đầu không?")) {
-                    onResetDefaultUsers();
-                  }
-                }}
-                className="text-xs text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-red-50 flex items-center space-x-1 transition-colors"
-                title="Khôi phục tài khoản mặc định"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Khôi phục mặc định</span>
-              </button>
-            )}
-            <button
-              onClick={handleOpenCreateUser}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Thêm Người Dùng</span>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* TAB 1: PRODUCT CRUD TABLE */}
       {adminTab === "products" && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-4 sm:p-6">
-          {/* Search & Filter Bar */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="relative w-full md:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm sản phẩm theo tên, danh mục, ID..."
-                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          {/* Search, Filter & Action Bar - Nút Thêm Sản Phẩm được đưa xuống đây gọn gàng */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            {/* Nhóm tìm kiếm và lọc dữ liệu sản phẩm */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm sản phẩm theo tên, danh mục, ID..."
+                  className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center space-x-1.5 shrink-0">
+                <span className="text-xs text-slate-500 font-medium">Danh mục:</span>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-1.5 shrink-0">
+                <span className="text-xs text-slate-500 font-medium">Kho hàng:</span>
+                <select
+                  value={selectedStockFilter}
+                  onChange={(e) => setSelectedStockFilter(e.target.value as any)}
+                  className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="all">Tất cả kho ({products.length})</option>
+                  <option value="in_stock">Còn hàng &gt;5 ({inStockCount})</option>
+                  <option value="low_stock">⚠️ Sắp hết hàng ≤ 5 ({lowStockCount})</option>
+                  <option value="out_of_stock">❌ Hết hàng ({outOfStockCount})</option>
+                </select>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-2 w-full md:w-auto">
-              <span className="text-xs text-slate-500 font-medium">Danh mục:</span>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            {/* Cụm nút Thao tác Sản phẩm (Chuyển từ phía trên xuống đây theo yêu cầu) */}
+            <div className="flex items-center justify-end space-x-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Bạn có chắc muốn khôi phục về danh sách sản phẩm mẫu ban đầu không?")) {
+                    onResetDefaultProducts();
+                  }
+                }}
+                className="text-xs text-slate-500 hover:text-red-600 px-3 py-2 rounded-xl border border-slate-200 hover:bg-red-50 flex items-center space-x-1 transition-colors cursor-pointer"
+                title="Khôi phục dữ liệu gốc"
               >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Khôi phục mặc định</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm Sản Phẩm</span>
+              </button>
             </div>
           </div>
 
@@ -1046,23 +1084,50 @@ export default function AdminPanel({
                         {formatVND(p.originalPrice)}
                       </td>
 
-                      {/* In Stock toggle & Stock Quantity */}
+                      {/* In Stock toggle & Stock Quantity (Đã nâng cấp Bộ chỉnh tồn kho Inline & Cảnh báo) */}
                       <td className="py-3 px-4 text-center">
-                        <div className="flex flex-col items-center space-y-1">
-                          <button
-                            onClick={() => handleToggleStock(p)}
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
-                              p.inStock
-                                ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                                : "bg-red-100 text-red-800 hover:bg-red-200"
-                            }`}
-                            title="Bấm để chuyển trạng thái Còn/Hết"
-                          >
-                            {p.inStock ? "Còn hàng" : "Hết hàng"}
-                          </button>
-                          <span className="text-[11px] font-bold text-slate-600">
-                            Kho: {p.stockQuantity !== undefined ? `${p.stockQuantity} cuốn` : "25 cuốn"}
-                          </span>
+                        <div className="flex flex-col items-center space-y-1.5">
+                          {/* Badge trạng thái tồn kho */}
+                          {!p.inStock || (p.stockQuantity ?? 25) === 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                              ❌ Hết hàng
+                            </span>
+                          ) : (p.stockQuantity ?? 25) <= 5 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                              ⚠️ Sắp hết ({p.stockQuantity ?? 25})
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              ✅ Còn ({p.stockQuantity ?? 25})
+                            </span>
+                          )}
+
+                          {/* Bộ điều khiển tăng / giảm số lượng tồn kho nhanh inline */}
+                          <div className="flex items-center space-x-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStockQuantity(p, -1)}
+                              className="w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:bg-slate-200 font-bold text-xs transition-colors"
+                              title="Giảm 1 cuốn"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.stockQuantity !== undefined ? p.stockQuantity : (p.inStock ? 25 : 0)}
+                              onChange={(e) => handleUpdateStockQuantity(p, Number(e.target.value), true)}
+                              className="w-10 text-center font-bold text-xs bg-white border border-slate-200 rounded py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStockQuantity(p, 1)}
+                              className="w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:bg-slate-200 font-bold text-xs transition-colors"
+                              title="Tăng 1 cuốn"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
                       </td>
 
@@ -1167,6 +1232,27 @@ export default function AdminPanel({
                         <option value="Hoàn tất">Hoàn tất</option>
                         <option value="Đã hủy">Đã hủy</option>
                       </select>
+
+                      {/* Nút In Hóa Đơn trong Admin - Rõ ràng trạng thái đã thanh toán */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvoiceOrder(ord)}
+                        className={`px-2.5 py-1 border rounded-lg text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer ${
+                          ord.isPaid || ord.status === "Hoàn tất"
+                            ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
+                            : "bg-slate-100 text-slate-400 border-slate-200"
+                        }`}
+                        title={
+                          ord.isPaid || ord.status === "Hoàn tất"
+                            ? "In hóa đơn bán lẻ (Đã thanh toán)"
+                            : "Đơn hàng này chưa thanh toán"
+                        }
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>
+                          In Hóa Đơn {ord.isPaid || ord.status === "Hoàn tất" ? "(Đã TT)" : "(Chưa TT)"}
+                        </span>
+                      </button>
 
                       <button
                         onClick={() => {
@@ -1288,21 +1374,21 @@ export default function AdminPanel({
 
           {/* User Table Card */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-4 sm:p-6">
-            {/* Search and Filters */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-              <div className="relative w-full md:w-80">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo tên, email, SĐT..."
-                  value={userSearchQuery}
-                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            {/* Search and Filters & Action Bar - Đưa các nút thao tác xuống thanh công cụ */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên, email, SĐT..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                <div className="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
+                <div className="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs shrink-0">
                   <span className="text-slate-400 font-medium">Vai trò:</span>
                   <select
                     value={userRoleFilter}
@@ -1316,7 +1402,7 @@ export default function AdminPanel({
                   </select>
                 </div>
 
-                <div className="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
+                <div className="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs shrink-0">
                   <span className="text-slate-400 font-medium">Trạng thái:</span>
                   <select
                     value={userStatusFilter}
@@ -1336,11 +1422,38 @@ export default function AdminPanel({
                       setUserRoleFilter("all");
                       setUserStatusFilter("all");
                     }}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-semibold px-2 py-1"
+                    className="text-xs text-blue-600 hover:text-blue-700 font-semibold px-2 py-1 cursor-pointer"
                   >
                     Đặt lại lọc
                   </button>
                 )}
+              </div>
+
+              {/* Cụm nút Thao tác Quản lý Người dùng */}
+              <div className="flex items-center justify-end space-x-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                {onResetDefaultUsers && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Bạn có chắc muốn khôi phục về danh sách tài khoản người dùng mặc định ban đầu không?")) {
+                        onResetDefaultUsers();
+                      }
+                    }}
+                    className="text-xs text-slate-500 hover:text-red-600 px-3 py-2 rounded-xl border border-slate-200 hover:bg-red-50 flex items-center space-x-1 transition-colors cursor-pointer"
+                    title="Khôi phục tài khoản mặc định"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Khôi phục mặc định</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleOpenCreateUser}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Thêm Người Dùng</span>
+                </button>
               </div>
             </div>
 
@@ -1768,9 +1881,6 @@ export default function AdminPanel({
       {/* 7. TAB QUẢN LÝ THỂ LOẠI SÁCH (CATEGORIES) */}
       {adminTab === "categories" && <CategoriesTab />}
 
-      {/* 8. TAB GIÁM SÁT HỆ THỐNG & DEVOPS (DEVOPS MONITOR) */}
-      {adminTab === "devops" && <DevOpsTab />}
-
       {/* CONFIRM DELETE REVIEW MODAL (Sử dụng createPortal gắn trực tiếp vào body để che phủ toàn màn hình, không bị cắt ngang header) */}
       {deletingReviewId && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
@@ -1961,8 +2071,8 @@ export default function AdminPanel({
                       />
                     </div>
 
-                    {/* Danh mục & Kho hàng */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* Danh mục, Tồn kho & Trạng thái */}
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block font-semibold text-slate-700 mb-1">
                           Danh mục *
@@ -1982,7 +2092,25 @@ export default function AdminPanel({
 
                       <div>
                         <label className="block font-semibold text-slate-700 mb-1">
-                          Kho hàng
+                          Số lượng kho *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          min={0}
+                          value={formStockQuantity}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setFormStockQuantity(val);
+                            setFormInStock(val > 0);
+                          }}
+                          className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px] font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Trạng thái kho
                         </label>
                         <div className="flex items-center space-x-2 pt-2">
                           <label className="flex items-center space-x-1 cursor-pointer">
@@ -1990,7 +2118,10 @@ export default function AdminPanel({
                               type="radio"
                               name="inStock"
                               checked={formInStock}
-                              onChange={() => setFormInStock(true)}
+                              onChange={() => {
+                                setFormInStock(true);
+                                if (formStockQuantity <= 0) setFormStockQuantity(25);
+                              }}
                               className="text-blue-600"
                             />
                             <span className="font-semibold text-emerald-600 text-[11px]">Còn</span>
@@ -2000,7 +2131,10 @@ export default function AdminPanel({
                               type="radio"
                               name="inStock"
                               checked={!formInStock}
-                              onChange={() => setFormInStock(false)}
+                              onChange={() => {
+                                setFormInStock(false);
+                                setFormStockQuantity(0);
+                              }}
                               className="text-blue-600"
                             />
                             <span className="font-semibold text-red-600 text-[11px]">Hết</span>
@@ -2531,6 +2665,13 @@ export default function AdminPanel({
         </div>,
         document.body
       )}
+
+      {/* MODAL IN HÓA ĐƠN TRONG ADMIN */}
+      <InvoiceModal
+        isOpen={Boolean(selectedInvoiceOrder)}
+        order={selectedInvoiceOrder}
+        onClose={() => setSelectedInvoiceOrder(null)}
+      />
     </div>
   );
 }

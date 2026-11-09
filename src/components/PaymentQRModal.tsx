@@ -29,14 +29,16 @@ export default function PaymentQRModal({
   onConfirmPaid
 }: PaymentQRModalProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  // Cho phép chuyển đổi linh hoạt giữa Thẻ QR MBBank gốc và QR động có sẵn số tiền
+  const [qrType, setQrType] = useState<"card" | "dynamic">("card");
 
   if (!isOpen) return null;
 
-  // Thông tin tài khoản nhận thanh toán chuẩn Napas247 VietQR
+  // Thông tin tài khoản nhận thanh toán chuẩn Napas247 VietQR (MBBank - CAO DINH BAO)
   const BANK_ID = "MB"; // Ngân hàng Quân Đội (MBBank)
   const BANK_NAME = "MBBank (Ngân hàng TMCP Quân Đội)";
-  const ACCOUNT_NO = "0905123456";
-  const ACCOUNT_NAME = "NHASACH BOOKSTORE";
+  const ACCOUNT_NO = "0347934359";
+  const ACCOUNT_NAME = "CAO DINH BAO";
   const TRANSFER_CONTENT = orderId; // Mã đơn hàng (VD: DB-123456 hoặc ORD-123456)
 
   // URL sinh mã QR động tự động điền sẵn số tiền và nội dung chuyển khoản
@@ -91,12 +93,57 @@ export default function PaymentQRModal({
         <div className="mt-5 space-y-5 text-xs sm:text-sm">
           {/* Khung hiển thị Mã QR */}
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col items-center">
+            {/* Bộ nút chuyển đổi tab xem: Mã QR MBBank chính thức hoặc QR VietQR tự động */}
+            <div className="flex items-center justify-center space-x-1.5 mb-3 bg-slate-200/70 p-1 rounded-xl text-xs">
+              <button
+                type="button"
+                onClick={() => setQrType("card")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  qrType === "card"
+                    ? "bg-white text-blue-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Mã QR MBBank (Theo thẻ gốc)
+              </button>
+              <button
+                type="button"
+                onClick={() => setQrType("dynamic")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  qrType === "dynamic"
+                    ? "bg-white text-blue-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                QR Động (Tự điền số tiền)
+              </button>
+            </div>
+
+            {/* Hiển thị ảnh thẻ QR MBBank hoặc QR động tùy theo tab lựa chọn */}
             <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 inline-block mb-3">
-              <img
-                src={qrUrl}
-                alt="VietQR Code"
-                className="w-52 h-52 sm:w-60 sm:h-60 object-contain mx-auto"
-              />
+              {qrType === "card" ? (
+                <div className="flex flex-col items-center">
+                  <img
+                    src="/images/vietqr-caodinhbao.jpg"
+                    alt="Mã QR MBBank CAO DINH BAO 0347934359"
+                    className="w-52 h-52 sm:w-60 sm:h-60 object-contain mx-auto rounded-xl shadow-xs"
+                  />
+                  <p className="mt-2 text-[11px] font-medium text-slate-500">
+                    Mã QR MBBank Napas247 - CAO DINH BAO (0347934359)
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <img
+                    src={qrUrl}
+                    alt="VietQR Tự động điền số tiền"
+                    className="w-52 h-52 sm:w-60 sm:h-60 object-contain mx-auto"
+                  />
+                  <p className="mt-2 text-[11px] font-medium text-slate-500">
+                    Quét để tự điền số tiền {formatVND(totalAmount)}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-1.5 text-slate-500 text-[11px]">
               <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />

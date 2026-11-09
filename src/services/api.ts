@@ -79,38 +79,6 @@ export interface AnalyticsSummary {
   }>;
 }
 
-// Kiểu dữ liệu Giám sát Hệ thống & DevOps (System Status)
-export interface SystemStatus {
-  status: "healthy" | "warning" | "offline";
-  server: {
-    port: number;
-    nodeVersion: string;
-    platform: string;
-    arch: string;
-    uptimeSeconds: number;
-    memory: {
-      rssMb: number;
-      heapUsedMb: number;
-      heapTotalMb: number;
-    };
-  };
-  database: {
-    type: string;
-    connected: boolean;
-    name: string;
-    pingLatencyMs: number | null;
-    collections: {
-      products: number;
-      orders: number;
-      users: number;
-      reviews: number;
-      coupons: number;
-      categories: number;
-    };
-  };
-  timestamp: string;
-}
-
 export const api = {
   // 1. Kiểm tra Backend Health
   async checkHealth() {
@@ -288,7 +256,7 @@ export const api = {
   },
 
   // 17. Thêm đánh giá cho sản phẩm lưu trực tiếp vào MongoDB
-  async addProductReview(productId: string, review: { author: string; rating: number; content: string }) {
+  async addProductReview(productId: string, review: { author: string; rating: number; content: string; imageUrl?: string }) {
     const res = await fetch(`${API_BASE}/products/${productId}/reviews`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -436,27 +404,5 @@ export const api = {
       console.error("❌ [API] Lỗi lấy báo cáo doanh thu:", err);
     }
     return null;
-  },
-
-  // --- MODULE GIÁM SÁT HỆ THỐNG & DEVOPS (DEVOPS MONITOR) ---
-  // 31. Lấy thông tin sức khỏe hệ thống và kết nối cơ sở dữ liệu
-  async getSystemStatus(): Promise<SystemStatus | null> {
-    try {
-      const res = await fetch(`${API_BASE}/system/status`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (err) {
-      console.error("❌ [API] Lỗi lấy trạng thái hệ thống DevOps:", err);
-    }
-    return null;
-  },
-
-  // 32. Kích hoạt nạp lại dữ liệu mẫu vào MongoDB từ giao diện Admin
-  async triggerSystemSeed() {
-    const res = await fetch(`${API_BASE}/system/seed`, {
-      method: "POST"
-    });
-    return await res.json();
   }
 };

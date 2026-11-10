@@ -213,13 +213,6 @@ export default function AdminPanel({
 
   const totalAdminOrderPages = Math.max(1, Math.ceil(filteredAdminOrders.length / adminOrdersPerPage));
 
-  // Đảm bảo không ở trang vượt quá tổng số trang hiện có
-  useEffect(() => {
-    if (adminOrderPage > totalAdminOrderPages) {
-      setAdminOrderPage(totalAdminOrderPages);
-    }
-  }, [adminOrderPage, totalAdminOrderPages]);
-
   // Cắt danh sách đơn hàng cho trang hiện tại
   const paginatedAdminOrders = useMemo(() => {
     const startIndex = (adminOrderPage - 1) * adminOrdersPerPage;
@@ -255,6 +248,13 @@ export default function AdminPanel({
   const displayAdminOrders = serverOrders.length > 0 ? serverOrders : paginatedAdminOrders;
   const displayTotalOrderCount = serverTotalOrders > 0 ? serverTotalOrders : filteredAdminOrders.length;
   const displayTotalOrderPages = serverTotalOrders > 0 ? serverTotalOrderPages : totalAdminOrderPages;
+
+  // Đảm bảo trang đơn hàng không vượt quá tổng số trang máy chủ
+  useEffect(() => {
+    if (adminOrderPage > displayTotalOrderPages) {
+      setAdminOrderPage(displayTotalOrderPages);
+    }
+  }, [adminOrderPage, displayTotalOrderPages]);
 
   // State phan trang danh gia Server-Side
   const [adminReviewPage, setAdminReviewPage] = useState<number>(1);
@@ -617,11 +617,6 @@ export default function AdminPanel({
     setAdminProdPage(1);
   }, [selectedCategory, searchQuery, selectedStockFilter]);
   const totalAdminProdPages = Math.max(1, Math.ceil(filteredProducts.length / adminProdPerPage));
-  useEffect(() => {
-    if (adminProdPage > totalAdminProdPages) {
-      setAdminProdPage(totalAdminProdPages);
-    }
-  }, [adminProdPage, totalAdminProdPages]);
   const paginatedAdminProducts = useMemo(() => {
     const startIndex = (adminProdPage - 1) * adminProdPerPage;
     return filteredProducts.slice(startIndex, startIndex + adminProdPerPage);
@@ -672,6 +667,13 @@ export default function AdminPanel({
   const displayAdminProducts = serverProducts.length > 0 ? serverProducts : paginatedAdminProducts;
   const displayTotalProdPages = serverTotalProducts > 0 ? serverTotalProdPages : totalAdminProdPages;
   const displayTotalProdCount = serverTotalProducts > 0 ? serverTotalProducts : filteredProducts.length;
+
+  // Đảm bảo trang sản phẩm không vượt quá tổng số trang máy chủ (Cho phép chuyển qua trang 5, 6, 7...)
+  useEffect(() => {
+    if (adminProdPage > displayTotalProdPages) {
+      setAdminProdPage(displayTotalProdPages);
+    }
+  }, [adminProdPage, displayTotalProdPages]);
 
   const displayTotalReviewCount = totalAdminReviews > 0 ? totalAdminReviews : reviewsList.length;
 
@@ -725,11 +727,6 @@ export default function AdminPanel({
     setAdminUserPage(1);
   }, [userSearchQuery, userRoleFilter, userStatusFilter]);
   const totalAdminUserPages = Math.max(1, Math.ceil(filteredUsers.length / adminUsersPerPage));
-  useEffect(() => {
-    if (adminUserPage > totalAdminUserPages) {
-      setAdminUserPage(totalAdminUserPages);
-    }
-  }, [adminUserPage, totalAdminUserPages]);
   const paginatedAdminUsers = useMemo(() => {
     const startIndex = (adminUserPage - 1) * adminUsersPerPage;
     return filteredUsers.slice(startIndex, startIndex + adminUsersPerPage);
@@ -766,6 +763,13 @@ export default function AdminPanel({
   const displayAdminUsers = serverUsers.length > 0 ? serverUsers : paginatedAdminUsers;
   const displayTotalUserCount = serverTotalUsers > 0 ? serverTotalUsers : filteredUsers.length;
   const displayTotalUserPages = serverTotalUsers > 0 ? serverTotalUserPages : totalAdminUserPages;
+
+  // Đảm bảo trang người dùng không vượt quá tổng số trang máy chủ
+  useEffect(() => {
+    if (adminUserPage > displayTotalUserPages) {
+      setAdminUserPage(displayTotalUserPages);
+    }
+  }, [adminUserPage, displayTotalUserPages]);
 
   const userStats = useMemo(() => {
     const total = users.length;
@@ -1677,41 +1681,54 @@ export default function AdminPanel({
                         </div>
                       )}
 
-                      {/* Customer Information */}
+                      {/* Customer Information (Bảo vệ an toàn chống crash nếu thiếu trường) */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
                         <div>
                           <span className="text-slate-400 block text-[11px]">Khách hàng:</span>
-                          <strong className="text-slate-800 font-bold">{ord.customerInfo.fullName}</strong>
+                          <strong className="text-slate-800 font-bold">
+                            {ord.customerInfo?.fullName || (ord as any).customerName || "Khách hàng"}
+                          </strong>
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[11px]">Số điện thoại:</span>
-                          <strong className="text-slate-800 font-bold">{ord.customerInfo.phone}</strong>
+                          <strong className="text-slate-800 font-bold">
+                            {ord.customerInfo?.phone || (ord as any).customerPhone || "0988 000 000"}
+                          </strong>
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[11px]">Địa chỉ giao:</span>
-                          <span className="text-slate-700">{ord.customerInfo.address}</span>
+                          <span className="text-slate-700">
+                            {ord.customerInfo?.address || (ord as any).shippingAddress || "Toàn quốc"}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Items List */}
+                      {/* Items List (Bảo vệ an toàn chống crash nếu items là undefined) */}
                       <div className="divide-y divide-slate-200/50">
-                        {ord.items.map((it) => (
-                          <div key={it.product.id} className="py-2 flex justify-between items-center">
-                            <div className="flex items-center space-x-2">
-                              <img
-                                src={it.product.imageUrl}
-                                alt={it.product.name}
-                                className="w-8 h-8 rounded-lg object-cover"
-                              />
-                              <span className="text-slate-800 font-medium">
-                                {it.product.name} <strong className="text-blue-600">x{it.quantity}</strong>
+                        {Array.isArray(ord.items) && ord.items.length > 0 ? (
+                          ord.items.map((it: any, idx: number) => (
+                            <div key={it.product?.id || idx} className="py-2 flex justify-between items-center">
+                              <div className="flex items-center space-x-2">
+                                <img
+                                  src={it.product?.imageUrl || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80"}
+                                  alt={it.product?.name || "Sách"}
+                                  className="w-8 h-8 rounded-lg object-cover"
+                                />
+                                <span className="text-slate-800 font-medium">
+                                  {it.product?.name || "Ấn Phẩm Sách"} <strong className="text-blue-600">x{it.quantity || 1}</strong>
+                                </span>
+                              </div>
+                              <span className="font-semibold text-slate-800">
+                                {formatVND((it.product?.price || 0) * (it.quantity || 1))}
                               </span>
                             </div>
-                            <span className="font-semibold text-slate-800">
-                              {formatVND(it.product.price * it.quantity)}
-                            </span>
+                          ))
+                        ) : (
+                          <div className="py-2 flex justify-between items-center text-slate-600">
+                            <span>Chi tiết đơn: <strong className="text-blue-600">{(ord as any).itemCount || 1} sản phẩm</strong></span>
+                            <span className="font-bold text-slate-900">{formatVND(ord.totalAmount || (ord as any).totalPrice || 0)}</span>
                           </div>
-                        ))}
+                        )}
                       </div>
 
                       {/* Total & Payment method */}

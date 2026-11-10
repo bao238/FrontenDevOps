@@ -49,9 +49,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/FrontenDevOps
-            git checkout -- .
+            git fetch origin main
+            git reset --hard origin/main
             git clean -fd
-            git pull origin main
             docker compose down --remove-orphans
             docker compose up -d --build
             docker image prune -f

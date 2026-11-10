@@ -260,7 +260,7 @@ export const api = {
   },
 
   // 17. Thêm đánh giá cho sản phẩm lưu trực tiếp vào MongoDB
-  async addProductReview(productId: string, review: { author: string; rating: number; content: string; imageUrl?: string }) {
+  async addProductReview(productId: string, review: { author: string; rating: number; content: string; imageUrl?: string; userId?: string }) {
     const res = await fetch(`${API_BASE}/products/${productId}/reviews`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

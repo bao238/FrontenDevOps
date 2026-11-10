@@ -157,7 +157,7 @@ exports.addProductReview = async (req, res) => {
   }
 
   try {
-    const { author, rating, content, userId } = req.body;
+    const { author, rating, content, userId, imageUrl } = req.body;
     if (!author || !content) {
       return res.status(400).json({ error: 'Vui lòng cung cấp đầy đủ tên người đánh giá và nội dung' });
     }
@@ -177,7 +177,8 @@ exports.addProductReview = async (req, res) => {
       date: 'Vừa xong',
       content: String(content).trim(),
       verified: true,
-      likes: 0
+      likes: 0,
+      imageUrl: imageUrl || null
     });
 
     // Lấy tất cả review của sản phẩm để tính lại rating và reviewsCount
@@ -240,7 +241,7 @@ exports.updateReview = async (req, res) => {
   }
 
   try {
-    const { author, rating, content } = req.body;
+    const { author, rating, content, imageUrl } = req.body;
     const review = await Review.findOne({ id: req.params.id });
     if (!review) {
       return res.status(404).json({ message: 'Không tìm thấy đánh giá trong MongoDB' });
@@ -249,6 +250,7 @@ exports.updateReview = async (req, res) => {
     if (author) review.author = String(author).trim();
     if (rating !== undefined) review.rating = Math.min(5, Math.max(1, Number(rating)));
     if (content) review.content = String(content).trim();
+    if (imageUrl !== undefined) review.imageUrl = imageUrl || null;
     await review.save();
 
     // Cập nhật lại rating và reviewsCount cho sản phẩm liên quan

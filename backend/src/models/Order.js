@@ -38,6 +38,7 @@ const orderSchema = new mongoose.Schema(
     reviewRating: { type: Number, default: 0 },
     reviewComment: { type: String, default: '' },
     reviewedAt: { type: String, default: null },
+    reviewImage: { type: String, default: null }, // Ảnh chụp sách thực tế khi đánh giá đơn
     // Thời gian khách hàng bấm "Đã nhận được hàng"
     receivedAt: { type: String, default: null }
   },

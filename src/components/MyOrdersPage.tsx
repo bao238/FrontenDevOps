@@ -16,6 +16,7 @@ import {
   Star,
   Printer,
   QrCode,
+  Camera,
   Calendar,
   AlertCircle,
   Send,
@@ -136,7 +137,7 @@ interface MyOrdersPageProps {
   // Callback khi người nhận xác nhận đã nhận hàng
   onConfirmReceived?: (orderId: string) => void;
   // Callback khi khách hàng gửi đánh giá cho đơn hàng
-  onReviewOrder?: (orderId: string, rating: number, comment: string) => void;
+  onReviewOrder?: (orderId: string, rating: number, comment: string, reviewImage?: string) => void;
   // Cho phép chuyển ngay đơn từ "Chờ lấy hàng" sang "Chờ giao hàng" để test nhanh
   onTriggerPickup?: (orderId: string) => void;
   // Tab ban đầu được chỉ định từ ProfilePage hoặc bên ngoài
@@ -166,6 +167,22 @@ export default function MyOrdersPage({
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>("");
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string | null>(null);
+  const [reviewImage, setReviewImage] = useState<string>("");
+
+  // Xử lý tải ảnh chụp sách thực tế từ máy tính
+  const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Vui lòng chọn ảnh có kích thước dưới 5MB!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setReviewImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Định dạng hiển thị tiền VNĐ
   const formatVND = (amount: number) => {
@@ -268,7 +285,8 @@ export default function MyOrdersPage({
       onReviewOrder(
         reviewingOrder.id,
         reviewRating,
-        reviewComment.trim() || "Sách đẹp, đóng gói rất cẩn thận, phục vụ tuyệt vời!"
+        reviewComment.trim() || "Sách đẹp, đóng gói rất cẩn thận, phục vụ tuyệt vời!",
+        reviewImage || undefined
       );
     }
 
@@ -278,6 +296,7 @@ export default function MyOrdersPage({
       setReviewingOrder(null);
       setReviewRating(5);
       setReviewComment("");
+      setReviewImage("");
     }, 1500);
   };
 
@@ -286,6 +305,7 @@ export default function MyOrdersPage({
     setReviewingOrder(ord);
     setReviewRating(ord.reviewRating || 5);
     setReviewComment(ord.reviewComment || "");
+    setReviewImage(ord.reviewImage || "");
   };
 
   // Trợ giúp huy hiệu trạng thái của từng đơn hàng
@@ -788,6 +808,17 @@ export default function MyOrdersPage({
                             "{ord.reviewComment}"
                           </p>
                         )}
+                        {ord.reviewImage && (
+                          <div className="mt-2 flex items-center space-x-2">
+                            <img
+                              src={ord.reviewImage}
+                              alt="Ảnh chụp thực tế"
+                              className="w-16 h-16 object-cover rounded-xl border border-amber-300 shadow-xs cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => window.open(ord.reviewImage, "_blank")}
+                            />
+                            <span className="text-[10px] text-amber-800 italic">(Ảnh chụp thực tế khi nhận sách)</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1133,6 +1164,45 @@ export default function MyOrdersPage({
                     placeholder="Viết cảm nhận của bạn về cuốn sách, chất lượng in ấn, thời gian giao hàng..."
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
+                </div>
+
+                {/* Đính kèm ảnh chụp sách thực tế */}
+                <div className="space-y-1">
+                  <label className="text-slate-700 font-bold block text-[11px]">
+                    Đính kèm ảnh chụp sách thực tế (Tùy chọn):
+                  </label>
+                  {reviewImage ? (
+                    <div className="flex items-center space-x-3 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                      <img
+                        src={reviewImage}
+                        alt="Ảnh đính kèm"
+                        className="w-14 h-14 object-cover rounded-lg border border-slate-200"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-800">Ảnh thực tế đã sẵn sàng</p>
+                        <p className="text-[10px] text-slate-400 truncate">Ảnh sẽ được lưu và đồng bộ lên trang chi tiết cuốn sách</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReviewImage("")}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Xóa ảnh"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="inline-flex items-center space-x-2 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl cursor-pointer text-slate-700 font-semibold transition-colors text-xs">
+                      <Camera className="w-4 h-4 text-amber-600" />
+                      <span>Chụp hoặc chọn ảnh thực tế từ thiết bị (Dưới 5MB)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReviewImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
 
                 {/* Nút hành động */}

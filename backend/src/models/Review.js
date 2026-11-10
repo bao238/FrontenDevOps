@@ -13,7 +13,8 @@ const reviewSchema = new mongoose.Schema(
     date: { type: String, default: 'Vừa xong' },
     content: { type: String, required: true, trim: true },
     verified: { type: Boolean, default: true },
-    likes: { type: Number, default: 0 }
+    likes: { type: Number, default: 0 },
+    imageUrl: { type: String, default: null } // Ảnh chụp sách thực tế do độc giả tải lên
   },
   { timestamps: true }
 );

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   User,
   Mail,
@@ -148,10 +148,22 @@ export default function ProfilePage({
 
   // Form State thông tin cá nhân
   const [name, setName] = useState(currentUser?.name || "");
+  const [email, setEmail] = useState(currentUser?.email || "");
   const [phone, setPhone] = useState(currentUser?.phone || "");
   const [address, setAddress] = useState(currentUser?.address || "");
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "");
   const [isSavedSuccess, setIsSavedSuccess] = useState(false);
+
+  // Tự động đồng bộ form khi thông tin currentUser được cập nhật
+  useEffect(() => {
+    if (currentUser) {
+      setName(currentUser.name || "");
+      setEmail(currentUser.email || "");
+      setPhone(currentUser.phone || "");
+      setAddress(currentUser.address || "");
+      setAvatarUrl(currentUser.avatarUrl || "");
+    }
+  }, [currentUser]);
 
   // Form State đổi mật khẩu
   const [oldPassword, setOldPassword] = useState("");
@@ -163,10 +175,11 @@ export default function ProfilePage({
   // Lưu thông tin cá nhân
   const handleSaveInfo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !email.trim()) return;
 
     onUpdateProfile({
       name: name.trim(),
+      email: email.trim(),
       phone: phone.trim(),
       address: address.trim(),
       avatarUrl: avatarUrl.trim() || undefined,
@@ -578,18 +591,20 @@ export default function ProfilePage({
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Địa chỉ email (Dùng để đăng nhập)
+                  Địa chỉ email (Dùng để đăng nhập) *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
-                    disabled
-                    value={currentUser.email}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 text-xs font-mono cursor-not-allowed"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="email@example.com"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Email là định danh tài khoản cố định, không thể thay đổi.</p>
+                <p className="text-[10px] text-slate-400 mt-1">Email dùng để nhận thông báo đơn hàng và đăng nhập vào BookStore.</p>
               </div>
 
               <div>

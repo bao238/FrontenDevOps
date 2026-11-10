@@ -132,6 +132,7 @@ export interface OrderRecord {
   isReviewed?: boolean;
   reviewRating?: number;
   reviewComment?: string;
+  reviewImage?: string;
   reviewedAt?: string;
   // Thời gian khách hàng xác nhận đã nhận hàng
   receivedAt?: string;
@@ -386,9 +387,11 @@ export default function App() {
     showToast("Đã làm trống giỏ hàng thành công!");
   };
 
-  // Cập nhật thông tin hồ sơ cá nhân độc giả
+  // Cập nhật thông tin hồ sơ cá nhân độc giả và đồng bộ vào hệ thống
   const handleUpdateProfile = (updated: Partial<UserProfile>) => {
     if (!currentUser) return;
+    const oldId = currentUser.id;
+    const oldEmail = currentUser.email;
     const newProf: UserProfile = { ...currentUser, ...updated };
     setCurrentUser(newProf);
     try {
@@ -396,7 +399,76 @@ export default function App() {
     } catch (err) {
       console.error("Lỗi khi lưu hồ sơ:", err);
     }
-    showToast("Cập nhật thông tin hồ sơ thành công!");
+
+    // 1. Cập nhật danh sách users trong state để AdminPanel thấy ngay và lưu local storage
+    setUsers((prevUsers) => {
+      const updatedUsers = prevUsers.map((u) => {
+        if (u.id === oldId || (oldEmail && u.email.toLowerCase() === oldEmail.toLowerCase())) {
+          return {
+            ...u,
+            name: newProf.name,
+            email: newProf.email,
+            phone: newProf.phone,
+            address: newProf.address || u.address,
+            avatarUrl: newProf.avatarUrl || u.avatarUrl,
+          };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem("bookstore_users", JSON.stringify(updatedUsers));
+      } catch (err) {
+        console.error("Lỗi khi lưu danh sách users:", err);
+      }
+      return updatedUsers;
+    });
+
+    // 2. Cập nhật thông tin giao hàng customerInfo
+    setCustomerInfo((prev) => ({
+      ...prev,
+      fullName: newProf.name,
+      phone: newProf.phone,
+      address: newProf.address || prev.address,
+    }));
+
+    // 3. Đồng bộ lên Backend REST API (MongoDB)
+    api.updateUser(oldId, {
+      name: newProf.name,
+      email: newProf.email,
+      phone: newProf.phone,
+      address: newProf.address,
+      avatarUrl: newProf.avatarUrl,
+    }).catch((err) => {
+      console.warn("[App] Lỗi đồng bộ updateUser lên MongoDB:", err);
+    });
+
+    // 4. Nếu email thay đổi, cập nhật các đơn hàng liên quan
+    if (newProf.email !== oldEmail) {
+      setOrders((prevOrders) => {
+        const updatedOrders = prevOrders.map((ord) => {
+          if (ord.userId === oldId || (ord.userEmail && ord.userEmail.toLowerCase() === oldEmail.toLowerCase())) {
+            return {
+              ...ord,
+              userEmail: newProf.email,
+              customerInfo: {
+                ...ord.customerInfo,
+                fullName: newProf.name,
+                phone: newProf.phone,
+              }
+            };
+          }
+          return ord;
+        });
+        try {
+          localStorage.setItem("bookstore_orders", JSON.stringify(updatedOrders));
+        } catch {
+          // ignore
+        }
+        return updatedOrders;
+      });
+    }
+
+    showToast("Cập nhật thông tin hồ sơ và đồng bộ hệ thống thành công!");
   };
 
   // Mua lại toàn bộ sách từ đơn hàng đã đặt
@@ -444,6 +516,13 @@ export default function App() {
         if (parsed.role !== "admin" && parsed.role !== "staff") {
           setIsAdminLoggedIn(false);
         }
+      }
+
+      const savedUsers = localStorage.getItem("bookstore_users");
+      if (savedUsers) {
+        try {
+          setUsers(JSON.parse(savedUsers));
+        } catch {}
       }
 
       const savedOrders = localStorage.getItem("bookstore_orders") || localStorage.getItem("dinhbao_orders");
@@ -510,6 +589,9 @@ export default function App() {
     api.getUsers().then((userList) => {
       if (userList && Array.isArray(userList)) {
         setUsers(userList);
+        try {
+          localStorage.setItem("bookstore_users", JSON.stringify(userList));
+        } catch {}
       }
     });
   }, []);
@@ -573,20 +655,24 @@ export default function App() {
     setAuthError(null);
 
     if (!loginEmail.trim() || !loginPassword.trim()) {
-      const err = "Vui lòng nhập đầy đủ Email/Tài khoản và Mật khẩu!";
+      const err = "Vui lòng nhập đầy đủ Email hoặc Số điện thoại và Mật khẩu!";
       setAuthError(err);
       showToast(err);
       return;
     }
 
     const inputVal = loginEmail.trim().toLowerCase();
+    const inputPhone = loginEmail.trim().replace(/\s+/g, "");
     const inputPass = loginPassword.trim();
-    const existing = users.find(
-      (u) =>
-        u.email.toLowerCase() === inputVal ||
-        (inputVal === "admin" && u.role === "admin") ||
-        u.name.toLowerCase() === inputVal
-    );
+    // CHỈ cho phép đăng nhập bằng Email hoặc Số điện thoại (KHÔNG đăng nhập bằng tên user)
+    const existing = users.find((u) => {
+      const uEmail = u.email ? u.email.trim().toLowerCase() : "";
+      const uPhone = u.phone ? u.phone.trim().replace(/\s+/g, "") : "";
+      if (uEmail && uEmail === inputVal) return true;
+      if (uPhone && (uPhone === inputPhone || uPhone === inputVal)) return true;
+      if (inputVal === "admin" && u.role === "admin") return true;
+      return false;
+    });
 
     // Fallback nếu tài khoản admin hệ thống (admin / admin123 hoặc admin@bookstore.vn / admin)
     const isFallbackAdmin =
@@ -1315,7 +1401,8 @@ export default function App() {
   };
 
   // Gửi nhận xét đánh giá đơn hàng (Nếu chưa đánh giá thì hiện số, đánh giá rồi thì ko hiện nữa)
-  const handleReviewOrder = (orderId: string, rating: number, comment: string) => {
+  const handleReviewOrder = (orderId: string, rating: number, comment: string, reviewImage?: string) => {
+    const targetOrder = orders.find((o) => o.id === orderId);
     const updated = orders.map((ord) => {
       if (ord.id === orderId) {
         return {
@@ -1323,6 +1410,7 @@ export default function App() {
           isReviewed: true,
           reviewRating: rating,
           reviewComment: comment,
+          reviewImage: reviewImage || ord.reviewImage,
           reviewedAt: new Date().toLocaleDateString("vi-VN"),
         };
       }
@@ -1339,9 +1427,37 @@ export default function App() {
       isReviewed: true,
       reviewRating: rating,
       reviewComment: comment,
+      reviewImage: reviewImage || undefined,
       reviewedAt: new Date().toLocaleDateString("vi-VN"),
     }).catch(console.error);
-    showToast(`Đã gửi đánh giá đơn #${orderId} thành công!`);
+
+    // Tự động đồng bộ đánh giá và ảnh chụp thực tế vào từng tác phẩm sách trong đơn hàng
+    if (targetOrder && targetOrder.items && targetOrder.items.length > 0) {
+      const authorName = currentUser?.name || targetOrder.customerInfo?.fullName || "Độc giả BookStore";
+      targetOrder.items.forEach((item) => {
+        api.addProductReview(item.product.id, {
+          author: authorName,
+          rating: rating,
+          content: comment,
+          imageUrl: reviewImage || undefined,
+          userId: currentUser?.id || targetOrder.userId,
+        }).then((res) => {
+          if (res && res.product) {
+            setProducts((prev) =>
+              prev.map((p) =>
+                p.id === item.product.id
+                  ? { ...p, rating: res.product.rating, reviewsCount: res.product.reviewsCount }
+                  : p
+              )
+            );
+          }
+        }).catch((err) => {
+          console.warn("[App] Lỗi đồng bộ review từ đơn hàng sang chi tiết sách:", err);
+        });
+      });
+    }
+
+    showToast(`Đã gửi đánh giá đơn #${orderId} và tự động đồng bộ nhận xét vào trang sách thành công!`);
   };
 
   // Kích hoạt shipper lấy hàng sớm (phục vụ test nhanh chuyển từ Chờ lấy hàng sang Chờ giao hàng)
@@ -1998,6 +2114,8 @@ export default function App() {
               onSelectRelatedProduct={handleSelectProduct}
               onToggleWishlist={handleToggleWishlist}
               isWishlisted={wishlist.some((w) => w.id === selectedProduct?.id)}
+              currentUser={currentUser}
+              userOrders={userScopedOrders}
             />
           ) : (
             <div className="space-y-8 animate-in fade-in duration-200">
@@ -3048,14 +3166,14 @@ export default function App() {
                     <div className="space-y-3 text-xs">
                       <div>
                         <label className="block font-semibold text-slate-700 mb-1">
-                          Email / Tài khoản / Số điện thoại
+                          Email hoặc Số điện thoại
                         </label>
                         <div className="relative">
                           <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                           <input
                             type="text"
                             required
-                            placeholder="admin@bookstore.vn hoặc email của bạn"
+                            placeholder="admin@bookstore.vn hoặc số điện thoại của bạn"
                             value={loginEmail}
                             onChange={(e) => {
                               setLoginEmail(e.target.value);

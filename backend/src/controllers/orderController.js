@@ -135,6 +135,7 @@ exports.updateOrderStatus = async (req, res) => {
     if (req.body.reviewRating !== undefined) updateData.reviewRating = req.body.reviewRating;
     if (req.body.reviewComment !== undefined) updateData.reviewComment = req.body.reviewComment;
     if (req.body.reviewedAt !== undefined) updateData.reviewedAt = req.body.reviewedAt;
+    if (req.body.reviewImage !== undefined) updateData.reviewImage = req.body.reviewImage;
     if (req.body.receivedAt !== undefined) updateData.receivedAt = req.body.receivedAt;
     if (req.body.isPaid !== undefined) updateData.isPaid = req.body.isPaid;
 

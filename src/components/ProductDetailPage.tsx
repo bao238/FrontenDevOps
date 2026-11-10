@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Product, ReviewItem } from "../data/products";
+import { UserProfile, OrderRecord } from "../App";
 import { api } from "../services/api";
 import {
   ArrowLeft,
@@ -37,6 +38,8 @@ interface ProductDetailPageProps {
   onSelectRelatedProduct: (product: Product) => void;
   onToggleWishlist?: (product: Product) => void;
   isWishlisted?: boolean;
+  currentUser?: UserProfile | null;
+  userOrders?: OrderRecord[];
 }
 
 export default function ProductDetailPage({
@@ -47,7 +50,9 @@ export default function ProductDetailPage({
   onBack,
   onSelectRelatedProduct,
   onToggleWishlist,
-  isWishlisted = false
+  isWishlisted = false,
+  currentUser,
+  userOrders = []
 }: ProductDetailPageProps) {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"specs" | "desc" | "reviews">("desc");
@@ -80,6 +85,20 @@ export default function ProductDetailPage({
 
   // Bộ lọc đánh giá theo số sao hoặc có ảnh
   const [reviewFilter, setReviewFilter] = useState<"all" | 5 | 4 | 3 | "has_photo">("all");
+
+  // 1. Kiểm tra xem người dùng đã mua và nhận sách này trong đơn hàng chưa
+  const userReceivedOrder = userOrders?.find(
+    (ord) =>
+      (ord.status === "Hoàn tất" || Boolean(ord.receivedAt)) &&
+      ord.items.some((it) => it.product.id === product.id)
+  );
+
+  // 2. Kiểm tra xem người dùng đã từng gửi đánh giá cho sản phẩm này chưa
+  const hasUserReviewed = reviews.some(
+    (r) =>
+      (currentUser && r.userId && r.userId === currentUser.id) ||
+      (currentUser && r.author && r.author.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+  ) || Boolean(userReceivedOrder?.isReviewed);
 
   // Xử lý tải ảnh chụp trang sách thực tế từ máy tính
   const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,41 +164,53 @@ export default function ProductDetailPage({
   // Handle Review submission lưu trực tiếp vào MongoDB
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reviewerName.trim() || !reviewContent.trim() || isSubmittingReview) return;
+    const authorName = currentUser?.name || reviewerName.trim();
+    if (!authorName || !reviewContent.trim() || isSubmittingReview) return;
 
     setIsSubmittingReview(true);
     try {
       const res = await api.addProductReview(product.id, {
-        author: reviewerName.trim(),
+        author: authorName,
         rating: reviewRating,
         content: reviewContent.trim(),
-        imageUrl: reviewImage || undefined
+        imageUrl: reviewImage || undefined,
+        userId: currentUser?.id
       });
 
       if (res && res.data) {
-        setReviews(res.data);
+        setReviews((prev) => [res.data, ...prev]);
       } else {
         const newRev: ReviewItem = {
           id: "rev-" + Date.now(),
-          author: reviewerName.trim(),
+          author: authorName,
           rating: reviewRating,
           date: "Vừa xong",
           content: reviewContent.trim(),
           verified: true,
           likes: 0,
-          imageUrl: reviewImage || undefined
+          imageUrl: reviewImage || undefined,
+          userId: currentUser?.id
         };
         setReviews((prev) => [newRev, ...prev]);
       }
 
-      setReviewerName("");
+      // Nếu người dùng có đơn hàng tương ứng, đánh dấu luôn đơn hàng là đã đánh giá
+      if (userReceivedOrder) {
+        api.updateOrderStatus(userReceivedOrder.id, "Hoàn tất", {
+          isReviewed: true,
+          reviewRating,
+          reviewComment: reviewContent.trim(),
+          reviewImage: reviewImage || undefined,
+          reviewedAt: new Date().toLocaleDateString("vi-VN"),
+        }).catch(console.error);
+      }
+
       setReviewContent("");
       setReviewImage("");
-      setReviewRating(5);
       setReviewSuccess(true);
-      setTimeout(() => setReviewSuccess(false), 4000);
+      setTimeout(() => setReviewSuccess(false), 5000);
     } catch (err) {
-      console.error("Lỗi khi gửi đánh giá lên MongoDB:", err);
+      console.error("Lỗi khi thêm đánh giá:", err);
     } finally {
       setIsSubmittingReview(false);
     }
@@ -768,126 +799,183 @@ export default function ProductDetailPage({
             )}
             </div>
 
-            {/* Write a Review Form */}
-            <div id="write-review" className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-              <h4 className="font-bold text-slate-900 text-sm flex items-center space-x-1.5">
-                <MessageSquare className="w-4 h-4 text-blue-600" />
-                <span>Gửi Đánh Giá Của Bạn</span>
-              </h4>
+            {/* Write a Review Form - Đồng bộ theo chính sách đánh giá xác thực */}
+            <div id="write-review">
+              {hasUserReviewed ? (
+                <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-200 space-y-3 animate-in fade-in">
+                  <div className="flex items-center space-x-3 text-emerald-800">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm">Bạn đã gửi đánh giá cho tác phẩm này</h4>
+                      <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">
+                        Cảm ơn bạn đã để lại phản hồi xác thực và chia sẻ cảm nhận thực tế sau khi nhận sách để bạn đọc khác cùng tham khảo!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : !currentUser ? (
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center space-y-3">
+                  <MessageSquare className="w-8 h-8 text-slate-400 mx-auto" />
+                  <h4 className="font-bold text-slate-800 text-sm">Đánh giá tác phẩm</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                    Chính sách đánh giá xác thực: Vui lòng đăng nhập và nhận sách thành công trong mục Đơn Hàng để gửi nhận xét và ảnh chụp thực tế cho tác phẩm này.
+                  </p>
+                </div>
+              ) : !userReceivedOrder && currentUser.role !== "admin" ? (
+                <div className="bg-blue-50/70 rounded-2xl p-6 border border-blue-200 space-y-2">
+                  <div className="flex items-start space-x-3 text-blue-900">
+                    <ShieldCheck className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-sm">Chính sách đánh giá xác thực từ người mua hàng</h4>
+                      <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                        Để đảm bảo mọi phản hồi đều chân thực và khách quan, tính năng đánh giá sẽ tự động mở sau khi bạn nhận sách thành công từ mục <strong>Đơn Hàng</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
+                  <h4 className="font-bold text-slate-900 text-sm flex items-center space-x-1.5">
+                    <MessageSquare className="w-4 h-4 text-blue-600" />
+                    <span>Gửi Đánh Giá Của Bạn</span>
+                  </h4>
 
-              {reviewSuccess && (
-                <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center space-x-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>Cảm ơn bạn! Đánh giá của bạn đã được đăng thành công.</span>
+                  {reviewSuccess && (
+                    <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center space-x-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>Cảm ơn bạn! Đánh giá của bạn đã được đăng thành công.</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAddReview} className="space-y-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {currentUser ? (
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">
+                            Người gửi đánh giá
+                          </label>
+                          <div className="flex items-center space-x-2.5 px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl">
+                            <img
+                              src={currentUser.avatarUrl || "/default-avatar.png"}
+                              alt={currentUser.name}
+                              className="w-6 h-6 rounded-full object-cover border border-slate-200"
+                            />
+                            <span className="font-bold text-slate-800 text-xs">{currentUser.name}</span>
+                            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full ml-auto">
+                              Tài khoản của bạn
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">
+                            Họ và tên của bạn *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Nguyễn Văn A"
+                            value={reviewerName}
+                            onChange={(e) => setReviewerName(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Số sao đánh giá *
+                        </label>
+                        <div className="flex items-center space-x-2 pt-1.5">
+                          {[1, 2, 3, 4, 5].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setReviewRating(num)}
+                              className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                            >
+                              <Star
+                                className={`w-6 h-6 ${
+                                  num <= reviewRating
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-slate-300"
+                                }`}
+                              />
+                            </button>
+                          ))}
+                          <span className="font-bold text-slate-700 ml-2">
+                            {reviewRating} / 5 sao
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Nội dung nhận xét chi tiết *
+                      </label>
+                      <textarea
+                        rows={3}
+                        required
+                        placeholder="Chia sẻ cảm nhận về nội dung sách, chất lượng in ấn, tốc độ giao hàng..."
+                        value={reviewContent}
+                        onChange={(e) => setReviewContent(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {/* Tải ảnh chụp thực tế */}
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Đính kèm ảnh chụp sách thực tế (Tùy chọn)
+                      </label>
+                      {reviewImage ? (
+                        <div className="flex items-center space-x-3 p-2 bg-white rounded-xl border border-slate-200">
+                          <img
+                            src={reviewImage}
+                            alt="Ảnh đính kèm"
+                            className="w-16 h-16 object-cover rounded-lg border border-slate-200"
+                          />
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-slate-800">Ảnh đã tải lên</p>
+                            <p className="text-[10px] text-slate-400">Ảnh sẽ hiển thị cùng nhận xét của bạn</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setReviewImage("")}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Xóa ảnh"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="inline-flex items-center space-x-2 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl cursor-pointer text-slate-700 font-semibold transition-colors">
+                          <Camera className="w-4 h-4 text-blue-600" />
+                          <span>Chọn ảnh từ máy tính (Dưới 5MB)</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleReviewImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingReview}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>{isSubmittingReview ? "Đang gửi..." : "Gửi Nhận Xét"}</span>
+                    </button>
+                  </form>
                 </div>
               )}
-
-              <form onSubmit={handleAddReview} className="space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">
-                      Họ và tên của bạn *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Nguyễn Văn A"
-                      value={reviewerName}
-                      onChange={(e) => setReviewerName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">
-                      Số sao đánh giá *
-                    </label>
-                    <div className="flex items-center space-x-2 pt-1.5">
-                      {[1, 2, 3, 4, 5].map((num) => (
-                        <button
-                          key={num}
-                          type="button"
-                          onClick={() => setReviewRating(num)}
-                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
-                        >
-                          <Star
-                            className={`w-6 h-6 ${
-                              num <= reviewRating
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-slate-300"
-                            }`}
-                          />
-                        </button>
-                      ))}
-                      <span className="font-bold text-slate-700 ml-2">
-                        {reviewRating} / 5 sao
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Nội dung nhận xét chi tiết *
-                  </label>
-                  <textarea
-                    rows={3}
-                    required
-                    placeholder="Chia sẻ cảm nhận về nội dung sách, chất lượng in ấn, tốc độ giao hàng..."
-                    value={reviewContent}
-                    onChange={(e) => setReviewContent(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Tải ảnh chụp thực tế */}
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Đính kèm ảnh chụp sách thực tế (Tùy chọn)
-                  </label>
-                  {reviewImage ? (
-                    <div className="flex items-center space-x-3 p-2 bg-white rounded-xl border border-slate-200">
-                      <img
-                        src={reviewImage}
-                        alt="Ảnh đính kèm"
-                        className="w-16 h-16 object-cover rounded-lg border border-slate-200"
-                      />
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-slate-800">Ảnh đã tải lên</p>
-                        <p className="text-[10px] text-slate-400">Ảnh sẽ hiển thị cùng nhận xét của bạn</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setReviewImage("")}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                        title="Xóa ảnh"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="inline-flex items-center space-x-2 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl cursor-pointer text-slate-700 font-semibold transition-colors">
-                      <Camera className="w-4 h-4 text-blue-600" />
-                      <span>Chọn ảnh từ máy tính (Dưới 5MB)</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleReviewImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmittingReview}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2 cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isSubmittingReview ? "Đang gửi lên MongoDB..." : "Gửi Nhận Xét"}</span>
-                </button>
-              </form>
             </div>
           </div>
         )}

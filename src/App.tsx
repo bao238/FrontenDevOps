@@ -356,9 +356,27 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Xử lý nút Mua Ngay - Yêu cầu đăng nhập trước khi mua
   const handleBuyNow = (prod: Product, quantity = 1) => {
+    if (!currentUser) {
+      showToast("Vui lòng đăng nhập tài khoản để tiến hành mua hàng!");
+      setAuthTab("login");
+      setIsAuthModalOpen(true);
+      return;
+    }
     addToCart(prod, quantity);
     switchTab("cart");
+  };
+
+  // Mở modal thanh toán chỉ khi người dùng đã đăng nhập tài khoản
+  const handleOpenCheckout = () => {
+    if (!currentUser) {
+      showToast("Vui lòng đăng nhập tài khoản để tiến hành đặt hàng và thanh toán!");
+      setAuthTab("login");
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setIsCheckoutOpen(true);
   };
 
   const handleClearCart = () => {
@@ -383,6 +401,12 @@ export default function App() {
 
   // Mua lại toàn bộ sách từ đơn hàng đã đặt
   const handleReorder = (order: OrderRecord) => {
+    if (!currentUser) {
+      showToast("Vui lòng đăng nhập tài khoản để đặt lại đơn hàng!");
+      setAuthTab("login");
+      setIsAuthModalOpen(true);
+      return;
+    }
     order.items.forEach((item) => {
       addToCart(item.product, item.quantity);
     });
@@ -754,24 +778,43 @@ export default function App() {
     setRegConfirmPassword("");
   };
 
-  // Handle Logout
+  // Handle Logout - Xóa sạch phiên, giỏ hàng và dữ liệu form đặt hàng
   const handleLogout = () => {
     setCurrentUser(null);
     setIsAdminLoggedIn(false);
     setCart([]);
     setSelectedCartIds([]);
-    localStorage.removeItem("bookstore_user");
-    localStorage.removeItem("bookstore_admin_session");
-    localStorage.removeItem("bookstore_admin_user");
-    localStorage.removeItem("dinhbao_user");
-    localStorage.removeItem("dinhbao_admin_session");
-    localStorage.removeItem("dinhbao_admin_user");
+    setCustomerInfo({
+      fullName: "",
+      phone: "",
+      address: "",
+      paymentMethod: "cod",
+      note: "",
+    });
+    setIsCheckoutOpen(false);
+    try {
+      localStorage.removeItem("bookstore_user");
+      localStorage.removeItem("bookstore_admin_session");
+      localStorage.removeItem("bookstore_admin_user");
+      localStorage.removeItem("dinhbao_user");
+      localStorage.removeItem("dinhbao_admin_session");
+      localStorage.removeItem("dinhbao_admin_user");
+      localStorage.removeItem("bookstore_cart_guest");
+    } catch (err) {
+      console.error("Lỗi khi dọn dẹp local storage lúc đăng xuất:", err);
+    }
     setIsUserMenuOpen(false);
-    showToast("Đã đăng xuất tài khoản thành công. Giỏ hàng và đơn hàng đã được xóa khỏi phiên.");
+    showToast("Đã đăng xuất tài khoản thành công. Giỏ hàng và dữ liệu phiên đã được xóa.");
   };
 
-  // Add to Cart
+  // Add to Cart - Ngăn chặn thêm giỏ hàng nếu chưa đăng nhập
   const addToCart = (product: Product, quantity = 1) => {
+    if (!currentUser) {
+      showToast("Vui lòng đăng nhập tài khoản để thêm sản phẩm vào giỏ hàng!");
+      setAuthTab("login");
+      setIsAuthModalOpen(true);
+      return;
+    }
     if (!product.inStock) {
       showToast("Sản phẩm hiện đang tạm hết hàng!");
       return;
@@ -928,9 +971,9 @@ export default function App() {
     setSearchQuery("");
   };
 
-  // Lọc danh sách đơn hàng cho người dùng hiện tại (Cô lập đơn hàng theo từng tài khoản)
+  // Lọc danh sách đơn hàng cho người dùng hiện tại (Cô lập đơn hàng chặt chẽ theo từng tài khoản)
   const userScopedOrders = useMemo(() => {
-    // Khi đã đăng xuất (chưa đăng nhập): Không hiển thị đơn hàng của tài khoản trước đó
+    // Khi đã đăng xuất (chưa đăng nhập): Tuyệt đối không hiển thị đơn hàng nào
     if (!currentUser) {
       return [];
     }
@@ -939,10 +982,8 @@ export default function App() {
       if (ord.userId && ord.userId === currentUser.id) return true;
       // 2. Khớp theo email tài khoản
       if (ord.userEmail && ord.userEmail.toLowerCase() === currentUser.email.toLowerCase()) return true;
-      // 3. Khớp theo số điện thoại đã lưu trong hồ sơ
-      if (currentUser.phone && ord.customerInfo?.phone && ord.customerInfo.phone === currentUser.phone) return true;
-      // 4. Khớp theo họ tên người nhận (chỉ khi đơn chưa có userId của người khác)
-      if (!ord.userId && ord.customerInfo?.fullName?.toLowerCase() === currentUser.name.toLowerCase()) return true;
+      // 3. Khớp theo số điện thoại đã lưu trong hồ sơ (chỉ áp dụng đối với đơn cũ legacy chưa có userId của ai)
+      if (!ord.userId && currentUser.phone && ord.customerInfo?.phone && ord.customerInfo.phone === currentUser.phone) return true;
       return false;
     });
   }, [orders, currentUser]);
@@ -1084,6 +1125,14 @@ export default function App() {
   // Xử lý tạo đơn hàng & điều hướng thanh toán chính xác (chỉ đặt các sản phẩm đã tick chọn)
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Bắt buộc phải đăng nhập tài khoản trước khi đặt hàng
+    if (!currentUser) {
+      showToast("Vui lòng đăng nhập tài khoản trước khi đặt hàng!");
+      setIsCheckoutOpen(false);
+      setAuthTab("login");
+      setIsAuthModalOpen(true);
+      return;
+    }
     // Ngăn chặn tạo đơn hàng khi giỏ rỗng
     if (cart.length === 0) {
       showToast("Giỏ hàng của bạn đang trống! Vui lòng chọn sách trước khi đặt hàng.");
@@ -1114,8 +1163,8 @@ export default function App() {
       paymentMethod: customerInfo.paymentMethod,
       status: "Chờ xác nhận", // Đơn hàng mới đặt sẽ tự động vào ô "Chờ xác nhận"
       customerInfo: { ...customerInfo },
-      userId: currentUser?.id,
-      userEmail: currentUser?.email,
+      userId: currentUser.id,
+      userEmail: currentUser.email,
       isPaid: false,
       isReviewed: false,
     };
@@ -1644,7 +1693,7 @@ export default function App() {
                 >
                   <span>📦</span>
                   <span>Đơn Hàng</span>
-                  {orders.length > 0 && (
+                  {currentUser && userScopedOrders.length > 0 && (
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
                         activeTab === "orders"
@@ -1652,7 +1701,7 @@ export default function App() {
                           : "bg-slate-200 text-slate-700"
                       }`}
                     >
-                      {orders.length}
+                      {userScopedOrders.length}
                     </span>
                   )}
                 </button>
@@ -1891,9 +1940,9 @@ export default function App() {
                     <span>📦</span>
                     <span>Đơn Hàng Của Tôi</span>
                   </div>
-                  {orders.length > 0 && (
+                  {currentUser && userScopedOrders.length > 0 && (
                     <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full">
-                      {orders.length}
+                      {userScopedOrders.length}
                     </span>
                   )}
                 </button>
@@ -2870,7 +2919,7 @@ export default function App() {
             onRemoveFromCart={removeFromCart}
             onClearCart={handleClearCart}
             onContinueShopping={() => switchTab("products")}
-            onProceedToCheckout={() => setIsCheckoutOpen(true)}
+            onProceedToCheckout={handleOpenCheckout}
             onSelectProduct={handleSelectProduct}
             suggestedProducts={products}
             promoCode={promoCode}

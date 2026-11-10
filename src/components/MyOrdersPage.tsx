@@ -564,7 +564,37 @@ export default function MyOrdersPage({
       </div>
 
       {/* DANH SÁCH CÁC THẺ ĐƠN HÀNG (ĐÃ GỘP GỌN GÀNG, BỎ THANH TIẾN TRÌNH CỒNG KỀNH TRÊN TỪNG ĐƠN) */}
-      {filteredOrders.length === 0 ? (
+      {!currentUser ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 text-center shadow-sm space-y-5 max-w-lg mx-auto animate-in fade-in zoom-in-95">
+          <div className="w-20 h-20 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
+            <Package className="w-10 h-10" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-base sm:text-lg font-black text-slate-900">
+              Bạn chưa đăng nhập tài khoản
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+              Vui lòng đăng nhập để theo dõi hành trình đơn hàng, xem trạng thái giao nhận và quản lý các đơn mua sắm của bạn.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+            >
+              Đăng nhập ngay
+            </button>
+            <button
+              type="button"
+              onClick={onContinueShopping}
+              className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              Tiếp tục chọn sách
+            </button>
+          </div>
+        </div>
+      ) : filteredOrders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-10 sm:p-14 text-center shadow-sm space-y-4 max-w-xl mx-auto">
           <div className="w-20 h-20 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">
             <ShoppingBag className="w-10 h-10 stroke-1" />

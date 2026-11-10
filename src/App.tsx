@@ -1,17 +1,22 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
+import { CATEGORIES, BOOK_FORMATS, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api } from "./services/api";
 
-// Ánh xạ icon/emoji trực quan cho từng thể loại sách
+// Ánh xạ icon/emoji trực quan cho 11 thể loại sách mở rộng
 const CATEGORY_ICONS: Record<string, string> = {
   "Tất cả": "📚",
   "Văn học - Tiểu thuyết": "📖",
   "Kinh tế - Kinh doanh": "📈",
   "Kỹ năng sống": "✨",
+  "Tâm lý học": "🧠",
   "Công nghệ - Lập trình": "💻",
-  "Khoa học - Triết học": "🧭",
-  "Thiếu nhi": "🎈"
+  "Khoa học - Triết học": "🔬",
+  "Lịch sử - Địa lý - Văn hóa": "🏛️",
+  "Thiếu nhi": "🎈",
+  "Manga - Comic": "⚡",
+  "Ngoại ngữ - Từ điển": "🌐",
+  "Y học - Sức khỏe": "🌿"
 };
 import {
   Search,
@@ -131,12 +136,16 @@ export interface OrderRecord {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile" | "blog">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile">("products");
   const [products, setProducts] = useState<Product[]>(INITIAL_BOOKS);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
+  // Bộ lọc theo hình thức / loại quyển sách (Bìa mềm, Bìa cứng, Sách bỏ túi, Boxset, Bản đặc biệt)
+  const [selectedBookFormat, setSelectedBookFormat] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
   const [cart, setCart] = useState<CartItem[]>([]);
+  // Danh sách ID các sản phẩm trong giỏ hàng được tick chọn để mua trước
+  const [selectedCartIds, setSelectedCartIds] = useState<string[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(8);
@@ -144,6 +153,24 @@ export default function App() {
   const [promoCode, setPromoCode] = useState<string>("");
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Xử lý bật/tắt tick chọn 1 sản phẩm trong giỏ hàng
+  const handleToggleCartSelect = (productId: string) => {
+    setSelectedCartIds((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  // Xử lý chọn tất cả hoặc bỏ chọn tất cả trong giỏ hàng
+  const handleToggleSelectAll = () => {
+    if (selectedCartIds.length === cart.length) {
+      setSelectedCartIds([]);
+    } else {
+      setSelectedCartIds(cart.map((item) => item.product.id));
+    }
+  };
 
   // Authentication States
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -255,7 +282,8 @@ export default function App() {
         setActiveTab("profile");
         setSelectedProduct(null);
       } else if (path === "/blog" || path.startsWith("/blog")) {
-        setActiveTab("blog");
+        // Góc đọc sách đã được loại bỏ, tự động điều hướng về trang sản phẩm
+        setActiveTab("products");
         setSelectedProduct(null);
       } else if (prodId || path.startsWith("/product")) {
         setActiveTab("products");
@@ -273,7 +301,7 @@ export default function App() {
     return () => window.removeEventListener("popstate", handleUrlSync);
   }, [products]);
 
-  const switchTab = (tab: "products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile" | "blog") => {
+  const switchTab = (tab: "products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile") => {
     setActiveTab(tab);
     setSelectedProduct(null);
     setIsUserMenuOpen(false);
@@ -293,10 +321,6 @@ export default function App() {
     } else if (tab === "profile") {
       if (window.location.pathname !== "/profile") {
         window.history.pushState({}, "", "/profile");
-      }
-    } else if (tab === "blog") {
-      if (window.location.pathname !== "/blog") {
-        window.history.pushState({}, "", "/blog");
       }
     } else {
       if (window.location.pathname !== "/" || window.location.search) {
@@ -326,6 +350,7 @@ export default function App() {
 
   const handleClearCart = () => {
     setCart([]);
+    setSelectedCartIds([]);
     showToast("Đã làm trống giỏ hàng thành công!");
   };
 
@@ -702,13 +727,15 @@ export default function App() {
       }
       return [...prev, { product, quantity }];
     });
+    // Tự động tick chọn cuốn sách vừa thêm vào giỏ hàng
+    setSelectedCartIds((prev) => (prev.includes(product.id) ? prev : [...prev, product.id]));
     showToast(`Đã thêm "${product.name.slice(0, 25)}..." vào giỏ hàng!`);
   };
 
   // Update Cart Quantity
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prev) => {
-      return prev
+      const updated = prev
         .map((item) => {
           if (item.product.id === productId) {
             const newQty = item.quantity + delta;
@@ -717,12 +744,14 @@ export default function App() {
           return item;
         })
         .filter(Boolean) as CartItem[];
+      return updated;
     });
   };
 
   // Remove from cart
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    setSelectedCartIds((prev) => prev.filter((id) => id !== productId));
     showToast("Đã xóa sản phẩm khỏi giỏ hàng");
   };
 
@@ -809,13 +838,14 @@ export default function App() {
   // Số lượng bộ lọc nâng cao đang kích hoạt
   const activeFiltersCount = useMemo(() => {
     let count = 0;
+    if (selectedBookFormat !== "Tất cả") count++;
     if (selectedPriceRange !== "all") count++;
     if (selectedAuthor !== "all") count++;
     if (selectedPublisher !== "all") count++;
     if (selectedMinRating > 0) count++;
     if (onlyInStock) count++;
     return count;
-  }, [selectedPriceRange, selectedAuthor, selectedPublisher, selectedMinRating, onlyInStock]);
+  }, [selectedBookFormat, selectedPriceRange, selectedAuthor, selectedPublisher, selectedMinRating, onlyInStock]);
 
   // Hàm thiết lập lại toàn bộ bộ lọc
   const handleResetFilters = () => {
@@ -825,17 +855,25 @@ export default function App() {
     setSelectedMinRating(0);
     setOnlyInStock(false);
     setSelectedCategory("Tất cả");
+    setSelectedBookFormat("Tất cả");
     setSearchQuery("");
   };
 
-  // Filter & Sort Products (Đã nâng cấp đa tiêu chí nâng cao)
+  // Filter & Sort Products (Đã nâng cấp lọc theo Thể loại & Loại quyển sách)
   const filteredProducts = useMemo(() => {
     const result = products.filter((item) => {
-      // 1. Lọc theo danh mục
+      // 1. Lọc theo danh mục thể loại
       const matchCat =
         selectedCategory === "Tất cả" || item.category === selectedCategory;
 
-      // 2. Lọc theo từ khóa tìm kiếm
+      // 2. Lọc theo hình thức / loại quyển sách (Bìa mềm, Bìa cứng, Boxset, Sách bỏ túi, Bản đặc biệt)
+      const matchFormat =
+        selectedBookFormat === "Tất cả" ||
+        item.bookFormat === selectedBookFormat ||
+        (item.specs?.["Hình thức"] &&
+          item.specs["Hình thức"].toLowerCase().includes(selectedBookFormat.toLowerCase()));
+
+      // 3. Lọc theo từ khóa tìm kiếm
       const query = searchQuery.toLowerCase().trim();
       const matchQuery =
         !query ||
@@ -845,7 +883,7 @@ export default function App() {
         (item.publisher && item.publisher.toLowerCase().includes(query)) ||
         (item.isbn && item.isbn.toLowerCase().includes(query));
 
-      // 3. Lọc theo khoảng giá
+      // 4. Lọc theo khoảng giá
       let matchPrice = true;
       if (selectedPriceRange === "under-100k") {
         matchPrice = item.price < 100000;
@@ -857,24 +895,25 @@ export default function App() {
         matchPrice = item.price > 500000;
       }
 
-      // 4. Lọc theo tác giả
+      // 5. Lọc theo tác giả
       const matchAuthor =
         selectedAuthor === "all" || item.author === selectedAuthor;
 
-      // 5. Lọc theo nhà xuất bản
+      // 6. Lọc theo nhà xuất bản
       const matchPublisher =
         selectedPublisher === "all" || item.publisher === selectedPublisher;
 
-      // 6. Lọc theo đánh giá tối thiểu
+      // 7. Lọc theo đánh giá tối thiểu
       const matchRating =
         selectedMinRating === 0 || item.rating >= selectedMinRating;
 
-      // 7. Lọc theo trạng thái còn hàng trong kho
+      // 8. Lọc theo trạng thái còn hàng trong kho
       const stock = item.stockQuantity ?? (item.inStock ? 25 : 0);
       const matchStock = !onlyInStock || (item.inStock && stock > 0);
 
       return (
         matchCat &&
+        matchFormat &&
         matchQuery &&
         matchPrice &&
         matchAuthor &&
@@ -896,6 +935,7 @@ export default function App() {
   }, [
     products,
     selectedCategory,
+    selectedBookFormat,
     searchQuery,
     sortBy,
     selectedPriceRange,
@@ -910,6 +950,7 @@ export default function App() {
     setCurrentPage(1);
   }, [
     selectedCategory,
+    selectedBookFormat,
     searchQuery,
     sortBy,
     itemsPerPage,
@@ -935,23 +976,35 @@ export default function App() {
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredProducts, currentPage, itemsPerPage]);
 
-  // Cart Calculations
+  // Cart Calculations - Tính toán dựa trên các sản phẩm được tick chọn để mua trước
+  const selectedCartItems = useMemo(() => {
+    return cart.filter((item) => selectedCartIds.includes(item.product.id));
+  }, [cart, selectedCartIds]);
+
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = cart.reduce(
+  const selectedItemsCount = selectedCartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  const subtotal = selectedCartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
     0
   );
   const discountAmount = subtotal * appliedDiscount;
-  const shippingFee = subtotal > 5000000 || subtotal === 0 ? 0 : 30000;
+  // Miễn phí vận chuyển toàn quốc cho đơn sách từ 250.000₫
+  const shippingFee = subtotal >= 250000 || subtotal === 0 ? 0 : 30000;
   const finalTotal = Math.max(0, subtotal - discountAmount + shippingFee);
 
-  // Xử lý tạo đơn hàng & điều hướng thanh toán chính xác
+  // Xử lý tạo đơn hàng & điều hướng thanh toán chính xác (chỉ đặt các sản phẩm đã tick chọn)
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Ngăn chặn tạo đơn hàng khi giỏ rỗng
     if (cart.length === 0) {
       showToast("Giỏ hàng của bạn đang trống! Vui lòng chọn sách trước khi đặt hàng.");
       setIsCheckoutOpen(false);
+      return;
+    }
+    // Ngăn chặn khi chưa tick chọn sản phẩm nào
+    if (selectedCartItems.length === 0) {
+      showToast("Vui lòng tick chọn ít nhất 1 cuốn sách trong giỏ hàng bạn muốn mua trước!");
       return;
     }
     if (!customerInfo.fullName || !customerInfo.phone || !customerInfo.address) {
@@ -961,14 +1014,14 @@ export default function App() {
     const generatedId = "DB-" + Math.floor(100000 + Math.random() * 900000);
     setCurrentOrderId(generatedId);
 
-    // Ghi nhận chính xác số tiền cần thanh toán trước khi dọn giỏ hàng
+    // Ghi nhận chính xác số tiền cần thanh toán cho các sản phẩm đã tick chọn
     const orderTotalToPay = finalTotal;
     setPaymentOrderTotal(orderTotalToPay);
 
     const newOrder: OrderRecord = {
       id: generatedId,
       date: new Date().toLocaleDateString("vi-VN"),
-      items: [...cart],
+      items: [...selectedCartItems],
       totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod,
       status: "Chờ xác nhận", // Đơn hàng mới đặt sẽ tự động vào ô "Chờ xác nhận"
@@ -985,20 +1038,21 @@ export default function App() {
       // ignore
     }
 
-    // Gửi đơn hàng lên Backend / MongoDB
+    // Gửi đơn hàng chỉ gồm các sản phẩm đã tick lên Backend / MongoDB
     api.createOrder({
       customerInfo: { ...customerInfo },
-      items: [...cart],
+      items: [...selectedCartItems],
       totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod
     }).catch(console.error);
 
-    // Xóa giỏ hàng và voucher sau khi đã chuyển thành đơn hàng thành công
-    setCart([]);
+    // Xóa khỏi giỏ hàng CHỈ các sản phẩm đã được tick mua, GIỮ LẠI các sản phẩm chưa tick mua
+    setCart((prev) => prev.filter((item) => !selectedCartIds.includes(item.product.id)));
+    setSelectedCartIds([]);
     setAppliedDiscount(0);
     setPromoCode("");
 
-    // Đóng hoàn toàn Checkout modal để không bị treo modal ngầm với số tiền 0 đ
+    // Đóng hoàn toàn Checkout modal
     setIsCheckoutOpen(false);
     setOrderSuccess(false);
 
@@ -1010,7 +1064,7 @@ export default function App() {
     } else {
       // Đơn hàng COD Tiền mặt
       switchTab("orders");
-      showToast("Đặt hàng thành công! Đơn hàng COD của bạn đang được xử lý.");
+      showToast("Đặt hàng thành công! Các sản phẩm chưa chọn vẫn được giữ lại trong giỏ hàng.");
     }
   };
 
@@ -1639,19 +1693,6 @@ export default function App() {
                   )}
                 </button>
 
-                {/* Nút Góc Đọc Sách / Blog */}
-                <button
-                  onClick={() => switchTab("blog")}
-                  className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap flex items-center space-x-1.5 cursor-pointer ${
-                    activeTab === "blog"
-                      ? "bg-white text-indigo-700 shadow-sm shadow-slate-200"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
-                  }`}
-                >
-                  <span>📖</span>
-                  <span>Góc Đọc Sách</span>
-                </button>
-
                 <button
                   onClick={() => switchTab("about")}
                   className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap flex items-center space-x-1.5 ${
@@ -1677,27 +1718,8 @@ export default function App() {
                 </button>
               </nav>
 
-              {/* Khối Tiện Ích Khách Hàng (Yêu Thích, Giỏ Hàng, Tài Khoản) - Gọn gàng và thoáng đãng */}
-              <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                {/* Nút Sách Yêu Thích */}
-                <button
-                  onClick={() => setIsWishlistOpen(true)}
-                  className="relative flex items-center space-x-1 px-2.5 py-2 text-xs font-bold text-slate-700 hover:text-rose-600 bg-slate-100/80 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-xl transition-all whitespace-nowrap shrink-0"
-                  title="Danh sách sách yêu thích"
-                >
-                  <Heart
-                    className={`w-3.5 h-3.5 shrink-0 ${
-                      wishlist.length > 0 ? "text-rose-500 fill-rose-500" : "text-slate-500"
-                    }`}
-                  />
-                  <span className="hidden xl:inline">Yêu thích</span>
-                  {wishlist.length > 0 && (
-                    <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full shadow-sm">
-                      {wishlist.length}
-                    </span>
-                  )}
-                </button>
-
+              {/* Khối Tiện Ích Khách Hàng (Giỏ Hàng, Tài Khoản) - Gọn gàng và thoáng đãng */}
+              <div className="flex items-center space-x-2 shrink-0">
                 {/* Nút Giỏ Hàng */}
                 <button
                   onClick={() => switchTab("cart")}
@@ -1726,7 +1748,7 @@ export default function App() {
                   <div className="relative">
                     <button
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                      className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-800 transition-colors whitespace-nowrap shrink-0 border border-slate-200"
+                      className="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 transition-colors whitespace-nowrap shrink-0 border border-slate-200 shadow-xs"
                       title={currentUser.name}
                     >
                       <img
@@ -1734,7 +1756,7 @@ export default function App() {
                         alt={currentUser.name}
                         className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
                       />
-                      <span className="hidden sm:inline max-w-[85px] xl:max-w-[110px] truncate">
+                      <span className="hidden sm:inline max-w-[130px] xl:max-w-[170px] truncate">
                         {currentUser.role === "admin" ? "Quản Trị Viên" : currentUser.name}
                       </span>
                       {currentUser.role === "admin" && (
@@ -1742,7 +1764,7 @@ export default function App() {
                           Admin
                         </span>
                       )}
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     </button>
 
                     {/* Dropdown Menu người dùng */}
@@ -1932,19 +1954,6 @@ export default function App() {
                       {orders.length}
                     </span>
                   )}
-                </button>
-
-                {/* Mobile Nav: Góc Đọc Sách */}
-                <button
-                  onClick={() => switchTab("blog")}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold text-left flex items-center space-x-2 transition-all cursor-pointer ${
-                    activeTab === "blog"
-                      ? "bg-indigo-50 text-indigo-700 font-extrabold"
-                      : "text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <span>📖</span>
-                  <span>Góc Đọc Sách &amp; Cẩm Nang</span>
                 </button>
 
                 <button
@@ -2169,39 +2178,75 @@ export default function App() {
 
             {/* Filter & Sorting Controls */}
             <section id="product-grid" className="space-y-4">
-              <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-                {/* Drop List Danh Mục Sách Tinh Gọn (Theo yêu cầu: Thay thế dàn nút tràn dòng bằng Dropdown) */}
-                <div className="flex items-center space-x-2.5 w-full md:w-auto">
-                  <span className="text-xs font-bold text-slate-600 shrink-0 flex items-center space-x-1">
-                    <span>📚</span>
-                    <span>Danh mục:</span>
-                  </span>
-                  <div className="relative w-full sm:w-64">
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-2xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs appearance-none transition-all"
-                    >
-                      {CATEGORIES.map((cat) => {
-                        const icon = CATEGORY_ICONS[cat] || "📚";
-                        const count =
-                          cat === "Tất cả"
-                            ? products.length
-                            : products.filter((p) => p.category === cat).length;
-                        return (
-                          <option key={cat} value={cat}>
-                            {icon} {cat} ({count} cuốn)
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3.5">
+                {/* Cụm Bộ Lọc: Thể Loại Sách & Loại Quyển Sách */}
+                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                  {/* Drop List Danh Mục Sách Tinh Gọn */}
+                  <div className="flex items-center space-x-2 w-full sm:w-auto">
+                    <span className="text-xs font-bold text-slate-600 shrink-0 flex items-center space-x-1">
+                      <span>📚</span>
+                      <span>Thể loại:</span>
+                    </span>
+                    <div className="relative w-full sm:w-56">
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-2xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs appearance-none transition-all"
+                      >
+                        {CATEGORIES.map((cat) => {
+                          const icon = CATEGORY_ICONS[cat] || "📚";
+                          const count =
+                            cat === "Tất cả"
+                              ? products.length
+                              : products.filter((p) => p.category === cat).length;
+                          return (
+                            <option key={cat} value={cat}>
+                              {icon} {cat} ({count} cuốn)
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Drop List Loại Quyển Sách (Hình Thức Bìa: Bìa mềm, Bìa cứng, Sách bỏ túi, Boxset, Bản đặc biệt) */}
+                  <div className="flex items-center space-x-2 w-full sm:w-auto">
+                    <span className="text-xs font-bold text-slate-600 shrink-0 flex items-center space-x-1">
+                      <span>📖</span>
+                      <span>Loại sách:</span>
+                    </span>
+                    <div className="relative w-full sm:w-44">
+                      <select
+                        value={selectedBookFormat}
+                        onChange={(e) => setSelectedBookFormat(e.target.value)}
+                        className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-2xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs appearance-none transition-all"
+                      >
+                        {BOOK_FORMATS.map((fmt) => {
+                          const count =
+                            fmt === "Tất cả"
+                              ? products.length
+                              : products.filter(
+                                  (p) =>
+                                    p.bookFormat === fmt ||
+                                    (p.specs?.["Hình thức"] &&
+                                      p.specs["Hình thức"].toLowerCase().includes(fmt.toLowerCase()))
+                                ).length;
+                          return (
+                            <option key={fmt} value={fmt}>
+                              {fmt} ({count})
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
 
                 {/* Search & Sort */}
-                <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
-                  <div className="relative w-full md:w-60">
+                <div className="flex items-center space-x-2.5 w-full lg:w-auto justify-end flex-wrap sm:flex-nowrap">
+                  <div className="relative w-full sm:w-56">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
@@ -2276,8 +2321,26 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                    {/* 1. Lọc theo Khoảng giá */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
+                    {/* 1. Lọc theo Hình thức / Loại quyển sách */}
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700 block">
+                        Loại quyển sách:
+                      </label>
+                      <select
+                        value={selectedBookFormat}
+                        onChange={(e) => setSelectedBookFormat(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {BOOK_FORMATS.map((fmt) => (
+                          <option key={fmt} value={fmt}>
+                            {fmt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 2. Lọc theo Khoảng giá */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Khoảng giá (VNĐ):
@@ -2295,7 +2358,7 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* 2. Lọc theo Tác giả */}
+                    {/* 3. Lọc theo Tác giả */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Tác giả tác phẩm:
@@ -2314,7 +2377,7 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* 3. Lọc theo Nhà xuất bản */}
+                    {/* 4. Lọc theo Nhà xuất bản */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Nhà xuất bản (NXB):
@@ -2333,7 +2396,7 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* 4. Lọc theo Đánh giá sao */}
+                    {/* 5. Lọc theo Đánh giá sao */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Đánh giá độc giả:
@@ -2421,30 +2484,6 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Nút Thả Tim Yêu Thích */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleWishlist(prod);
-                          }}
-                          className={`absolute top-3 right-3 z-20 p-2 rounded-xl backdrop-blur-md transition-all shadow-md ${
-                            wishlist.some((w) => w.id === prod.id)
-                              ? "bg-rose-500 text-white shadow-rose-500/30"
-                              : "bg-white/85 hover:bg-white text-slate-700"
-                          }`}
-                          title={
-                            wishlist.some((w) => w.id === prod.id)
-                              ? "Xóa khỏi yêu thích"
-                              : "Thêm vào yêu thích"
-                          }
-                        >
-                          <Heart
-                            className={`w-3.5 h-3.5 ${
-                              wishlist.some((w) => w.id === prod.id) ? "fill-white" : ""
-                            }`}
-                          />
-                        </button>
-
                         {/* Tạm hết hàng overlay */}
                         {!prod.inStock && (
                           <div className="absolute inset-0 z-30 bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center text-white text-xs font-bold">
@@ -2456,11 +2495,16 @@ export default function App() {
                       {/* Thông tin chi tiết sách */}
                       <div className="pt-3.5 flex-1 flex flex-col justify-between space-y-3">
                         <div>
-                          {/* Thể loại & Tồn kho & Đánh giá */}
-                          <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-                            <span className="font-bold text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
-                              {prod.category}
-                            </span>
+                          {/* Thể loại & Loại quyển sách & Tồn kho & Đánh giá */}
+                          <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 flex-wrap gap-1">
+                            <div className="flex items-center space-x-1">
+                              <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                                {prod.category}
+                              </span>
+                              <span className="font-semibold text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
+                                {prod.bookFormat || "Bìa mềm"}
+                              </span>
+                            </div>
                             {prod.inStock && prod.stockQuantity !== undefined && prod.stockQuantity <= 5 && (
                               <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md font-black animate-pulse">
                                 ⚡ Còn {prod.stockQuantity}
@@ -2483,10 +2527,10 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* Tên Sách */}
+                          {/* Tên Sách - Cố định chiều cao 2 dòng để căn đều thẻ */}
                           <h3
                             onClick={() => handleSelectProduct(prod)}
-                            className="font-bold text-sm text-slate-900 line-clamp-2 hover:text-blue-600 cursor-pointer transition-colors leading-snug"
+                            className="font-bold text-sm text-slate-900 line-clamp-2 hover:text-blue-600 cursor-pointer transition-colors leading-snug h-10 flex items-start"
                             title={prod.name}
                           >
                             {prod.name}
@@ -2890,6 +2934,9 @@ export default function App() {
         {activeTab === "cart" && (
           <CartPage
             cart={cart}
+            selectedProductIds={selectedCartIds}
+            onToggleSelectProduct={handleToggleCartSelect}
+            onToggleSelectAll={handleToggleSelectAll}
             onUpdateQuantity={updateQuantity}
             onRemoveFromCart={removeFromCart}
             onClearCart={handleClearCart}
@@ -2956,17 +3003,6 @@ export default function App() {
               setIsAuthModalOpen(true);
             }}
             onLogout={handleLogout}
-            onContinueShopping={() => switchTab("products")}
-          />
-        )}
-
-        {/* TAB 7: GÓC ĐỌC SÁCH & BLOG PHÊ BÌNH VĂN HỌC (TRANG RIÊNG BIỆT) */}
-        {activeTab === "blog" && (
-          <BlogPage
-            products={products}
-            onSelectBook={(prod) => {
-              handleSelectProduct(prod);
-            }}
             onContinueShopping={() => switchTab("products")}
           />
         )}
@@ -3778,27 +3814,6 @@ export default function App() {
           isOpen={Boolean(selectedInvoiceOrder)}
           order={selectedInvoiceOrder}
           onClose={() => setSelectedInvoiceOrder(null)}
-        />
-
-        {/* MODAL SÁCH YÊU THÍCH (WISHLIST) */}
-        <WishlistModal
-          isOpen={isWishlistOpen}
-          onClose={() => setIsWishlistOpen(false)}
-          wishlist={wishlist}
-          onRemoveFromWishlist={(id) => {
-            setWishlist((prev) => {
-              const next = prev.filter((p) => p.id !== id);
-              try {
-                localStorage.setItem("bookstore_wishlist", JSON.stringify(next));
-              } catch {}
-              return next;
-            });
-          }}
-          onAddToCart={(p) => {
-            addToCart(p);
-            showToast(`Đã thêm "${p.name}" vào giỏ hàng!`);
-          }}
-          onSelectProduct={(p) => handleSelectProduct(p)}
         />
 
         {/* MODAL TRA CỨU TIẾN TRÌNH ĐƠN HÀNG */}

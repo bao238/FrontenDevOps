@@ -19,6 +19,8 @@ export interface Product {
   id: string;
   name: string;
   category: string;
+  // Phân loại hình thức quyển sách (Bìa mềm, Bìa cứng, Sách bỏ túi, Boxset, Bản đặc biệt)
+  bookFormat?: "Bìa mềm" | "Bìa cứng" | "Sách bỏ túi" | "Boxset" | "Bản đặc biệt";
   price: number;
   originalPrice: number;
   discountPercent: number;
@@ -38,15 +40,30 @@ export interface Product {
   reviews?: ReviewItem[];
 }
 
-// 6 Thể loại sách chính thức cho Nhà Sách BookStore
+// Danh mục phân loại hình thức quyển sách cho Nhà Sách BookStore
+export const BOOK_FORMATS = [
+  "Tất cả",
+  "Bìa mềm",
+  "Bìa cứng",
+  "Sách bỏ túi",
+  "Boxset",
+  "Bản đặc biệt"
+];
+
+// 11 Thể loại sách chính thức và mở rộng cho Nhà Sách BookStore
 export const CATEGORIES = [
   "Tất cả",
   "Văn học - Tiểu thuyết",
   "Kinh tế - Kinh doanh",
   "Kỹ năng sống",
+  "Tâm lý học",
   "Công nghệ - Lập trình",
   "Khoa học - Triết học",
-  "Thiếu nhi"
+  "Lịch sử - Địa lý - Văn hóa",
+  "Thiếu nhi",
+  "Manga - Comic",
+  "Ngoại ngữ - Từ điển",
+  "Y học - Sức khỏe"
 ];
 
 // Danh sách 18 cuốn sách Bestseller khởi tạo làm dữ liệu mẫu dự phòng
@@ -78,6 +95,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-989-123-4'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -107,6 +125,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-53-9021-3'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -135,6 +154,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-1-18234-8'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: false
   },
@@ -164,6 +184,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-963-789-1'
     },
+    bookFormat: 'Bìa cứng',
     inStock: true,
     featured: true
   },
@@ -193,6 +214,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-989-654-3'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: false
   },
@@ -224,6 +246,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-58-4567-8'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -252,6 +275,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-1-09876-2'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -280,6 +304,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-99-4321-0'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: false
   },
@@ -310,6 +335,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-77-8910-4'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -338,6 +364,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-88-9123-5'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: false
   },
@@ -366,6 +393,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-1-12345-6'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -396,6 +424,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-80-6789-1'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -424,6 +453,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-95-1234-7'
     },
+    bookFormat: 'Bìa cứng',
     inStock: true,
     featured: true
   },
@@ -452,6 +482,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-80-9988-2'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: false
   },
@@ -483,6 +514,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-943-876-5'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -511,6 +543,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-77-5432-1'
     },
+    bookFormat: 'Bìa cứng',
     inStock: true,
     featured: false
   },
@@ -541,6 +574,7 @@ export const INITIAL_BOOKS: Product[] = [
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-2-19876-0'
     },
+    bookFormat: 'Bìa mềm',
     inStock: true,
     featured: true
   },
@@ -568,6 +602,512 @@ export const INITIAL_BOOKS: Product[] = [
       'Hình thức': 'Bìa mềm minh họa đẹp',
       'Ngôn ngữ': 'Tiếng Việt',
       'Mã ISBN': '978-604-2-20123-1'
+    },
+    bookFormat: 'Bìa mềm',
+    inStock: true,
+    featured: false,
+  },
+
+  // --- THỂ LOẠI: TÂM LÝ HỌC ---
+  {
+    id: 'prod-book-19',
+    name: 'Tư Duy Nhanh Và Chậm (Thinking, Fast and Slow)',
+    category: 'Tâm lý học',
+    bookFormat: 'Bìa cứng',
+    price: 185000,
+    originalPrice: 229000,
+    discountPercent: 19,
+    rating: 4.9,
+    reviewsCount: 142,
+    imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
+    description: 'Kiệt tác tâm lý học hành vi của Daniel Kahneman - nhà kinh tế học đoạt giải Nobel. Tác phẩm phân tích sâu sắc hai hệ thống vận hành tư duy của con người: Hệ thống 1 (nhanh, bản năng) và Hệ thống 2 (chậm, logic).',
+    author: 'Daniel Kahneman',
+    publisher: 'NXB Thế Giới',
+    publicationYear: 2023,
+    pages: 612,
+    isbn: '978-604-77-8912-4',
+    specs: {
+      'Tác giả': 'Daniel Kahneman',
+      'Nhà xuất bản': 'NXB Thế Giới',
+      'Năm xuất bản': '2023',
+      'Số trang': '612 trang',
+      'Hình thức': 'Bìa cứng ép nhũ',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-77-8912-4'
+    },
+    inStock: true,
+    featured: true
+  },
+  {
+    id: 'prod-book-20',
+    name: 'Tâm Lý Học Về Tiền (The Psychology of Money)',
+    category: 'Tâm lý học',
+    bookFormat: 'Bìa mềm',
+    price: 135000,
+    originalPrice: 168000,
+    discountPercent: 20,
+    rating: 4.8,
+    reviewsCount: 228,
+    imageUrl: 'https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&w=800&q=80',
+    description: 'Cuốn sách bán chạy toàn cầu của Morgan Housel chia sẻ 19 câu chuyện ngắn khám phá những cách kỳ lạ mà mọi người nghĩ về tiền bạc, giúp bạn làm chủ tư duy tài chính cá nhân bền vững.',
+    author: 'Morgan Housel',
+    publisher: 'NXB Trẻ',
+    publicationYear: 2023,
+    pages: 328,
+    isbn: '978-604-1-19823-3',
+    specs: {
+      'Tác giả': 'Morgan Housel',
+      'Nhà xuất bản': 'NXB Trẻ',
+      'Năm xuất bản': '2023',
+      'Số trang': '328 trang',
+      'Hình thức': 'Bìa mềm tay gập',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-1-19823-3'
+    },
+    inStock: true,
+    featured: false
+  },
+  {
+    id: 'prod-book-21',
+    name: 'Hiểu Về Trái Tim',
+    category: 'Tâm lý học',
+    bookFormat: 'Bìa cứng',
+    price: 155000,
+    originalPrice: 195000,
+    discountPercent: 21,
+    rating: 4.9,
+    reviewsCount: 380,
+    imageUrl: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80',
+    description: 'Tác phẩm chữa lành tâm hồn kinh điển của Thầy Minh Niệm. Cuốn sách giúp bạn nhận diện những cung bậc cảm xúc, hóa giải phiền muộn, nuôi dưỡng bình an nội tâm và xây dựng tình thương đích thực.',
+    author: 'Thầy Minh Niệm',
+    publisher: 'NXB Tổng Hợp TP.HCM',
+    publicationYear: 2024,
+    pages: 480,
+    isbn: '978-604-58-1209-7',
+    specs: {
+      'Tác giả': 'Thầy Minh Niệm',
+      'Nhà xuất bản': 'NXB Tổng Hợp TP.HCM',
+      'Năm xuất bản': '2024',
+      'Số trang': '480 trang',
+      'Hình thức': 'Bìa cứng cao cấp',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-58-1209-7'
+    },
+    inStock: true,
+    featured: true
+  },
+
+  // --- THỂ LOẠI: LỊCH SỬ - ĐỊA LÝ - VĂN HÓA ---
+  {
+    id: 'prod-book-22',
+    name: 'Sapiens: Lược Sử Loài Người',
+    category: 'Lịch sử - Địa lý - Văn hóa',
+    bookFormat: 'Bìa cứng',
+    price: 210000,
+    originalPrice: 260000,
+    discountPercent: 19,
+    rating: 4.9,
+    reviewsCount: 420,
+    imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
+    description: 'Tác phẩm vĩ đại của Yuval Noah Harari bao quát toàn bộ lịch sử tiến hóa của loài người từ thời kỳ đồ đá cho đến kỷ nguyên trí tuệ nhân tạo, mở rộng nhãn quan về thế giới hiện đại.',
+    author: 'Yuval Noah Harari',
+    publisher: 'NXB Tri Thức',
+    publicationYear: 2023,
+    pages: 560,
+    isbn: '978-604-945-812-7',
+    specs: {
+      'Tác giả': 'Yuval Noah Harari',
+      'Nhà xuất bản': 'NXB Tri Thức',
+      'Năm xuất bản': '2023',
+      'Số trang': '560 trang',
+      'Hình thức': 'Bìa cứng mạ vàng',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-945-812-7'
+    },
+    inStock: true,
+    featured: true
+  },
+  {
+    id: 'prod-book-23',
+    name: 'Súng, Vi Trùng Và Thép',
+    category: 'Lịch sử - Địa lý - Văn hóa',
+    bookFormat: 'Bìa mềm',
+    price: 178000,
+    originalPrice: 220000,
+    discountPercent: 19,
+    rating: 4.8,
+    reviewsCount: 165,
+    imageUrl: 'https://images.unsplash.com/photo-1474932430478-367dbb6832c1?auto=format&fit=crop&w=800&q=80',
+    description: 'Cuốn sách đoạt giải Pulitzer danh giá của Jared Diamond giải mã nguồn gốc của sự bất bình đẳng giữa các xã hội loài người xuyên suốt 13.000 năm lịch sử.',
+    author: 'Jared Diamond',
+    publisher: 'NXB Thế Giới',
+    publicationYear: 2022,
+    pages: 648,
+    isbn: '978-604-77-4589-3',
+    specs: {
+      'Tác giả': 'Jared Diamond',
+      'Nhà xuất bản': 'NXB Thế Giới',
+      'Năm xuất bản': '2022',
+      'Số trang': '648 trang',
+      'Hình thức': 'Bìa mềm',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-77-4589-3'
+    },
+    inStock: true,
+    featured: false
+  },
+  {
+    id: 'prod-book-24',
+    name: 'Đại Việt Sử Ký Toàn Thư (Bản Đặc Biệt Bìa Da Mạ Vàng)',
+    category: 'Lịch sử - Địa lý - Văn hóa',
+    bookFormat: 'Bản đặc biệt',
+    price: 495000,
+    originalPrice: 620000,
+    discountPercent: 20,
+    rating: 5.0,
+    reviewsCount: 95,
+    imageUrl: 'https://images.unsplash.com/photo-1495640388908-05fa85288e61?auto=format&fit=crop&w=800&q=80',
+    description: 'Bộ quốc sử đồ sộ nhất Việt Nam được in ấn trên giấy xốp ngoại nhập cao cấp, bìa da dập nổi dát vàng tinh xảo, phụ bản tranh khắc gỗ truyền thống quý giá.',
+    author: 'Ngô Sĩ Liên & Quốc Sử Quán',
+    publisher: 'NXB Khoa Học Xã Hội',
+    publicationYear: 2024,
+    pages: 1250,
+    isbn: '978-604-90-2345-1',
+    specs: {
+      'Tác giả': 'Ngô Sĩ Liên',
+      'Nhà xuất bản': 'NXB Khoa Học Xã Hội',
+      'Năm xuất bản': '2024',
+      'Số trang': '1250 trang',
+      'Hình thức': 'Bản đặc biệt da dập nổi',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-90-2345-1'
+    },
+    inStock: true,
+    featured: true
+  },
+
+  // --- THỂ LOẠI: MANGA - COMIC ---
+  {
+    id: 'prod-book-25',
+    name: 'Doraemon Trọn Bộ 45 Tập (Boxset Sưu Tầm Kỷ Niệm)',
+    category: 'Manga - Comic',
+    bookFormat: 'Boxset',
+    price: 890000,
+    originalPrice: 1100000,
+    discountPercent: 19,
+    rating: 5.0,
+    reviewsCount: 520,
+    imageUrl: 'https://images.unsplash.com/photo-1532012164546-f432f2e3edd4?auto=format&fit=crop&w=800&q=80',
+    description: 'Trọn bộ 45 tập Doraemon nguyên bản trong hộp Boxset cứng cáp tuyệt đẹp. Tặng kèm bộ bưu thiếp độc quyền và huy hiệu chú mèo máy tương lai.',
+    author: 'Fujiko F. Fujio',
+    publisher: 'NXB Kim Đồng',
+    publicationYear: 2024,
+    pages: 8600,
+    isbn: '978-604-2-33441-2',
+    specs: {
+      'Tác giả': 'Fujiko F. Fujio',
+      'Nhà xuất bản': 'NXB Kim Đồng',
+      'Năm xuất bản': '2024',
+      'Số trang': '45 tập trọn bộ',
+      'Hình thức': 'Boxset hộp cứng cao cấp',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-2-33441-2'
+    },
+    inStock: true,
+    featured: true
+  },
+  {
+    id: 'prod-book-26',
+    name: 'One Piece - Boxset Đại Hải Trình (Tập 1 - 23 Arc Đông Hải & Alabasta)',
+    category: 'Manga - Comic',
+    bookFormat: 'Boxset',
+    price: 680000,
+    originalPrice: 850000,
+    discountPercent: 20,
+    rating: 4.9,
+    reviewsCount: 310,
+    imageUrl: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&w=800&q=80',
+    description: 'Boxset chính hãng 23 tập đầu của siêu phẩm One Piece cùng thuyền trưởng Monkey D. Luffy bắt đầu hành trình tìm kiếm kho báu vĩ đại.',
+    author: 'Eiichiro Oda',
+    publisher: 'NXB Kim Đồng',
+    publicationYear: 2023,
+    pages: 4500,
+    isbn: '978-604-2-28901-7',
+    specs: {
+      'Tác giả': 'Eiichiro Oda',
+      'Nhà xuất bản': 'NXB Kim Đồng',
+      'Năm xuất bản': '2023',
+      'Số trang': '23 tập trọn bộ',
+      'Hình thức': 'Boxset hộp gập nam châm',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-2-28901-7'
+    },
+    inStock: true,
+    featured: false
+  },
+  {
+    id: 'prod-book-27',
+    name: 'Thám Tử Lừng Danh Conan - Tập 104',
+    category: 'Manga - Comic',
+    bookFormat: 'Bìa mềm',
+    price: 30000,
+    originalPrice: 35000,
+    discountPercent: 14,
+    rating: 4.9,
+    reviewsCount: 190,
+    imageUrl: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=800&q=80',
+    description: 'Tập mới nhất mở ra cuộc đụng độ nghẹt thở giữa Conan, Akai Shuichi và các thành viên cộm cán của Tổ chức Áo Đen bí ẩn.',
+    author: 'Gosho Aoyama',
+    publisher: 'NXB Kim Đồng',
+    publicationYear: 2024,
+    pages: 192,
+    isbn: '978-604-2-31092-8',
+    specs: {
+      'Tác giả': 'Gosho Aoyama',
+      'Nhà xuất bản': 'NXB Kim Đồng',
+      'Năm xuất bản': '2024',
+      'Số trang': '192 trang',
+      'Hình thức': 'Bìa mềm kèm obi',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-2-31092-8'
+    },
+    inStock: true,
+    featured: false
+  },
+
+  // --- THỂ LOẠI: NGOẠI NGỮ - TỪ ĐIỂN ---
+  {
+    id: 'prod-book-28',
+    name: 'English Grammar in Use (Bản Song Ngữ Anh - Việt Có Đáp Án)',
+    category: 'Ngoại ngữ - Từ điển',
+    bookFormat: 'Bìa mềm',
+    price: 165000,
+    originalPrice: 205000,
+    discountPercent: 20,
+    rating: 4.9,
+    reviewsCount: 410,
+    imageUrl: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80',
+    description: 'Giáo trình ngữ pháp tiếng Anh chuẩn mực số 1 thế giới của Raymond Murphy, trình bày súc tích với 145 chuyên đề ngữ pháp và bài tập thực hành thiết thực.',
+    author: 'Raymond Murphy',
+    publisher: 'Cambridge University Press / NXB Trẻ',
+    publicationYear: 2023,
+    pages: 390,
+    isbn: '978-110-84-5765-1',
+    specs: {
+      'Tác giả': 'Raymond Murphy',
+      'Nhà xuất bản': 'NXB Trẻ',
+      'Năm xuất bản': '2023',
+      'Số trang': '390 trang',
+      'Hình thức': 'Bìa mềm in 4 màu',
+      'Ngôn ngữ': 'Song ngữ Anh - Việt',
+      'Mã ISBN': '978-110-84-5765-1'
+    },
+    inStock: true,
+    featured: true
+  },
+  {
+    id: 'prod-book-29',
+    name: 'Oxford Advanced Learner\'s Dictionary (10th Hardcover Edition)',
+    category: 'Ngoại ngữ - Từ điển',
+    bookFormat: 'Bìa cứng',
+    price: 450000,
+    originalPrice: 560000,
+    discountPercent: 20,
+    rating: 5.0,
+    reviewsCount: 185,
+    imageUrl: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80',
+    description: 'Đại từ điển Anh - Anh chuẩn mực thế giới bản in lần thứ 10, bìa cứng sang trọng, giải nghĩa 228.000 từ ngữ, cụm từ và ví dụ thực tế.',
+    author: 'AS Hornby & Oxford Team',
+    publisher: 'Oxford University Press',
+    publicationYear: 2023,
+    pages: 1890,
+    isbn: '978-019-47-9854-3',
+    specs: {
+      'Tác giả': 'AS Hornby',
+      'Nhà xuất bản': 'Oxford University Press',
+      'Năm xuất bản': '2023',
+      'Số trang': '1890 trang',
+      'Hình thức': 'Bìa cứng chỉ khâu',
+      'Ngôn ngữ': 'Tiếng Anh',
+      'Mã ISBN': '978-019-47-9854-3'
+    },
+    inStock: true,
+    featured: false
+  },
+
+  // --- THỂ LOẠI: Y HỌC - SỨC KHỎE ---
+  {
+    id: 'prod-book-30',
+    name: 'Cơ Thể: Hướng Dẫn Dành Cho Người Sử Dụng (The Body)',
+    category: 'Y học - Sức khỏe',
+    bookFormat: 'Bìa cứng',
+    price: 195000,
+    originalPrice: 245000,
+    discountPercent: 20,
+    rating: 4.9,
+    reviewsCount: 230,
+    imageUrl: 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&w=800&q=80',
+    description: 'Chuyến du hành kỳ thú khám phá cơ thể con người của Bill Bryson. Cuốn sách giúp bạn hiểu tường tận về các tế bào, bộ não, hệ miễn dịch và cách nuôi dưỡng một thể trạng sung mãn.',
+    author: 'Bill Bryson',
+    publisher: 'NXB Dân Trí',
+    publicationYear: 2023,
+    pages: 512,
+    isbn: '978-604-34-4512-8',
+    specs: {
+      'Tác giả': 'Bill Bryson',
+      'Nhà xuất bản': 'NXB Dân Trí',
+      'Năm xuất bản': '2023',
+      'Số trang': '512 trang',
+      'Hình thức': 'Bìa cứng kèm áo ôm',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-34-4512-8'
+    },
+    inStock: true,
+    featured: true
+  },
+  {
+    id: 'prod-book-31',
+    name: 'Nhân Tố Enzyme (Trọn Bộ 4 Tập Nuôi Dưỡng Sức Khỏe Toàn Diện)',
+    category: 'Y học - Sức khỏe',
+    bookFormat: 'Boxset',
+    price: 290000,
+    originalPrice: 360000,
+    discountPercent: 19,
+    rating: 4.8,
+    reviewsCount: 270,
+    imageUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=800&q=80',
+    description: 'Bộ sách bán chạy hàng triệu bản của bác sĩ Hiromi Shinya hướng dẫn phương pháp ăn uống thanh lọc, bảo toàn enzyme diệu kỳ để sống trường thọ và không bệnh tật.',
+    author: 'Hiromi Shinya',
+    publisher: 'NXB Thế Giới',
+    publicationYear: 2023,
+    pages: 820,
+    isbn: '978-604-77-9021-2',
+    specs: {
+      'Tác giả': 'Hiromi Shinya',
+      'Nhà xuất bản': 'NXB Thế Giới',
+      'Năm xuất bản': '2023',
+      'Số trang': '4 tập trọn bộ',
+      'Hình thức': 'Boxset hộp xốp cao cấp',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-77-9021-2'
+    },
+    inStock: true,
+    featured: false
+  },
+
+  // --- SÁCH PHÂN LOẠI ĐẶC BIỆT: BẢN ĐẶC BIỆT, BOXSET & SÁCH BỎ TÚI ---
+  {
+    id: 'prod-book-32',
+    name: 'Harry Potter - Trọn Bộ 7 Tập Bìa Cứng (Special Boxset Edition)',
+    category: 'Văn học - Tiểu thuyết',
+    bookFormat: 'Boxset',
+    price: 1680000,
+    originalPrice: 2100000,
+    discountPercent: 20,
+    rating: 5.0,
+    reviewsCount: 680,
+    imageUrl: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80',
+    description: 'Trọn bộ 7 tập thế giới phù thủy Harry Potter phiên bản bìa cứng đóng hộp rương gỗ cổ điển. Kèm huy hiệu Hogwarts mạ bạc và bản đồ Đạo tặc độc quyền.',
+    author: 'J.K. Rowling',
+    publisher: 'NXB Trẻ',
+    publicationYear: 2024,
+    pages: 4200,
+    isbn: '978-604-1-24890-5',
+    specs: {
+      'Tác giả': 'J.K. Rowling',
+      'Nhà xuất bản': 'NXB Trẻ',
+      'Năm xuất bản': '2024',
+      'Số trang': '7 tập bìa cứng',
+      'Hình thức': 'Boxset rương gỗ sang trọng',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-1-24890-5'
+    },
+    inStock: true,
+    featured: true
+  },
+  {
+    id: 'prod-book-33',
+    name: 'Đắc Nhân Tâm (Bản Đặc Biệt Mạ Vàng Kỷ Niệm 100 Năm)',
+    category: 'Kỹ năng sống',
+    bookFormat: 'Bản đặc biệt',
+    price: 295000,
+    originalPrice: 380000,
+    discountPercent: 22,
+    rating: 5.0,
+    reviewsCount: 340,
+    imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
+    description: 'Phiên bản giới hạn kỷ niệm của tuyệt tác Đắc Nhân Tâm. Bìa da nhân tạo dập nổi họa tiết cổ điển, cạnh sách thếp vàng 24K, đánh số thứ tự độc bản cho nhà sưu tập.',
+    author: 'Dale Carnegie',
+    publisher: 'NXB Tổng Hợp TP.HCM / First News',
+    publicationYear: 2024,
+    pages: 360,
+    isbn: '978-604-58-9901-2',
+    specs: {
+      'Tác giả': 'Dale Carnegie',
+      'Nhà xuất bản': 'First News',
+      'Năm xuất bản': '2024',
+      'Số trang': '360 trang',
+      'Hình thức': 'Bản đặc biệt thếp vàng',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-58-9901-2'
+    },
+    inStock: true,
+    featured: true
+  },
+  {
+    id: 'prod-book-34',
+    name: 'Hoàng Tử Bé (Bản Sách Bỏ Túi Pocket Book Tiện Dụng)',
+    category: 'Thiếu nhi',
+    bookFormat: 'Sách bỏ túi',
+    price: 42000,
+    originalPrice: 55000,
+    discountPercent: 24,
+    rating: 4.8,
+    reviewsCount: 155,
+    imageUrl: 'https://images.unsplash.com/photo-1532012164546-f432f2e3edd4?auto=format&fit=crop&w=800&q=80',
+    description: 'Phiên bản sách bỏ túi khổ 10x15cm nhỏ xinh, tiện lợi mang theo trong ba lô hay túi áo, giúp bạn thưởng thức từng trang văn dịu mát bất cứ nơi đâu.',
+    author: 'Antoine de Saint-Exupéry',
+    publisher: 'NXB Kim Đồng',
+    publicationYear: 2024,
+    pages: 120,
+    isbn: '978-604-2-31890-0',
+    specs: {
+      'Tác giả': 'Antoine de Saint-Exupéry',
+      'Nhà xuất bản': 'NXB Kim Đồng',
+      'Năm xuất bản': '2024',
+      'Số trang': '120 trang',
+      'Hình thức': 'Sách bỏ túi (Pocket size)',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-2-31890-0'
+    },
+    inStock: true,
+    featured: false
+  },
+  {
+    id: 'prod-book-35',
+    name: 'Sổ Tay Lập Trình Viên & Kiến Trúc Phần Mềm (Sách Bỏ Túi DevOps)',
+    category: 'Công nghệ - Lập trình',
+    bookFormat: 'Sách bỏ túi',
+    price: 75000,
+    originalPrice: 95000,
+    discountPercent: 21,
+    rating: 4.9,
+    reviewsCount: 110,
+    imageUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
+    description: 'Cẩm nang tra cứu bỏ túi các lệnh Git, Docker, Kubernetes, CI/CD Pipeline và các mẫu Design Patterns cốt lõi nhất cho kỹ sư phần mềm hiện đại.',
+    author: 'Dev Master & Tech Team',
+    publisher: 'NXB Thông Tin & Truyền Thông',
+    publicationYear: 2024,
+    pages: 180,
+    isbn: '978-604-80-8761-4',
+    specs: {
+      'Tác giả': 'Dev Master',
+      'Nhà xuất bản': 'NXB TT&TT',
+      'Năm xuất bản': '2024',
+      'Số trang': '180 trang',
+      'Hình thức': 'Sách bỏ túi bìa gập',
+      'Ngôn ngữ': 'Tiếng Việt',
+      'Mã ISBN': '978-604-80-8761-4'
     },
     inStock: true,
     featured: false

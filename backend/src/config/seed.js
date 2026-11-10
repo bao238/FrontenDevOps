@@ -881,6 +881,46 @@ const initialCategories = [
     icon: 'Heart',
     displayOrder: 6,
     isActive: true
+  },
+  {
+    name: 'Tâm lý học',
+    slug: 'tam-ly-hoc',
+    description: 'Tâm lý hành vi, chữa lành cảm xúc, thấu hiểu nội tâm và tư duy sâu sắc',
+    icon: 'Sparkles',
+    displayOrder: 7,
+    isActive: true
+  },
+  {
+    name: 'Lịch sử - Địa lý - Văn hóa',
+    slug: 'lich-su-dia-ly-van-hoa',
+    description: 'Lược sử các nền văn minh, địa chính trị, di sản văn hóa và cội nguồn dân tộc',
+    icon: 'Compass',
+    displayOrder: 8,
+    isActive: true
+  },
+  {
+    name: 'Manga - Comic',
+    slug: 'manga-comic',
+    description: 'Truyện tranh Nhật Bản, tiểu thuyết đồ họa và truyện tranh comic thiếu niên',
+    icon: 'BookOpen',
+    displayOrder: 9,
+    isActive: true
+  },
+  {
+    name: 'Ngoại ngữ - Từ điển',
+    slug: 'ngoai-ngu-tu-dien',
+    description: 'Giáo trình luyện thi IELTS, TOEIC, từ điển chuẩn mực và ngữ pháp ứng dụng',
+    icon: 'BookOpen',
+    displayOrder: 10,
+    isActive: true
+  },
+  {
+    name: 'Y học - Sức khỏe',
+    slug: 'y-hoc-suc-khoe',
+    description: 'Chăm sóc sức khỏe gia đình, dinh dưỡng khoa học, y học thưởng thức và thể chất',
+    icon: 'Heart',
+    displayOrder: 11,
+    isActive: true
   }
 ];
 

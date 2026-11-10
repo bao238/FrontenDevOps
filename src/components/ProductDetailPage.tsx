@@ -243,23 +243,6 @@ export default function ProductDetailPage({
             )}
             <div className="absolute top-4 right-4 z-20 flex space-x-2">
               <button
-                onClick={() => {
-                  if (onToggleWishlist) {
-                    onToggleWishlist(product);
-                  } else {
-                    setIsLiked(!isLiked);
-                  }
-                }}
-                className={`p-2.5 rounded-2xl backdrop-blur-md transition-all shadow-md ${
-                  isWishlisted || isLiked
-                    ? "bg-rose-500 text-white shadow-rose-500/30"
-                    : "bg-white/80 hover:bg-white text-slate-700"
-                }`}
-                title={isWishlisted || isLiked ? "Xóa khỏi yêu thích" : "Thêm vào yêu thích"}
-              >
-                <Heart className={`w-4 h-4 ${isWishlisted || isLiked ? "fill-white" : ""}`} />
-              </button>
-              <button
                 onClick={handleShare}
                 className="p-2.5 rounded-2xl bg-white/80 hover:bg-white text-slate-700 backdrop-blur-md transition-all shadow-md relative"
                 title="Chia sẻ sản phẩm"

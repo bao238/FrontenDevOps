@@ -27,6 +27,10 @@ export interface CartItem {
 
 interface CartPageProps {
   cart: CartItem[];
+  // Quản lý trạng thái tick chọn sản phẩm riêng trong giỏ hàng
+  selectedProductIds?: string[];
+  onToggleSelectProduct?: (productId: string) => void;
+  onToggleSelectAll?: () => void;
   onUpdateQuantity: (productId: string, delta: number) => void;
   onRemoveFromCart: (productId: string) => void;
   onClearCart: () => void;
@@ -46,6 +50,9 @@ interface CartPageProps {
 
 export default function CartPage({
   cart,
+  selectedProductIds,
+  onToggleSelectProduct,
+  onToggleSelectAll,
   onUpdateQuantity,
   onRemoveFromCart,
   onClearCart,
@@ -62,6 +69,9 @@ export default function CartPage({
   shippingFee,
   totalAmount,
 }: CartPageProps) {
+  // Danh sách ID các sản phẩm được chọn (mặc định chọn tất cả nếu chưa truyền)
+  const activeSelectedIds = selectedProductIds ?? cart.map((i) => i.product.id);
+  const isAllSelected = cart.length > 0 && activeSelectedIds.length === cart.length;
   // Format VND
   const formatVND = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -196,11 +206,19 @@ export default function CartPage({
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              {/* Table Top Bar */}
+              {/* Table Top Bar với Checkbox Chọn Tất Cả */}
               <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Danh sách sản phẩm ({cart.length} mẫu mã)
-                </span>
+                <label className="flex items-center space-x-2.5 cursor-pointer text-xs font-bold text-slate-800 select-none group">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={() => onToggleSelectAll && onToggleSelectAll()}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                  />
+                  <span className="uppercase tracking-wider group-hover:text-blue-600 transition-colors">
+                    Chọn tất cả ({activeSelectedIds.length}/{cart.length} sản phẩm muốn mua)
+                  </span>
+                </label>
                 <button
                   type="button"
                   onClick={() => {
@@ -219,13 +237,27 @@ export default function CartPage({
               <div className="divide-y divide-slate-100">
                 {cart.map((item) => {
                   const lineTotal = item.product.price * item.quantity;
+                  const isChecked = activeSelectedIds.includes(item.product.id);
                   return (
                     <div
                       key={item.product.id}
-                      className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors"
+                      className={`p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
+                        isChecked ? "bg-white hover:bg-slate-50/50" : "bg-slate-50/40 opacity-75 hover:opacity-90"
+                      }`}
                     >
-                      {/* Product Thumbnail & Details */}
-                      <div className="flex items-center space-x-4 flex-1 min-w-0">
+                      {/* Checkbox & Product Thumbnail & Details */}
+                      <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+                        {/* Checkbox chọn riêng cuốn sách này để mua trước */}
+                        <div className="shrink-0 flex items-center pr-1">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => onToggleSelectProduct && onToggleSelectProduct(item.product.id)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                            title={isChecked ? "Bỏ chọn (mua sau)" : "Tick chọn để thanh toán trước"}
+                          />
+                        </div>
+
                         {/* Bìa sách tỷ lệ 3:4 với hiệu ứng gáy sách 3D */}
                         <div
                           onClick={() => onSelectProduct(item.product)}
@@ -426,7 +458,7 @@ export default function CartPage({
               {/* Price Breakdown */}
               <div className="space-y-3 text-xs border-t border-slate-100 pt-4">
                 <div className="flex justify-between text-slate-600">
-                  <span>Tạm tính hàng hóa:</span>
+                  <span>Tạm tính ({activeSelectedIds.length} cuốn đã chọn):</span>
                   <span className="font-semibold text-slate-900">{formatVND(subtotal)}</span>
                 </div>
 
@@ -465,11 +497,26 @@ export default function CartPage({
               {/* Checkout Button */}
               <button
                 type="button"
-                onClick={onProceedToCheckout}
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-xl shadow-blue-500/25 transition-all transform hover:-translate-y-0.5 flex items-center justify-center space-x-2"
+                onClick={() => {
+                  if (activeSelectedIds.length === 0) {
+                    alert("Vui lòng tick chọn ít nhất 1 cuốn sách để tiến hành đặt hàng!");
+                    return;
+                  }
+                  onProceedToCheckout();
+                }}
+                disabled={activeSelectedIds.length === 0}
+                className={`w-full py-3.5 rounded-2xl text-xs sm:text-sm font-bold shadow-xl transition-all flex items-center justify-center space-x-2 ${
+                  activeSelectedIds.length === 0
+                    ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 transform hover:-translate-y-0.5 cursor-pointer"
+                }`}
               >
                 <CreditCard className="w-4 h-4" />
-                <span>Tiến Hành Đặt Hàng &amp; Thanh Toán</span>
+                <span>
+                  {activeSelectedIds.length === 0
+                    ? "Vui Lòng Chọn Sách Để Mua"
+                    : `Tiến Hành Đặt Hàng (${activeSelectedIds.length} cuốn đã chọn)`}
+                </span>
               </button>
 
               <p className="text-center text-[11px] text-slate-400 flex items-center justify-center space-x-1">

@@ -20,6 +20,8 @@ const productSchema = new mongoose.Schema(
     id: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: true, trim: true },
     category: { type: String, required: true, index: true },
+    // Phân loại hình thức quyển sách (Bìa mềm, Bìa cứng, Sách bỏ túi, Boxset, Bản đặc biệt)
+    bookFormat: { type: String, default: 'Bìa mềm' },
     price: { type: Number, required: true },
     originalPrice: { type: Number, required: true },
     discountPercent: { type: Number, default: 0 },

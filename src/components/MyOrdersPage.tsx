@@ -17,6 +17,7 @@ import {
   Printer,
   QrCode,
   Camera,
+  Edit3,
   Calendar,
   AlertCircle,
   Send,
@@ -168,6 +169,7 @@ export default function MyOrdersPage({
   const [reviewComment, setReviewComment] = useState<string>("");
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string | null>(null);
   const [reviewImage, setReviewImage] = useState<string>("");
+  const [isEditingReview, setIsEditingReview] = useState<boolean>(false);
 
   // Xử lý tải ảnh chụp sách thực tế từ máy tính
   const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,6 +308,8 @@ export default function MyOrdersPage({
     setReviewRating(ord.reviewRating || 5);
     setReviewComment(ord.reviewComment || "");
     setReviewImage(ord.reviewImage || "");
+    // Nếu đơn hàng đã đánh giá rồi thì mặc định mở chế độ XEM CHI TIẾT
+    setIsEditingReview(!ord.isReviewed);
   };
 
   // Trợ giúp huy hiệu trạng thái của từng đơn hàng
@@ -1045,10 +1049,16 @@ export default function MyOrdersPage({
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">
-                    Đánh Giá Đơn Hàng #{reviewingOrder.id}
+                    {reviewingOrder.isReviewed && !isEditingReview
+                      ? `Chi Tiết Đánh Giá Đơn Hàng #${reviewingOrder.id}`
+                      : reviewingOrder.isReviewed
+                      ? `Chỉnh Sửa Đánh Giá #${reviewingOrder.id}`
+                      : `Đánh Giá Đơn Hàng #${reviewingOrder.id}`}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Chia sẻ cảm nhận về tác phẩm sách &amp; chất lượng dịch vụ
+                    {reviewingOrder.isReviewed && !isEditingReview
+                      ? `Đã gửi đánh giá vào ${reviewingOrder.reviewedAt || reviewingOrder.date}`
+                      : "Chia sẻ cảm nhận về tác phẩm sách & chất lượng dịch vụ"}
                   </p>
                 </div>
               </div>
@@ -1073,7 +1083,103 @@ export default function MyOrdersPage({
                   Đơn hàng đã được ghi nhận đánh giá và số lượng chờ đánh giá đã được cập nhật.
                 </p>
               </div>
+            ) : reviewingOrder.isReviewed && !isEditingReview ? (
+              /* CHẾ ĐỘ XEM CHI TIẾT ĐÁNH GIÁ (KHI BẤM "XEM ĐÁNH GIÁ") */
+              <div className="space-y-4 pt-4 text-xs">
+                {/* Danh sách sách trong đơn */}
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 space-y-2">
+                  <span className="text-[11px] font-bold text-slate-500 block">Sản phẩm trong đơn:</span>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    {reviewingOrder.items.map((it) => (
+                      <div key={it.product.id} className="flex items-center space-x-2">
+                        <img
+                          src={it.product.imageUrl}
+                          alt={it.product.name}
+                          className="w-8 h-10 object-cover rounded border border-slate-200"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-800 text-xs truncate">{it.product.name}</p>
+                          <p className="text-[10px] text-slate-400">{it.product.category}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Số sao đã đánh giá */}
+                <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-1.5">
+                  <span className="text-[11px] font-bold text-amber-800 block">Chất lượng tác phẩm &amp; dịch vụ:</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex text-amber-400">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          className={`w-5 h-5 ${
+                            s <= (reviewingOrder.reviewRating || 5)
+                              ? "fill-amber-400 text-amber-400"
+                              : "text-slate-200"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="font-bold text-amber-700 text-xs">
+                      ({reviewingOrder.reviewRating || 5}/5 sao)
+                    </span>
+                    <span className="text-[11px] text-amber-600 font-semibold ml-auto">
+                      {reviewingOrder.reviewRating === 5 && "⭐ Tuyệt vời - Rất hài lòng"}
+                      {reviewingOrder.reviewRating === 4 && "⭐ Tốt - Hài lòng"}
+                      {reviewingOrder.reviewRating === 3 && "⭐ Bình thường - Tạm được"}
+                      {reviewingOrder.reviewRating === 2 && "⭐ Chưa hài lòng"}
+                      {reviewingOrder.reviewRating === 1 && "⭐ Rất không hài lòng"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Lời nhận xét */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                  <span className="text-[11px] font-bold text-slate-500 block">Lời nhận xét của bạn:</span>
+                  <p className="text-slate-800 text-xs italic leading-relaxed">
+                    "{reviewingOrder.reviewComment || "Sách đẹp, đóng gói rất cẩn thận, phục vụ tuyệt vời!"}"
+                  </p>
+                </div>
+
+                {/* Ảnh chụp thực tế nếu có */}
+                {reviewingOrder.reviewImage ? (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-slate-500 block">Ảnh chụp sách thực tế:</span>
+                    <img
+                      src={reviewingOrder.reviewImage}
+                      alt="Ảnh chụp thực tế"
+                      className="w-24 h-24 object-cover rounded-xl border border-slate-200 shadow-xs cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => window.open(reviewingOrder.reviewImage, "_blank")}
+                    />
+                    <p className="text-[10px] text-slate-400 italic">Bấm vào ảnh để xem kích thước lớn</p>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 italic">Đơn hàng này chưa đính kèm ảnh thực tế.</p>
+                )}
+
+                {/* Nút thao tác của Chế độ Xem */}
+                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setReviewingOrder(null)}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors cursor-pointer text-xs"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingReview(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold shadow-md shadow-orange-500/20 transition-all flex items-center space-x-1.5 cursor-pointer text-xs"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Chỉnh Sửa Đánh Giá</span>
+                  </button>
+                </div>
+              </div>
             ) : (
+              /* CHẾ ĐỘ ĐÁNH GIÁ MỚI HOẶC CHỈNH SỬA ĐÁNH GIÁ */
               <form onSubmit={handleSubmitReview} className="space-y-4 pt-4 text-xs">
                 {/* Danh sách sách trong đơn */}
                 <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 space-y-2">
@@ -1209,17 +1315,23 @@ export default function MyOrdersPage({
                 <div className="flex items-center justify-end space-x-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setReviewingOrder(null)}
+                    onClick={() => {
+                      if (reviewingOrder.isReviewed) {
+                        setIsEditingReview(false);
+                      } else {
+                        setReviewingOrder(null);
+                      }
+                    }}
                     className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors cursor-pointer"
                   >
-                    Hủy
+                    {reviewingOrder.isReviewed ? "Hủy" : "Hủy"}
                   </button>
                   <button
                     type="submit"
                     className="px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold shadow-md shadow-orange-500/20 transition-all flex items-center space-x-1.5 cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Gửi Đánh Giá</span>
+                    <span>{reviewingOrder.isReviewed ? "Cập Nhật Đánh Giá" : "Gửi Đánh Giá"}</span>
                   </button>
                 </div>
               </form>

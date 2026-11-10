@@ -799,57 +799,58 @@ export default function ProductDetailPage({
             )}
             </div>
 
-            {/* Write a Review Form - Đồng bộ theo chính sách đánh giá xác thực */}
-            <div id="write-review">
-              {hasUserReviewed ? (
-                <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-200 space-y-3 animate-in fade-in">
-                  <div className="flex items-center space-x-3 text-emerald-800">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm">Bạn đã gửi đánh giá cho tác phẩm này</h4>
-                      <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">
-                        Cảm ơn bạn đã để lại phản hồi xác thực và chia sẻ cảm nhận thực tế sau khi nhận sách để bạn đọc khác cùng tham khảo!
-                      </p>
-                    </div>
-                  </div>
+            {/* Write a Review Form - Luôn mở form để độc giả có thể gửi đánh giá bất kỳ lúc nào */}
+            <div id="write-review" className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                <h4 className="font-bold text-slate-900 text-sm flex items-center space-x-1.5">
+                  <MessageSquare className="w-4 h-4 text-blue-600" />
+                  <span>Gửi Đánh Giá Của Bạn</span>
+                </h4>
+                {userReceivedOrder ? (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-bold border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>✓ Đã mua và nhận hàng</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[11px] font-bold border border-blue-200">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Đánh giá từ độc giả</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Thông báo tình trạng xác thực */}
+              {userReceivedOrder ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Bạn đã nhận cuốn sách này qua đơn hàng <strong>#{userReceivedOrder.id}</strong>. Nhận xét của bạn sẽ tự động được đồng bộ và gắn huy hiệu <strong>✓ Đã mua hàng tại BookStore</strong>!
+                  </span>
                 </div>
-              ) : !currentUser ? (
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-center space-y-3">
-                  <MessageSquare className="w-8 h-8 text-slate-400 mx-auto" />
-                  <h4 className="font-bold text-slate-800 text-sm">Đánh giá tác phẩm</h4>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                    Chính sách đánh giá xác thực: Vui lòng đăng nhập và nhận sách thành công trong mục Đơn Hàng để gửi nhận xét và ảnh chụp thực tế cho tác phẩm này.
-                  </p>
-                </div>
-              ) : !userReceivedOrder && currentUser.role !== "admin" ? (
-                <div className="bg-blue-50/70 rounded-2xl p-6 border border-blue-200 space-y-2">
-                  <div className="flex items-start space-x-3 text-blue-900">
-                    <ShieldCheck className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-bold text-sm">Chính sách đánh giá xác thực từ người mua hàng</h4>
-                      <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                        Để đảm bảo mọi phản hồi đều chân thực và khách quan, tính năng đánh giá sẽ tự động mở sau khi bạn nhận sách thành công từ mục <strong>Đơn Hàng</strong>.
-                      </p>
-                    </div>
-                  </div>
+              ) : hasUserReviewed ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Bạn đã gửi nhận xét cho tác phẩm này. Bạn vẫn có thể tiếp tục chia sẻ thêm cảm nhận hoặc cập nhật phản hồi mới bên dưới!
+                  </span>
                 </div>
               ) : (
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-                  <h4 className="font-bold text-slate-900 text-sm flex items-center space-x-1.5">
-                    <MessageSquare className="w-4 h-4 text-blue-600" />
-                    <span>Gửi Đánh Giá Của Bạn</span>
-                  </h4>
+                <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-800 flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>
+                    Chia sẻ cảm nhận chân thực của bạn về nội dung, chất lượng in ấn để cộng đồng bạn đọc BookStore cùng tham khảo!
+                  </span>
+                </div>
+              )}
 
-                  {reviewSuccess && (
-                    <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center space-x-2">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <span>Cảm ơn bạn! Đánh giá của bạn đã được đăng thành công.</span>
-                    </div>
-                  )}
+              {reviewSuccess && (
+                <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center space-x-2 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Cảm ơn bạn! Đánh giá của bạn đã được đăng thành công.</span>
+                </div>
+              )}
 
-                  <form onSubmit={handleAddReview} className="space-y-4 text-xs">
+              <form onSubmit={handleAddReview} className="space-y-4 text-xs">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {currentUser ? (
                         <div>
@@ -974,8 +975,6 @@ export default function ProductDetailPage({
                       <span>{isSubmittingReview ? "Đang gửi..." : "Gửi Nhận Xét"}</span>
                     </button>
                   </form>
-                </div>
-              )}
             </div>
           </div>
         )}

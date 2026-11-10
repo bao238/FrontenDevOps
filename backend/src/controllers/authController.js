@@ -138,9 +138,34 @@ exports.updateUser = async (req, res) => {
   }
 
   try {
+    const { name, email, phone, role, status, address, avatarUrl } = req.body;
+    const updateData = {};
+    if (name) updateData.name = String(name).trim();
+    if (email) updateData.email = String(email).trim().toLowerCase();
+    if (phone !== undefined) updateData.phone = String(phone).trim();
+    if (role) updateData.role = role;
+    if (status) updateData.status = status;
+    if (address !== undefined) updateData.address = String(address).trim();
+    if (avatarUrl) updateData.avatarUrl = String(avatarUrl).trim();
+
+    const targetId = req.params.id;
+    const queryConditions = [
+      { id: targetId },
+      { email: (targetId || '').toLowerCase() }
+    ];
+    if (req.body.oldEmail) {
+      queryConditions.push({ email: req.body.oldEmail.toLowerCase() });
+    }
+    if (req.body.id) {
+      queryConditions.push({ id: req.body.id });
+    }
+    if (req.body.phone) {
+      queryConditions.push({ phone: req.body.phone });
+    }
+
     const updated = await User.findOneAndUpdate(
-      { id: req.params.id },
-      { $set: req.body },
+      { $or: queryConditions },
+      { $set: updateData },
       { new: true }
     );
 

@@ -403,7 +403,11 @@ export default function App() {
     // 1. Cập nhật danh sách users trong state để AdminPanel thấy ngay và lưu local storage
     setUsers((prevUsers) => {
       const updatedUsers = prevUsers.map((u) => {
-        if (u.id === oldId || (oldEmail && u.email.toLowerCase() === oldEmail.toLowerCase())) {
+        if (
+          u.id === oldId ||
+          (oldEmail && u.email && u.email.toLowerCase() === oldEmail.toLowerCase()) ||
+          (newProf.phone && u.phone && u.phone.trim() === newProf.phone.trim())
+        ) {
           return {
             ...u,
             name: newProf.name,
@@ -431,13 +435,24 @@ export default function App() {
       address: newProf.address || prev.address,
     }));
 
-    // 3. Đồng bộ lên Backend REST API (MongoDB)
+    // 3. Đồng bộ lên Backend REST API (MongoDB) và cập nhật lại danh sách users
     api.updateUser(oldId, {
       name: newProf.name,
       email: newProf.email,
       phone: newProf.phone,
       address: newProf.address,
       avatarUrl: newProf.avatarUrl,
+      oldEmail: oldEmail,
+      id: oldId,
+    } as any).then(() => {
+      api.getUsers().then((freshList) => {
+        if (freshList && Array.isArray(freshList)) {
+          setUsers(freshList);
+          try {
+            localStorage.setItem("bookstore_users", JSON.stringify(freshList));
+          } catch {}
+        }
+      });
     }).catch((err) => {
       console.warn("[App] Lỗi đồng bộ updateUser lên MongoDB:", err);
     });

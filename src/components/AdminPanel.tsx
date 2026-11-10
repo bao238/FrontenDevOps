@@ -1023,7 +1023,10 @@ export default function AdminPanel({
             <span>Đơn Hàng ({orders.length})</span>
           </button>
           <button
-            onClick={() => setAdminTab("users")}
+            onClick={() => {
+              setAdminTab("users");
+              if (onResetDefaultUsers) onResetDefaultUsers();
+            }}
             className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
               adminTab === "users"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
@@ -1722,6 +1725,17 @@ export default function AdminPanel({
 
               {/* Cụm nút Thao tác Quản lý Người dùng */}
               <div className="flex items-center justify-end space-x-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                {onResetDefaultUsers && (
+                  <button
+                    type="button"
+                    onClick={() => onResetDefaultUsers()}
+                    className="text-xs text-blue-600 hover:text-blue-700 px-3 py-2 rounded-xl border border-blue-200 hover:bg-blue-50 flex items-center space-x-1.5 transition-colors cursor-pointer font-bold"
+                    title="Đồng bộ danh sách tài khoản mới nhất từ MongoDB"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Làm mới</span>
+                  </button>
+                )}
                 {onResetDefaultUsers && (
                   <button
                     type="button"

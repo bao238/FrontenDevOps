@@ -2463,7 +2463,7 @@ export default function AdminPanel({
                       </div>
                     </div>
 
-                    {/* Giá bán & Giá gốc */}
+                    {/* Giá bán & Giá gốc - Cho phép người dùng tự do nhập mọi mệnh giá (step="any") */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block font-semibold text-slate-700 mb-1">
@@ -2473,7 +2473,7 @@ export default function AdminPanel({
                           type="number"
                           required
                           min={0}
-                          step={10000}
+                          step="any"
                           value={formPrice}
                           onChange={(e) => setFormPrice(Number(e.target.value))}
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2488,7 +2488,7 @@ export default function AdminPanel({
                         <input
                           type="number"
                           min={0}
-                          step={10000}
+                          step="any"
                           value={formOriginalPrice}
                           onChange={(e) => setFormOriginalPrice(Number(e.target.value))}
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"

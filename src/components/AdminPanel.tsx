@@ -579,10 +579,11 @@ export default function AdminPanel({
 
   // Format VND
   const formatVND = (amount: number) => {
+    const validAmount = Number(amount);
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
-    }).format(amount);
+    }).format(isNaN(validAmount) ? 0 : validAmount);
   };
 
   // Filtered Products for Admin Table (Đã kết hợp Bộ lọc Kho hàng)
@@ -676,10 +677,14 @@ export default function AdminPanel({
 
   // Statistics
   const totalRevenue = useMemo(() => {
-    return orders
-      .filter((o) => o.status !== "Đã hủy")
-      .reduce((sum, o) => sum + o.totalAmount, 0);
-  }, [orders]);
+    const list = serverOrders.length > 0 ? serverOrders : orders;
+    return list
+      .filter((o) => (o.status || (o as any).orderStatus) !== "Đã hủy")
+      .reduce((sum, o) => {
+        const val = Number(o.totalAmount) || Number((o as any).totalPrice) || 0;
+        return sum + (isNaN(val) ? 0 : val);
+      }, 0);
+  }, [orders, serverOrders]);
 
   // Thống kê chi tiết tình trạng kho sách
   const inStockCount = products.filter(
@@ -1253,10 +1258,10 @@ export default function AdminPanel({
                   onChange={(e) => setSelectedStockFilter(e.target.value as any)}
                   className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  <option value="all">Tất cả kho ({products.length})</option>
-                  <option value="in_stock">Còn hàng &gt;5 ({inStockCount})</option>
-                  <option value="low_stock">⚠️ Sắp hết hàng ≤ 5 ({lowStockCount})</option>
-                  <option value="out_of_stock">❌ Hết hàng ({outOfStockCount})</option>
+                  <option value="all">Tất cả kho ({displayTotalBooks.toLocaleString('vi-VN')})</option>
+                  <option value="in_stock">Còn hàng &gt;5 ({displayInStockCount.toLocaleString('vi-VN')})</option>
+                  <option value="low_stock">⚠️ Sắp hết hàng ≤ 5 ({displayLowStockCount.toLocaleString('vi-VN')})</option>
+                  <option value="out_of_stock">❌ Hết hàng ({displayOutOfStockCount.toLocaleString('vi-VN')})</option>
                 </select>
               </div>
             </div>
@@ -1301,7 +1306,7 @@ export default function AdminPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredProducts.length === 0 ? (
+                {displayAdminProducts.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-8 text-slate-400">
                       Không tìm thấy sản phẩm nào phù hợp
@@ -2133,7 +2138,7 @@ export default function AdminPanel({
                   onChange={(e) => setSelectedProductReviewFilter(e.target.value)}
                   className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 max-w-[200px] truncate font-medium"
                 >
-                  <option value="all">📦 Tất cả sản phẩm ({products.length})</option>
+                  <option value="all">📦 Tất cả sản phẩm ({displayTotalBooks.toLocaleString('vi-VN')})</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}

@@ -1206,6 +1206,42 @@ export default function App() {
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredProducts, currentPage, itemsPerPage]);
 
+  // Server-Side State cho Cửa Hàng (Storefront): Chỉ lấy đúng 8-12 cuốn của trang hiện tại, tuyệt đối không lấy 10.000 cuốn gây tràn RAM
+  const [storeProducts, setStoreProducts] = useState<Product[]>([]);
+  const [totalStoreProducts, setTotalStoreProducts] = useState<number>(0);
+  const [totalStorePages, setTotalStorePages] = useState<number>(1);
+  const [isLoadingStoreProducts, setIsLoadingStoreProducts] = useState<boolean>(false);
+
+  // Hàm tải dữ liệu phân trang máy chủ cho Cửa Hàng
+  const fetchStoreProducts = async (page = currentPage, limit = itemsPerPage) => {
+    setIsLoadingStoreProducts(true);
+    try {
+      const res = await api.getProducts({
+        page,
+        limit,
+        category: selectedCategory,
+        search: searchQuery
+      });
+      if (res && res.data) {
+        setStoreProducts(res.data);
+        setTotalStoreProducts(res.count ?? res.totalAllCount ?? res.data.length);
+        setTotalStorePages(res.totalPages || 1);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải sản phẩm phân trang cửa hàng:", err);
+    } finally {
+      setIsLoadingStoreProducts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStoreProducts(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage, selectedCategory, searchQuery]);
+
+  const displayStoreProducts = storeProducts.length > 0 ? storeProducts : paginatedProducts;
+  const displayTotalStoreProducts = totalStoreProducts > 0 ? totalStoreProducts : filteredProducts.length;
+  const displayTotalStorePages = totalStoreProducts > 0 ? totalStorePages : totalPages;
+
   // Cart Calculations - Tính toán dựa trên các sản phẩm được tick chọn để mua trước
   const selectedCartItems = useMemo(() => {
     return cart.filter((item) => selectedCartIds.includes(item.product.id));
@@ -2623,7 +2659,7 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {paginatedProducts.map((prod) => (
+                  {displayStoreProducts.map((prod) => (
                     <div
                       key={prod.id}
                       className="bg-white rounded-3xl border border-slate-200/80 p-3.5 shadow-sm hover:shadow-xl hover:border-blue-300 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group"
@@ -2766,11 +2802,11 @@ export default function App() {
                       Hiển thị{" "}
                       <strong className="text-slate-800 font-bold">
                         {(currentPage - 1) * itemsPerPage + 1} -{" "}
-                        {Math.min(currentPage * itemsPerPage, filteredProducts.length)}
+                        {Math.min(currentPage * itemsPerPage, displayTotalStoreProducts)}
                       </strong>{" "}
                       trên tổng số{" "}
                       <strong className="text-slate-800 font-bold">
-                        {filteredProducts.length}
+                        {displayTotalStoreProducts.toLocaleString("vi-VN")}
                       </strong>{" "}
                       cuốn sách
                     </span>
@@ -2794,7 +2830,7 @@ export default function App() {
                   </div>
 
                   {/* Nút điều hướng các trang */}
-                  {totalPages > 1 && (
+                  {displayTotalStorePages > 1 && (
                     <div className="flex items-center space-x-1.5">
                       {/* Nút Trang trước */}
                       <button
@@ -2816,10 +2852,10 @@ export default function App() {
                       </button>
 
                       {/* Các nút số trang */}
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      {Array.from({ length: displayTotalStorePages }, (_, i) => i + 1).map((page) => {
                         if (
                           page === 1 ||
-                          page === totalPages ||
+                          page === displayTotalStorePages ||
                           (page >= currentPage - 1 && page <= currentPage + 1)
                         ) {
                           return (
@@ -2840,7 +2876,7 @@ export default function App() {
                           );
                         } else if (
                           (page === currentPage - 2 && page > 1) ||
-                          (page === currentPage + 2 && page < totalPages)
+                          (page === currentPage + 2 && page < displayTotalStorePages)
                         ) {
                           return (
                             <span key={page} className="px-1 text-slate-400 text-xs font-bold">

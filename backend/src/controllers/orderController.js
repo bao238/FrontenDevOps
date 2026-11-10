@@ -3,15 +3,21 @@ const OrderItem = require('../models/OrderItem');
 const Product = require('../models/Product');
 const { isDbConnected } = require('../config/db');
 
-// GET /api/orders (Lấy toàn bộ danh sách đơn hàng)
+// GET /api/orders (Lấy danh sách đơn hàng, hỗ trợ phân trang khi dữ liệu lớn)
 exports.getOrders = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
-    const orders = await Order.find().sort({ createdAt: -1 }).lean();
-    return res.json({ source: 'mongodb', count: orders.length, data: orders });
+    const limit = parseInt(req.query.limit) || 100;
+    const totalCount = await Order.countDocuments();
+    const orders = await Order.find()
+      .select('-trackingTimelineFull')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    return res.json({ source: 'mongodb', count: totalCount, data: orders });
   } catch (err) {
     console.error('[OrderController] Lỗi truy vấn MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi truy vấn đơn hàng MongoDB', message: err.message });

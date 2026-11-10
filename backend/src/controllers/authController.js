@@ -105,14 +105,20 @@ exports.register = async (req, res) => {
   }
 };
 
-// GET /api/users
+// GET /api/users (Hỗ trợ phân trang khi dữ liệu lớn)
 exports.getUsers = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
-    const users = await User.find().sort({ createdAt: -1 }).lean();
+    const limit = parseInt(req.query.limit) || 120;
+    const totalCount = await User.countDocuments();
+    const users = await User.find()
+      .select('-userPayload -profileBio')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
     const formatted = users.map(u => ({
       id: u.id,
       name: u.name,
@@ -124,7 +130,7 @@ exports.getUsers = async (req, res) => {
       address: u.address || '',
       createdAt: u.createdAtStr || (u.createdAt ? new Date(u.createdAt).toLocaleDateString('vi-VN') : '')
     }));
-    return res.json({ source: 'mongodb', count: formatted.length, data: formatted });
+    return res.json({ source: 'mongodb', count: totalCount, data: formatted });
   } catch (err) {
     console.error('[AuthController] Lỗi lấy danh sách user MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi lấy danh sách người dùng', message: err.message });

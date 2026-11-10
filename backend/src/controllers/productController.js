@@ -3,15 +3,22 @@ const Review = require('../models/Review');
 const { isDbConnected } = require('../config/db');
 
 // GET /api/products
-// Lấy danh sách toàn bộ sách từ MongoDB, sắp xếp theo thời gian mới nhất
+// Lấy danh sách toàn bộ sách từ MongoDB, sắp xếp theo thời gian mới nhất (hỗ trợ phân trang khi dữ liệu lớn >= 1GB)
 exports.getProducts = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
-    const products = await Product.find().sort({ createdAt: -1 }).lean();
-    return res.json({ source: 'mongodb', count: products.length, data: products });
+    const limit = parseInt(req.query.limit) || 150;
+    const totalCount = await Product.countDocuments();
+    // Bỏ qua trường ebookContent lớn khi tải danh sách để tối ưu tốc độ và tránh tràn bộ nhớ Node.js
+    const products = await Product.find()
+      .select('-ebookContent')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    return res.json({ source: 'mongodb', count: totalCount, data: products });
   } catch (err) {
     console.error('[ProductController] Lỗi truy vấn MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi truy vấn sản phẩm MongoDB', message: err.message });

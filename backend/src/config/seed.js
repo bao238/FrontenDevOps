@@ -973,6 +973,12 @@ const initialCoupons = [
 // Hàm nạp dữ liệu tự động vào MongoDB
 async function seedData() {
   try {
+    // Kiem tra so luong sach hien co trong MongoDB. Neu da co sach thi bo qua seed de bao ve du lieu va tiet kiem RAM
+    const totalExistingProducts = await Product.countDocuments();
+    if (totalExistingProducts > 0) {
+      console.log(`📦 [MongoDB Seed] Database da co ${totalExistingProducts} cuon sach, bo qua seed de bao ve du lieu.`);
+      return;
+    }
     // 1. Kiểm tra làm mới nếu database còn lưu dữ liệu cũ
     const legacyProduct = await Product.findOne({
       category: { $in: ['Laptop & PC', 'Điện thoại', 'Phụ kiện', 'Âm thanh', 'Smart Home'] }

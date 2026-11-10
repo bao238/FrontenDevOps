@@ -226,12 +226,58 @@ export default function AdminPanel({
     return filteredAdminOrders.slice(startIndex, startIndex + adminOrdersPerPage);
   }, [filteredAdminOrders, adminOrderPage, adminOrdersPerPage]);
 
-  // Tải danh sách đánh giá từ MongoDB
-  const fetchReviews = async () => {
+  // Server-Side State cho Đơn hàng trong Admin
+  const [serverOrders, setServerOrders] = useState<OrderRecord[]>([]);
+  const [serverTotalOrders, setServerTotalOrders] = useState<number>(0);
+  const [serverTotalOrderPages, setServerTotalOrderPages] = useState<number>(1);
+
+  const fetchServerOrders = async (page = adminOrderPage, limit = adminOrdersPerPage) => {
+    try {
+      const res = await api.getOrders({
+        page,
+        limit,
+        status: adminOrderFilter
+      });
+      if (res && res.data && res.data.length > 0) {
+        setServerOrders(res.data);
+        setServerTotalOrders(res.count ?? res.totalAllCount ?? res.data.length);
+        setServerTotalOrderPages(res.totalPages || 1);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải đơn hàng từ MongoDB:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchServerOrders(adminOrderPage, adminOrdersPerPage);
+  }, [adminOrderPage, adminOrdersPerPage, adminOrderFilter]);
+
+  const displayAdminOrders = serverOrders.length > 0 ? serverOrders : paginatedAdminOrders;
+  const displayTotalOrderCount = serverTotalOrders > 0 ? serverTotalOrders : filteredAdminOrders.length;
+  const displayTotalOrderPages = serverTotalOrders > 0 ? serverTotalOrderPages : totalAdminOrderPages;
+
+  // State phan trang danh gia Server-Side
+  const [adminReviewPage, setAdminReviewPage] = useState<number>(1);
+  const [adminReviewsPerPage, setAdminReviewsPerPage] = useState<number>(10);
+  const [totalAdminReviews, setTotalAdminReviews] = useState<number>(0);
+  const [totalAdminReviewPages, setTotalAdminReviewPages] = useState<number>(1);
+
+  // Tải danh sách đánh giá từ MongoDB ho tro Server-Side Pagination
+  const fetchReviews = async (page = adminReviewPage, limit = adminReviewsPerPage) => {
     setIsLoadingReviews(true);
     try {
-      const data = await api.getAllReviews();
-      setReviewsList(data);
+      const res = await api.getAllReviews({
+        page,
+        limit,
+        rating: reviewRatingFilter,
+        search: reviewSearchQuery,
+        productId: selectedProductReviewFilter
+      });
+      if (res && res.data) {
+        setReviewsList(res.data);
+        setTotalAdminReviews(res.count ?? res.totalAllCount ?? res.data.length);
+        setTotalAdminReviewPages(res.totalPages || 1);
+      }
     } catch (err) {
       console.error("Lỗi khi tải đánh giá từ MongoDB:", err);
     } finally {
@@ -240,8 +286,8 @@ export default function AdminPanel({
   };
 
   useEffect(() => {
-    fetchReviews();
-  }, []);
+    fetchReviews(adminReviewPage, adminReviewsPerPage);
+  }, [adminReviewPage, adminReviewsPerPage, reviewRatingFilter, reviewSearchQuery, selectedProductReviewFilter]);
 
   // Mở modal chỉnh sửa đánh giá
   const handleOpenEditReview = (rev: ReviewItem) => {
@@ -314,17 +360,16 @@ export default function AdminPanel({
   }, [reviewsList, reviewSearchQuery, reviewRatingFilter, selectedProductReviewFilter]);
 
   // Phân trang danh sách đánh giá từ MongoDB (mặc định 10 đánh giá / trang)
-  const [adminReviewPage, setAdminReviewPage] = useState<number>(1);
-  const [adminReviewsPerPage, setAdminReviewsPerPage] = useState<number>(10);
   useEffect(() => {
     setAdminReviewPage(1);
   }, [reviewSearchQuery, reviewRatingFilter, selectedProductReviewFilter]);
-  const totalAdminReviewPages = Math.max(1, Math.ceil(filteredReviews.length / adminReviewsPerPage));
+  const localTotalAdminReviewPages = Math.max(1, Math.ceil(filteredReviews.length / adminReviewsPerPage));
+  const displayTotalReviewPages = totalAdminReviews > 0 ? totalAdminReviewPages : localTotalAdminReviewPages;
   useEffect(() => {
-    if (adminReviewPage > totalAdminReviewPages) {
-      setAdminReviewPage(totalAdminReviewPages);
+    if (adminReviewPage > displayTotalReviewPages) {
+      setAdminReviewPage(displayTotalReviewPages);
     }
-  }, [adminReviewPage, totalAdminReviewPages]);
+  }, [adminReviewPage, displayTotalReviewPages]);
   const paginatedAdminReviews = useMemo(() => {
     const startIndex = (adminReviewPage - 1) * adminReviewsPerPage;
     return filteredReviews.slice(startIndex, startIndex + adminReviewsPerPage);
@@ -581,6 +626,54 @@ export default function AdminPanel({
     return filteredProducts.slice(startIndex, startIndex + adminProdPerPage);
   }, [filteredProducts, adminProdPage, adminProdPerPage]);
 
+  // Server-Side State cho Sản phẩm trong Admin (Tránh nạp toàn bộ 10.000+ sản phẩm gây tràn RAM)
+  const [serverProducts, setServerProducts] = useState<Product[]>([]);
+  const [serverTotalProducts, setServerTotalProducts] = useState<number>(0);
+  const [serverTotalProdPages, setServerTotalProdPages] = useState<number>(1);
+  const [serverProdStats, setServerProdStats] = useState<{
+    total: number;
+    inStock: number;
+    lowStock: number;
+    outOfStock: number;
+  }>({ total: 0, inStock: 0, lowStock: 0, outOfStock: 0 });
+  const [isLoadingServerProducts, setIsLoadingServerProducts] = useState<boolean>(false);
+
+  // Tải danh sách sản phẩm phân trang từ MongoDB
+  const fetchServerProducts = async (page = adminProdPage, limit = adminProdPerPage) => {
+    setIsLoadingServerProducts(true);
+    try {
+      const res = await api.getProducts({
+        page,
+        limit,
+        category: selectedCategory,
+        search: searchQuery,
+        stock: selectedStockFilter
+      });
+      if (res && res.data) {
+        setServerProducts(res.data);
+        setServerTotalProducts(res.count ?? res.totalAllCount ?? res.data.length);
+        setServerTotalProdPages(res.totalPages || 1);
+        if (res.stats) {
+          setServerProdStats(res.stats);
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải dữ liệu sản phẩm từ MongoDB:", err);
+    } finally {
+      setIsLoadingServerProducts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchServerProducts(adminProdPage, adminProdPerPage);
+  }, [adminProdPage, adminProdPerPage, selectedCategory, searchQuery, selectedStockFilter]);
+
+  const displayAdminProducts = serverProducts.length > 0 ? serverProducts : paginatedAdminProducts;
+  const displayTotalProdPages = serverTotalProducts > 0 ? serverTotalProdPages : totalAdminProdPages;
+  const displayTotalProdCount = serverTotalProducts > 0 ? serverTotalProducts : filteredProducts.length;
+
+  const displayTotalReviewCount = totalAdminReviews > 0 ? totalAdminReviews : reviewsList.length;
+
   // Statistics
   const totalRevenue = useMemo(() => {
     return orders
@@ -598,6 +691,11 @@ export default function AdminPanel({
   const outOfStockCount = products.filter(
     (p) => !p.inStock || (p.stockQuantity ?? 25) === 0
   ).length;
+
+  const displayTotalBooks = serverProdStats.total > 0 ? serverProdStats.total : (serverTotalProducts > 0 ? serverTotalProducts : products.length);
+  const displayInStockCount = serverProdStats.inStock > 0 ? serverProdStats.inStock : inStockCount;
+  const displayLowStockCount = serverProdStats.lowStock > 0 ? serverProdStats.lowStock : lowStockCount;
+  const displayOutOfStockCount = serverProdStats.outOfStock > 0 ? serverProdStats.outOfStock : outOfStockCount;
 
   // Filtered Users for Admin Table
   const filteredUsers = useMemo(() => {
@@ -631,6 +729,38 @@ export default function AdminPanel({
     const startIndex = (adminUserPage - 1) * adminUsersPerPage;
     return filteredUsers.slice(startIndex, startIndex + adminUsersPerPage);
   }, [filteredUsers, adminUserPage, adminUsersPerPage]);
+
+  // Server-Side State cho Người dùng trong Admin
+  const [serverUsers, setServerUsers] = useState<UserAccount[]>([]);
+  const [serverTotalUsers, setServerTotalUsers] = useState<number>(0);
+  const [serverTotalUserPages, setServerTotalUserPages] = useState<number>(1);
+
+  const fetchServerUsers = async (page = adminUserPage, limit = adminUsersPerPage) => {
+    try {
+      const res = await api.getUsers({
+        page,
+        limit,
+        role: userRoleFilter,
+        status: userStatusFilter,
+        search: userSearchQuery
+      });
+      if (res && res.data && res.data.length > 0) {
+        setServerUsers(res.data);
+        setServerTotalUsers(res.count ?? res.totalAllCount ?? res.data.length);
+        setServerTotalUserPages(res.totalPages || 1);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải người dùng từ MongoDB:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchServerUsers(adminUserPage, adminUsersPerPage);
+  }, [adminUserPage, adminUsersPerPage, userRoleFilter, userStatusFilter, userSearchQuery]);
+
+  const displayAdminUsers = serverUsers.length > 0 ? serverUsers : paginatedAdminUsers;
+  const displayTotalUserCount = serverTotalUsers > 0 ? serverTotalUsers : filteredUsers.length;
+  const displayTotalUserPages = serverTotalUsers > 0 ? serverTotalUserPages : totalAdminUserPages;
 
   const userStats = useMemo(() => {
     const total = users.length;
@@ -949,7 +1079,7 @@ export default function AdminPanel({
           </div>
           <div>
             <p className="text-[11px] text-slate-500 font-medium">Tổng đầu sách</p>
-            <h3 className="text-xl font-black text-slate-900">{products.length}</h3>
+            <h3 className="text-xl font-black text-slate-900">{displayTotalBooks.toLocaleString('vi-VN')}</h3>
           </div>
         </div>
 
@@ -959,7 +1089,7 @@ export default function AdminPanel({
           </div>
           <div>
             <p className="text-[11px] text-slate-500 font-medium">Còn hàng (&gt;5)</p>
-            <h3 className="text-xl font-black text-emerald-600">{inStockCount}</h3>
+            <h3 className="text-xl font-black text-emerald-600">{displayInStockCount.toLocaleString('vi-VN')}</h3>
           </div>
         </div>
 
@@ -970,7 +1100,7 @@ export default function AdminPanel({
           </div>
           <div>
             <p className="text-[11px] text-amber-800 font-bold">Sắp hết (≤ 5)</p>
-            <h3 className="text-xl font-black text-amber-600">{lowStockCount}</h3>
+            <h3 className="text-xl font-black text-amber-600">{displayLowStockCount.toLocaleString('vi-VN')}</h3>
           </div>
         </div>
 
@@ -980,7 +1110,7 @@ export default function AdminPanel({
           </div>
           <div>
             <p className="text-[11px] text-slate-500 font-medium">Hết hàng (0)</p>
-            <h3 className="text-xl font-black text-red-600">{outOfStockCount}</h3>
+            <h3 className="text-xl font-black text-red-600">{displayOutOfStockCount.toLocaleString('vi-VN')}</h3>
           </div>
         </div>
 
@@ -1009,7 +1139,7 @@ export default function AdminPanel({
             }`}
           >
             <Package className="w-4 h-4" />
-            <span>Sản Phẩm ({products.length})</span>
+            <span>Sản Phẩm ({displayTotalProdCount.toLocaleString('vi-VN')})</span>
           </button>
           <button
             onClick={() => setAdminTab("orders")}
@@ -1020,7 +1150,7 @@ export default function AdminPanel({
             }`}
           >
             <ShoppingBag className="w-4 h-4" />
-            <span>Đơn Hàng ({orders.length})</span>
+            <span>Đơn Hàng ({displayTotalOrderCount.toLocaleString('vi-VN')})</span>
           </button>
           <button
             onClick={() => {
@@ -1034,7 +1164,7 @@ export default function AdminPanel({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Người Dùng ({users.length})</span>
+            <span>Người Dùng ({displayTotalUserCount.toLocaleString('vi-VN')})</span>
           </button>
           <button
             onClick={() => setAdminTab("reviews")}
@@ -1045,7 +1175,7 @@ export default function AdminPanel({
             }`}
           >
             <Star className="w-4 h-4" />
-            <span>Đánh Giá ({reviewsList.length})</span>
+            <span>Đánh Giá ({displayTotalReviewCount.toLocaleString('vi-VN')})</span>
           </button>
           <button
             onClick={() => setAdminTab("coupons")}
@@ -1178,7 +1308,7 @@ export default function AdminPanel({
                     </td>
                   </tr>
                 ) : (
-                  paginatedAdminProducts.map((p) => (
+                  displayAdminProducts.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Name & Thumbnail */}
                       <td className="py-3 px-4">
@@ -1301,8 +1431,8 @@ export default function AdminPanel({
           {/* Thanh phân trang sản phẩm chuẩn 10 cuốn / trang */}
           <AdminPagination
             currentPage={adminProdPage}
-            totalPages={totalAdminProdPages}
-            totalItems={filteredProducts.length}
+            totalPages={displayTotalProdPages}
+            totalItems={displayTotalProdCount}
             itemsPerPage={adminProdPerPage}
             itemLabel="sản phẩm"
             onPageChange={setAdminProdPage}
@@ -1393,7 +1523,7 @@ export default function AdminPanel({
             </div>
           ) : (
             <div className="space-y-4">
-              {paginatedAdminOrders.map((ord) => {
+              {displayAdminOrders.map((ord) => {
                   const isPendingConfirm =
                     ord.status === "Chờ xác nhận" || (ord.status === "Đang xử lý" && !ord.pickupTime);
                   const isPickup = ord.status === "Chờ lấy hàng";
@@ -1603,8 +1733,8 @@ export default function AdminPanel({
             {/* Thanh phân trang đơn hàng chuẩn 10 đơn / trang */}
             <AdminPagination
               currentPage={adminOrderPage}
-              totalPages={totalAdminOrderPages}
-              totalItems={filteredAdminOrders.length}
+              totalPages={displayTotalOrderPages}
+              totalItems={displayTotalOrderCount}
               itemsPerPage={adminOrdersPerPage}
               itemLabel="đơn hàng"
               onPageChange={setAdminOrderPage}
@@ -1785,7 +1915,7 @@ export default function AdminPanel({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {paginatedAdminUsers.map((user) => (
+                    {displayAdminUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
                         {/* Avatar & Name */}
                         <td className="py-3 px-3">
@@ -1921,8 +2051,8 @@ export default function AdminPanel({
               {/* Thanh phân trang người dùng chuẩn 10 người dùng / trang */}
               <AdminPagination
                 currentPage={adminUserPage}
-                totalPages={totalAdminUserPages}
-                totalItems={filteredUsers.length}
+                totalPages={displayTotalUserPages}
+                totalItems={displayTotalUserCount}
                 itemsPerPage={adminUsersPerPage}
                 itemLabel="người dùng"
                 onPageChange={setAdminUserPage}
@@ -2028,7 +2158,7 @@ export default function AdminPanel({
 
                 <button
                   type="button"
-                  onClick={fetchReviews}
+                  onClick={() => fetchReviews()}
                   disabled={isLoadingReviews}
                   className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors disabled:opacity-50"
                   title="Làm mới dữ liệu từ MongoDB"
@@ -2192,7 +2322,7 @@ export default function AdminPanel({
               <AdminPagination
                 currentPage={adminReviewPage}
                 totalPages={totalAdminReviewPages}
-                totalItems={filteredReviews.length}
+                totalItems={displayTotalReviewCount}
                 itemsPerPage={adminReviewsPerPage}
                 itemLabel="đánh giá"
                 onPageChange={setAdminReviewPage}

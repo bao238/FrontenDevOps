@@ -3,25 +3,90 @@ const Review = require('../models/Review');
 const { isDbConnected } = require('../config/db');
 
 // GET /api/products
-// Lấy danh sách toàn bộ sách từ MongoDB, sắp xếp theo thời gian mới nhất (hỗ trợ phân trang khi dữ liệu lớn >= 1GB)
+// Lay danh sach sach tu MongoDB voi phan trang phia may chu (Server-Side Pagination), tranh tai toan bo 10.000+ san pham gay tran RAM
 exports.getProducts = async (req, res) => {
   if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+    return res.status(503).json({ error: 'Co so du lieu MongoDB chua ket noi' });
   }
 
   try {
-    const limit = parseInt(req.query.limit) || 150;
-    const totalCount = await Product.countDocuments();
-    // Bỏ qua trường ebookContent lớn khi tải danh sách để tối ưu tốc độ và tránh tràn bộ nhớ Node.js
-    const products = await Product.find()
+    // 1. Tham so phan trang: trang hien tai va so luong moi trang (mac dinh 10 cuon, toi da 100)
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    // 2. Xay dung dieu kien loc linh hoat (Category, Search, Kho hang)
+    const query = {};
+
+    // Loc theo the loai sach
+    if (req.query.category && req.query.category !== 'Tất cả') {
+      query.category = req.query.category;
+    }
+
+    // Loc theo tu khoa tim kiem (ten sach, the loai, ma dinh danh id)
+    if (req.query.search && req.query.search.trim()) {
+      const q = req.query.search.trim();
+      query.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { category: { $regex: q, $options: 'i' } },
+        { id: { $regex: q, $options: 'i' } }
+      ];
+    }
+
+    // Loc theo tinh trang kho sach (Stock Filter)
+    if (req.query.stock) {
+      if (req.query.stock === 'in_stock') {
+        query.inStock = true;
+        query.stockQuantity = { $gt: 5 };
+      } else if (req.query.stock === 'low_stock') {
+        query.inStock = true;
+        query.stockQuantity = { $gt: 0, $lte: 5 };
+      } else if (req.query.stock === 'out_of_stock') {
+        query.$or = [{ inStock: false }, { stockQuantity: 0 }];
+      }
+    }
+
+    // 3. Tinh tong so luong san pham thoa man dieu kien loc va tong so san pham toan he thong
+    const totalCount = await Product.countDocuments(query);
+    const totalAllCount = await Product.countDocuments();
+    const inStockCount = await Product.countDocuments({
+      inStock: true,
+      $or: [{ stockQuantity: { $gt: 5 } }, { stockQuantity: { $exists: false } }]
+    });
+    const lowStockCount = await Product.countDocuments({
+      inStock: true,
+      stockQuantity: { $gt: 0, $lte: 5 }
+    });
+    const outOfStockCount = await Product.countDocuments({
+      $or: [{ inStock: false }, { stockQuantity: 0 }]
+    });
+
+    // 4. Chi lay dung phan du lieu trang hien tai (skip / limit) va bo qua ebookContent nang de tranh tran RAM
+    const products = await Product.find(query)
       .select('-ebookContent')
       .sort({ createdAt: -1 })
+      .skip(skip)
       .limit(limit)
       .lean();
-    return res.json({ source: 'mongodb', count: totalCount, data: products });
+
+    // 5. Tra ve ket qua phan trang chuan Server-Side
+    return res.json({
+      source: 'mongodb',
+      count: totalCount,
+      totalAllCount,
+      totalPages: Math.ceil(totalCount / limit) || 1,
+      currentPage: page,
+      stats: {
+        total: totalAllCount,
+        inStock: inStockCount,
+        lowStock: lowStockCount,
+        outOfStock: outOfStockCount
+      },
+      data: products
+    });
   } catch (err) {
-    console.error('[ProductController] Lỗi truy vấn MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi truy vấn sản phẩm MongoDB', message: err.message });
+    console.error('[ProductController] Loi truy van MongoDB:', err.message);
+    return res.status(500).json({ error: 'Loi truy van san pham MongoDB', message: err.message });
   }
 };
 
@@ -125,18 +190,53 @@ exports.deleteProduct = async (req, res) => {
 };
 
 // GET /api/reviews
-// Lấy danh sách toàn bộ đánh giá trong hệ thống
+// Lay danh sach danh gia voi phan trang Server-Side, tranh tran RAM khi co hang chuc nghin danh gia
 exports.getAllReviews = async (req, res) => {
   if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+    return res.status(503).json({ error: 'Co so du lieu MongoDB chua ket noi' });
   }
 
   try {
-    const reviews = await Review.find().sort({ createdAt: -1 }).lean();
-    return res.json({ source: 'mongodb', count: reviews.length, data: reviews });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (req.query.rating && req.query.rating !== 'all') {
+      query.rating = Number(req.query.rating);
+    }
+    if (req.query.search && req.query.search.trim()) {
+      const q = req.query.search.trim();
+      query.$or = [
+        { author: { $regex: q, $options: 'i' } },
+        { content: { $regex: q, $options: 'i' } },
+        { productName: { $regex: q, $options: 'i' } },
+        { productId: { $regex: q, $options: 'i' } }
+      ];
+    }
+    if (req.query.productId && req.query.productId !== 'all') {
+      query.productId = req.query.productId;
+    }
+
+    const totalCount = await Review.countDocuments(query);
+    const totalAllCount = await Review.countDocuments();
+    const reviews = await Review.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    return res.json({
+      source: 'mongodb',
+      count: totalCount,
+      totalAllCount,
+      totalPages: Math.ceil(totalCount / limit) || 1,
+      currentPage: page,
+      data: reviews
+    });
   } catch (err) {
-    console.error('[ProductController] Lỗi lấy tất cả đánh giá:', err.message);
-    return res.status(500).json({ error: 'Lỗi lấy tất cả đánh giá', message: err.message });
+    console.error('[ProductController] Loi lay tat ca danh gia:', err.message);
+    return res.status(500).json({ error: 'Loi lay tat ca danh gia', message: err.message });
   }
 };
 

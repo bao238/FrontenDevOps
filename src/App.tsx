@@ -590,22 +590,22 @@ export default function App() {
       // ignore
     }
 
-    // Tự động đồng bộ 100% từ Backend REST API (MongoDB)
-    api.getProducts().then((res) => {
+    // Tự động đồng bộ 100% từ Backend REST API (MongoDB) có hỗ trợ phân trang Server-Side
+    api.getProducts({ page: 1, limit: 35 }).then((res) => {
       if (res && res.data) {
         setProducts(res.data);
       }
     });
-    api.getOrders().then((ordList) => {
-      if (ordList && Array.isArray(ordList) && ordList.length > 0) {
-        setOrders(ordList);
+    api.getOrders({ page: 1, limit: 20 }).then((res) => {
+      if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setOrders(res.data);
       }
     });
-    api.getUsers().then((userList) => {
-      if (userList && Array.isArray(userList)) {
-        setUsers(userList);
+    api.getUsers({ page: 1, limit: 20 }).then((res) => {
+      if (res && res.data && Array.isArray(res.data)) {
+        setUsers(res.data);
         try {
-          localStorage.setItem("bookstore_users", JSON.stringify(userList));
+          localStorage.setItem("bookstore_users", JSON.stringify(res.data));
         } catch {}
       }
     });
@@ -1570,8 +1570,8 @@ export default function App() {
   };
 
   const handleResetDefaultUsers = () => {
-    api.getUsers().then((userList) => {
-      if (userList) setUsers(userList);
+    api.getUsers({ page: 1, limit: 50 }).then((res) => {
+      if (res && res.data) setUsers(res.data);
     });
     showToast("Đã đồng bộ lại danh sách người dùng từ MongoDB!");
   };
@@ -1700,68 +1700,130 @@ export default function App() {
         )}
 
         {/* Giao diện Trang Quản Trị Độc Lập (Đã bỏ màn hình đăng nhập theo yêu cầu) */}
-        <div className="min-h-screen flex flex-col justify-between">
-            {/* Header riêng của Admin */}
-            <header className="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-xl shadow-md">
-                  B
-                </div>
-                <div>
-                  <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight flex items-center space-x-2">
-                    <span>BookStore Admin Console</span>
-                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-bold uppercase">
-                      Hệ Thống Quản Trị Nhà Sách
-                    </span>
-                  </h1>
-                  <p className="text-[11px] text-slate-400">Trang quản trị nội bộ nhà sách &bull; /admin</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => switchTab("products")}
-                  className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
-                >
-                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                  <span>Về Cửa Hàng</span>
-                </button>
-                <button
-                  onClick={handleAdminLogout}
-                  className="flex items-center space-x-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Đăng xuất</span>
-                </button>
-              </div>
-            </header>
-
-            {/* Nội dung AdminPanel */}
-            <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
-              <AdminPanel
-                products={products}
-                onAddProduct={handleAddProduct}
-                onUpdateProduct={handleUpdateProduct}
-                onDeleteProduct={handleDeleteProduct}
-                onResetDefaultProducts={handleResetDefaultProducts}
-                orders={orders}
-                onUpdateOrderStatus={handleUpdateOrderStatus}
-                onDeleteOrder={handleDeleteOrder}
-                onSwitchToStore={() => switchTab("products")}
-                onAdminLogout={handleAdminLogout}
-                users={users}
-                onAddUser={handleAddUser}
-                onUpdateUser={handleUpdateUser}
-                onDeleteUser={handleDeleteUser}
-                onToggleLockUser={handleToggleLockUser}
-                onResetDefaultUsers={handleResetDefaultUsers}
-              />
-            </main>
-
-            {/* Footer riêng của Admin */}
-            <footer className="bg-slate-900 border-t border-slate-800 text-slate-500 text-xs py-4 px-6 text-center">
-              BookStore Admin Console &bull; Quản lý sách &amp; đơn hàng nội bộ
-            </footer>
+        <div className="min-h-screen flex flex-col justify-between">
+
+            {/* Header riêng của Admin */}
+
+            <header className="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
+
+              <div className="flex items-center space-x-3">
+
+                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-xl shadow-md">
+
+                  B
+
+                </div>
+
+                <div>
+
+                  <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight flex items-center space-x-2">
+
+                    <span>BookStore Admin Console</span>
+
+                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-bold uppercase">
+
+                      Hệ Thống Quản Trị Nhà Sách
+
+                    </span>
+
+                  </h1>
+
+                  <p className="text-[11px] text-slate-400">Trang quản trị nội bộ nhà sách &bull; /admin</p>
+
+                </div>
+
+              </div>
+
+
+
+              <div className="flex items-center space-x-3">
+
+                <button
+
+                  onClick={() => switchTab("products")}
+
+                  className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
+
+                >
+
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+
+                  <span>Về Cửa Hàng</span>
+
+                </button>
+
+                <button
+
+                  onClick={handleAdminLogout}
+
+                  className="flex items-center space-x-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
+
+                >
+
+                  <LogOut className="w-3.5 h-3.5" />
+
+                  <span>Đăng xuất</span>
+
+                </button>
+
+              </div>
+
+            </header>
+
+
+
+            {/* Nội dung AdminPanel */}
+
+            <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+
+              <AdminPanel
+
+                products={products}
+
+                onAddProduct={handleAddProduct}
+
+                onUpdateProduct={handleUpdateProduct}
+
+                onDeleteProduct={handleDeleteProduct}
+
+                onResetDefaultProducts={handleResetDefaultProducts}
+
+                orders={orders}
+
+                onUpdateOrderStatus={handleUpdateOrderStatus}
+
+                onDeleteOrder={handleDeleteOrder}
+
+                onSwitchToStore={() => switchTab("products")}
+
+                onAdminLogout={handleAdminLogout}
+
+                users={users}
+
+                onAddUser={handleAddUser}
+
+                onUpdateUser={handleUpdateUser}
+
+                onDeleteUser={handleDeleteUser}
+
+                onToggleLockUser={handleToggleLockUser}
+
+                onResetDefaultUsers={handleResetDefaultUsers}
+
+              />
+
+            </main>
+
+
+
+            {/* Footer riêng của Admin */}
+
+            <footer className="bg-slate-900 border-t border-slate-800 text-slate-500 text-xs py-4 px-6 text-center">
+
+              BookStore Admin Console &bull; Quản lý sách &amp; đơn hàng nội bộ
+
+            </footer>
+
           </div>
       </div>
     );

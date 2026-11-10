@@ -112,13 +112,35 @@ exports.getUsers = async (req, res) => {
   }
 
   try {
-    const limit = parseInt(req.query.limit) || 120;
-    const totalCount = await User.countDocuments();
-    const users = await User.find()
-      .select('-userPayload -profileBio')
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (req.query.role && req.query.role !== 'all') {
+      query.role = req.query.role;
+    }
+    if (req.query.status && req.query.status !== 'all') {
+      query.status = req.query.status;
+    }
+    if (req.query.search && req.query.search.trim()) {
+      const q = req.query.search.trim();
+      query.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+        { phone: { $regex: q, $options: 'i' } }
+      ];
+    }
+
+    const totalCount = await User.countDocuments(query);
+    const totalAllCount = await User.countDocuments();
+    const users = await User.find(query)
+      .select('-userPayload -profileBio -password')
       .sort({ createdAt: -1 })
+      .skip(skip)
       .limit(limit)
       .lean();
+
     const formatted = users.map(u => ({
       id: u.id,
       name: u.name,
@@ -130,7 +152,15 @@ exports.getUsers = async (req, res) => {
       address: u.address || '',
       createdAt: u.createdAtStr || (u.createdAt ? new Date(u.createdAt).toLocaleDateString('vi-VN') : '')
     }));
-    return res.json({ source: 'mongodb', count: totalCount, data: formatted });
+
+    return res.json({
+      source: 'mongodb',
+      count: totalCount,
+      totalAllCount,
+      totalPages: Math.ceil(totalCount / limit) || 1,
+      currentPage: page,
+      data: formatted
+    });
   } catch (err) {
     console.error('[AuthController] Lỗi lấy danh sách user MongoDB:', err.message);
     return res.status(500).json({ error: 'Lỗi lấy danh sách người dùng', message: err.message });

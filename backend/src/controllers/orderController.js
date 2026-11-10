@@ -3,24 +3,50 @@ const OrderItem = require('../models/OrderItem');
 const Product = require('../models/Product');
 const { isDbConnected } = require('../config/db');
 
-// GET /api/orders (Lấy danh sách đơn hàng, hỗ trợ phân trang khi dữ liệu lớn)
+// GET /api/orders (Lay danh sach don hang, ho tro phan trang Server-Side khi du lieu lon)
 exports.getOrders = async (req, res) => {
   if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+    return res.status(503).json({ error: 'Co so du lieu MongoDB chua ket noi' });
   }
 
   try {
-    const limit = parseInt(req.query.limit) || 100;
-    const totalCount = await Order.countDocuments();
-    const orders = await Order.find()
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (req.query.status && req.query.status !== 'all') {
+      query.status = req.query.status;
+    }
+    if (req.query.search && req.query.search.trim()) {
+      const q = req.query.search.trim();
+      query.$or = [
+        { id: { $regex: q, $options: 'i' } },
+        { 'customerInfo.fullName': { $regex: q, $options: 'i' } },
+        { 'customerInfo.phone': { $regex: q, $options: 'i' } }
+      ];
+    }
+
+    const totalCount = await Order.countDocuments(query);
+    const totalAllCount = await Order.countDocuments();
+    const orders = await Order.find(query)
       .select('-trackingTimelineFull')
       .sort({ createdAt: -1 })
+      .skip(skip)
       .limit(limit)
       .lean();
-    return res.json({ source: 'mongodb', count: totalCount, data: orders });
+
+    return res.json({
+      source: 'mongodb',
+      count: totalCount,
+      totalAllCount,
+      totalPages: Math.ceil(totalCount / limit) || 1,
+      currentPage: page,
+      data: orders
+    });
   } catch (err) {
-    console.error('[OrderController] Lỗi truy vấn MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi truy vấn đơn hàng MongoDB', message: err.message });
+    console.error('[OrderController] Loi truy van MongoDB:', err.message);
+    return res.status(500).json({ error: 'Loi truy van don hang MongoDB', message: err.message });
   }
 };
 

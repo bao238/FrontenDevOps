@@ -83,6 +83,53 @@ export interface AnalyticsSummary {
   }>;
 }
 
+// Kieu du lieu phan trang Server-Side
+export interface PaginatedResponse<T> {
+  source: string;
+  count: number;
+  totalAllCount?: number;
+  totalPages: number;
+  currentPage: number;
+  stats?: {
+    total: number;
+    inStock: number;
+    lowStock: number;
+    outOfStock: number;
+  };
+  data: T[];
+}
+
+export interface ProductQueryParams {
+  page?: number;
+  limit?: number;
+  category?: string;
+  search?: string;
+  stock?: string;
+}
+
+export interface OrderQueryParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+}
+
+export interface UserQueryParams {
+  page?: number;
+  limit?: number;
+  role?: string;
+  status?: string;
+  search?: string;
+}
+
+export interface ReviewQueryParams {
+  page?: number;
+  limit?: number;
+  rating?: number | string;
+  search?: string;
+  productId?: string;
+}
+
 export const api = {
   // 1. Kiểm tra Backend Health
   async checkHealth() {
@@ -94,21 +141,49 @@ export const api = {
       return { status: "offline", service: "disconnected" };
     }
   },
-
-  // 2. Lấy danh sách sản phẩm từ MongoDB (có fallback dữ liệu sách chuẩn)
-  async getProducts(): Promise<{ source: string; data: Product[] }> {
+  // 2. Lay danh sach san pham tu MongoDB ho tro Server-Side Pagination
+  async getProducts(params?: ProductQueryParams): Promise<PaginatedResponse<Product>> {
     try {
-      const res = await fetch(`${API_BASE}/products`);
+      const query = new URLSearchParams();
+      if (params?.page) query.append("page", String(params.page));
+      if (params?.limit) query.append("limit", String(params.limit));
+      if (params?.category && params.category !== "Tất cả") query.append("category", params.category);
+      if (params?.search && params.search.trim()) query.append("search", params.search.trim());
+      if (params?.stock && params.stock !== "all") query.append("stock", params.stock);
+
+      const qs = query.toString() ? `?${query.toString()}` : "";
+      const res = await fetch(`${API_BASE}/products${qs}`);
       if (res.ok) {
         const json = await res.json();
-        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-          return { source: json.source || "mongodb", data: json.data };
+        if (json.data && Array.isArray(json.data)) {
+          return {
+            source: json.source || "mongodb",
+            count: json.count ?? json.data.length,
+            totalAllCount: json.totalAllCount ?? json.count ?? json.data.length,
+            totalPages: json.totalPages || 1,
+            currentPage: json.currentPage || (params?.page || 1),
+            stats: json.stats,
+            data: json.data
+          };
         }
       }
     } catch (err) {
-      console.error("❌ [API] Lỗi khi kết nối lấy sản phẩm từ MongoDB:", err);
+      console.error("❌ [API] Loi khi ket noi lay san pham tu MongoDB:", err);
     }
-    return { source: "fallback-initial", data: INITIAL_BOOKS };
+    return {
+      source: "fallback-initial",
+      count: INITIAL_BOOKS.length,
+      totalAllCount: INITIAL_BOOKS.length,
+      totalPages: 1,
+      currentPage: 1,
+      stats: {
+        total: INITIAL_BOOKS.length,
+        inStock: INITIAL_BOOKS.length,
+        lowStock: 0,
+        outOfStock: 0
+      },
+      data: INITIAL_BOOKS
+    };
   },
 
   // 3. Thêm sản phẩm mới (Admin)
@@ -138,19 +213,32 @@ export const api = {
     });
     return await res.json();
   },
-
-  // 6. Lấy danh sách đơn hàng
-  async getOrders() {
+  // 6. Lay danh sach don hang ho tro Server-Side Pagination
+  async getOrders(params?: OrderQueryParams): Promise<PaginatedResponse<any>> {
     try {
-      const res = await fetch(`${API_BASE}/orders`);
+      const query = new URLSearchParams();
+      if (params?.page) query.append("page", String(params.page));
+      if (params?.limit) query.append("limit", String(params.limit));
+      if (params?.status && params.status !== "all") query.append("status", params.status);
+      if (params?.search && params.search.trim()) query.append("search", params.search.trim());
+
+      const qs = query.toString() ? `?${query.toString()}` : "";
+      const res = await fetch(`${API_BASE}/orders${qs}`);
       if (res.ok) {
         const json = await res.json();
-        return json.data || [];
+        return {
+          source: json.source || "mongodb",
+          count: json.count ?? (json.data ? json.data.length : 0),
+          totalAllCount: json.totalAllCount ?? json.count ?? 0,
+          totalPages: json.totalPages || 1,
+          currentPage: json.currentPage || (params?.page || 1),
+          data: json.data || []
+        };
       }
     } catch (err) {
-      console.error("❌ [API] Lỗi lấy đơn hàng từ MongoDB:", err);
+      console.error("❌ [API] Loi lay don hang tu MongoDB:", err);
     }
-    return [];
+    return { source: "empty", count: 0, totalPages: 1, currentPage: 1, data: [] };
   },
 
   // 7. Tạo đơn hàng mới
@@ -184,19 +272,33 @@ export const api = {
     if (!res.ok) throw new Error(data.message || data.error || "Đăng nhập thất bại");
     return data;
   },
-
-  // 10. Lấy danh sách Users từ MongoDB (cho Admin)
-  async getUsers(): Promise<UserAccount[]> {
+  // 10. Lay danh sach Users tu MongoDB ho tro Server-Side Pagination
+  async getUsers(params?: UserQueryParams): Promise<PaginatedResponse<UserAccount>> {
     try {
-      const res = await fetch(`${API_BASE}/users`);
+      const query = new URLSearchParams();
+      if (params?.page) query.append("page", String(params.page));
+      if (params?.limit) query.append("limit", String(params.limit));
+      if (params?.role && params.role !== "all") query.append("role", params.role);
+      if (params?.status && params.status !== "all") query.append("status", params.status);
+      if (params?.search && params.search.trim()) query.append("search", params.search.trim());
+
+      const qs = query.toString() ? `?${query.toString()}` : "";
+      const res = await fetch(`${API_BASE}/users${qs}`);
       if (res.ok) {
         const json = await res.json();
-        return json.data || [];
+        return {
+          source: json.source || "mongodb",
+          count: json.count ?? (json.data ? json.data.length : 0),
+          totalAllCount: json.totalAllCount ?? json.count ?? 0,
+          totalPages: json.totalPages || 1,
+          currentPage: json.currentPage || (params?.page || 1),
+          data: json.data || []
+        };
       }
     } catch (err) {
-      console.error("❌ [API] Lỗi lấy danh sách user từ MongoDB:", err);
+      console.error("❌ [API] Loi lay danh sach user tu MongoDB:", err);
     }
-    return [];
+    return { source: "empty", count: 0, totalPages: 1, currentPage: 1, data: [] };
   },
 
   // 11. Xóa đơn hàng (Admin)
@@ -268,19 +370,33 @@ export const api = {
     });
     return await res.json();
   },
-
-  // 18. Lấy toàn bộ đánh giá trong hệ thống (Admin)
-  async getAllReviews(): Promise<ReviewItem[]> {
+  // 18. Lay toan bo danh gia trong he thong ho tro Server-Side Pagination
+  async getAllReviews(params?: ReviewQueryParams): Promise<PaginatedResponse<ReviewItem>> {
     try {
-      const res = await fetch(`${API_BASE}/reviews`);
+      const query = new URLSearchParams();
+      if (params?.page) query.append("page", String(params.page));
+      if (params?.limit) query.append("limit", String(params.limit));
+      if (params?.rating && params.rating !== "all") query.append("rating", String(params.rating));
+      if (params?.search && params.search.trim()) query.append("search", params.search.trim());
+      if (params?.productId && params.productId !== "all") query.append("productId", params.productId);
+
+      const qs = query.toString() ? `?${query.toString()}` : "";
+      const res = await fetch(`${API_BASE}/reviews${qs}`);
       if (res.ok) {
         const json = await res.json();
-        return json.data || [];
+        return {
+          source: json.source || "mongodb",
+          count: json.count ?? (json.data ? json.data.length : 0),
+          totalAllCount: json.totalAllCount ?? json.count ?? 0,
+          totalPages: json.totalPages || 1,
+          currentPage: json.currentPage || (params?.page || 1),
+          data: json.data || []
+        };
       }
     } catch (err) {
-      console.error("❌ [API] Lỗi lấy tất cả đánh giá:", err);
+      console.error("❌ [API] Loi lay tat ca danh gia:", err);
     }
-    return [];
+    return { source: "empty", count: 0, totalPages: 1, currentPage: 1, data: [] };
   },
 
   // 19. Xóa đánh giá (Admin)

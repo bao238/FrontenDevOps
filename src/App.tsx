@@ -1499,37 +1499,6 @@ export default function App() {
           </div>
         )}
 
-        {/* KHỐI ĐỈNH TRANG: THANH THÔNG BÁO & HEADER (ĐÃ SỬA LỖI TRÀN & LỖI DÍNH SCROLL) */}
-        <div className="space-y-2.5">
-          {/* Thanh Thông Báo Tiện Ích Đỉnh Trang (Top Announcement Bar) */}
-          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white py-2 px-4 sm:px-6 rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between text-xs gap-2 border border-blue-900/40">
-            <div className="flex items-center space-x-2 overflow-hidden text-center sm:text-left">
-              <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 shadow-sm">
-                Ưu Đãi
-              </span>
-              <span className="text-slate-200 truncate">
-                Hội Sách Tri Thức 2026 &bull; Nhập mã <strong className="text-amber-300 font-mono font-bold">BOOKWORM10</strong> giảm 10% &bull; Freeship toàn quốc từ 250k
-              </span>
-            </div>
-
-            <div className="flex items-center space-x-3 text-slate-300 text-[11px] font-medium shrink-0">
-              {/* Lối Vào Cổng Quản Trị Trực Tiếp Cho Admin / Quản Trị Viên */}
-              <button
-                onClick={() => switchTab("admin")}
-                className="hover:text-amber-300 transition-colors flex items-center space-x-1 text-purple-300 hover:text-white font-semibold"
-                title="Truy cập Cổng Quản Trị Hệ Thống /admin"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-                <span>Quản trị {currentUser?.role === "admin" ? "(Admin)" : ""}</span>
-              </button>
-              <span className="text-slate-600 hidden sm:inline">&bull;</span>
-              <span className="hidden sm:flex items-center space-x-1 text-slate-300">
-                <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Hotline: <strong className="text-white">1900 8888</strong></span>
-              </span>
-            </div>
-          </div>
-
           {/* Main Header / Store Navigation - Dính mượt mà trên cùng (Sticky Top-0) */}
           <header className="bg-white/95 backdrop-blur-md rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-md shadow-slate-200/50 sticky top-0 z-40 transition-all">
             <div className="flex items-center justify-between gap-3">
@@ -1890,7 +1859,6 @@ export default function App() {
               </div>
             )}
           </header>
-        </div>
 
         {/* TAB 1: SẢN PHẨM (PRODUCTS) */}
         {activeTab === "products" && (

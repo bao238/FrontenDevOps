@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { CATEGORIES, BOOK_FORMATS, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api } from "./services/api";
@@ -1212,20 +1212,46 @@ export default function App() {
   const [totalStorePages, setTotalStorePages] = useState<number>(1);
   const [isLoadingStoreProducts, setIsLoadingStoreProducts] = useState<boolean>(false);
 
+  // Debounce tìm kiếm cửa hàng 300ms
+  const [debouncedStoreSearch, setDebouncedStoreSearch] = useState(searchQuery);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStoreSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Bộ nhớ đệm phân trang Cửa Hàng (In-Memory Page Cache) - Lật trang siêu tốc 0ms
+  const storePageCacheRef = useRef<Map<string, { data: Product[]; count: number; totalPages: number }>>(new Map());
+
   // Hàm tải dữ liệu phân trang máy chủ cho Cửa Hàng
   const fetchStoreProducts = async (page = currentPage, limit = itemsPerPage) => {
+    const cacheKey = `${page}-${limit}-${selectedCategory}-${debouncedStoreSearch}`;
+    if (storePageCacheRef.current.has(cacheKey)) {
+      const cached = storePageCacheRef.current.get(cacheKey)!;
+      setStoreProducts(cached.data);
+      setTotalStoreProducts(cached.count);
+      setTotalStorePages(cached.totalPages);
+      return; // Phản hồi tức thì 0ms!
+    }
+
     setIsLoadingStoreProducts(true);
     try {
       const res = await api.getProducts({
         page,
         limit,
         category: selectedCategory,
-        search: searchQuery
+        search: debouncedStoreSearch
       });
       if (res && res.data) {
         setStoreProducts(res.data);
         setTotalStoreProducts(res.count ?? res.totalAllCount ?? res.data.length);
         setTotalStorePages(res.totalPages || 1);
+        storePageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count: res.count ?? res.totalAllCount ?? res.data.length,
+          totalPages: res.totalPages || 1
+        });
       }
     } catch (err) {
       console.error("Lỗi khi tải sản phẩm phân trang cửa hàng:", err);
@@ -1236,7 +1262,7 @@ export default function App() {
 
   useEffect(() => {
     fetchStoreProducts(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, selectedCategory, searchQuery]);
+  }, [currentPage, itemsPerPage, selectedCategory, debouncedStoreSearch]);
 
   const displayStoreProducts = storeProducts.length > 0 ? storeProducts : paginatedProducts;
   const displayTotalStoreProducts = totalStoreProducts > 0 ? totalStoreProducts : filteredProducts.length;

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 // Import createPortal để render modal trực tiếp ra document.body, tránh lỗi cắt ngang header do stacking context hoặc space-y
 import { createPortal } from "react-dom";
 import { Product, CATEGORIES, ReviewItem } from "../data/products";
@@ -232,7 +232,20 @@ export default function AdminPanel({
     canceled: number;
   } | null>(null);
 
+  // Bộ nhớ đệm phân trang Đơn Hàng (In-Memory Page Cache) - Chuyển trang tức thì 0ms
+  const orderPageCacheRef = useRef<Map<string, { data: OrderRecord[]; count: number; totalPages: number; stats?: any }>>(new Map());
+
   const fetchServerOrders = async (page = adminOrderPage, limit = adminOrdersPerPage) => {
+    const cacheKey = `${page}-${limit}-${adminOrderFilter}`;
+    if (orderPageCacheRef.current.has(cacheKey)) {
+      const cached = orderPageCacheRef.current.get(cacheKey)!;
+      setServerOrders(cached.data);
+      setServerTotalOrders(cached.count);
+      setServerTotalOrderPages(cached.totalPages);
+      if (cached.stats) setServerOrderStats(cached.stats);
+      return;
+    }
+
     try {
       const res = await api.getOrders({
         page,
@@ -246,6 +259,12 @@ export default function AdminPanel({
         if (res.stats) {
           setServerOrderStats(res.stats as any);
         }
+        orderPageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count: res.count ?? res.totalAllCount ?? res.data.length,
+          totalPages: res.totalPages || 1,
+          stats: res.stats
+        });
       }
     } catch (err) {
       console.error("Lỗi khi tải đơn hàng từ MongoDB:", err);
@@ -269,6 +288,7 @@ export default function AdminPanel({
 
   // Cập nhật trạng thái đơn hàng thời gian thực (Real-time UI Update 0ms)
   const handleUpdateOrderStatusRealtime = (orderId: string, newStatus: AdminOrderStatus, extraData?: any) => {
+    orderPageCacheRef.current.clear();
     setServerOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, ...extraData } : o))
     );
@@ -276,6 +296,7 @@ export default function AdminPanel({
   };
 
   const handleDeleteOrderRealtime = (orderId: string) => {
+    orderPageCacheRef.current.clear();
     setServerOrders((prev) => prev.filter((o) => o.id !== orderId));
     setServerTotalOrders((prev) => Math.max(0, prev - 1));
     onDeleteOrder(orderId);
@@ -647,6 +668,18 @@ export default function AdminPanel({
     return filteredProducts.slice(startIndex, startIndex + adminProdPerPage);
   }, [filteredProducts, adminProdPage, adminProdPerPage]);
 
+  // Debounce tìm kiếm sản phẩm 300ms (Tránh gọi API liên tục mỗi phím gõ)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Bộ nhớ đệm phân trang Sản phẩm (In-Memory Page Cache) - Chuyển qua lại giữa các trang mượt 0ms
+  const productPageCacheRef = useRef<Map<string, { data: Product[]; count: number; totalPages: number; stats?: any }>>(new Map());
+
   // Server-Side State cho Sản phẩm trong Admin (Tránh nạp toàn bộ 10.000+ sản phẩm gây tràn RAM)
   const [serverProducts, setServerProducts] = useState<Product[]>([]);
   const [serverTotalProducts, setServerTotalProducts] = useState<number>(0);
@@ -661,13 +694,23 @@ export default function AdminPanel({
 
   // Tải danh sách sản phẩm phân trang từ MongoDB
   const fetchServerProducts = async (page = adminProdPage, limit = adminProdPerPage) => {
+    const cacheKey = `${page}-${limit}-${selectedCategory}-${debouncedSearchQuery}-${selectedStockFilter}`;
+    if (productPageCacheRef.current.has(cacheKey)) {
+      const cached = productPageCacheRef.current.get(cacheKey)!;
+      setServerProducts(cached.data);
+      setServerTotalProducts(cached.count);
+      setServerTotalProdPages(cached.totalPages);
+      if (cached.stats) setServerProdStats(cached.stats);
+      return; // Phản hồi tức thì 0ms!
+    }
+
     setIsLoadingServerProducts(true);
     try {
       const res = await api.getProducts({
         page,
         limit,
         category: selectedCategory,
-        search: searchQuery,
+        search: debouncedSearchQuery,
         stock: selectedStockFilter
       });
       if (res && res.data) {
@@ -677,6 +720,12 @@ export default function AdminPanel({
         if (res.stats) {
           setServerProdStats(res.stats as any);
         }
+        productPageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count: res.count ?? res.totalAllCount ?? res.data.length,
+          totalPages: res.totalPages || 1,
+          stats: res.stats
+        });
       }
     } catch (err) {
       console.error("Lỗi khi tải dữ liệu sản phẩm từ MongoDB:", err);
@@ -687,7 +736,7 @@ export default function AdminPanel({
 
   useEffect(() => {
     fetchServerProducts(adminProdPage, adminProdPerPage);
-  }, [adminProdPage, adminProdPerPage, selectedCategory, searchQuery, selectedStockFilter]);
+  }, [adminProdPage, adminProdPerPage, selectedCategory, debouncedSearchQuery, selectedStockFilter]);
 
   const displayAdminProducts = serverProducts.length > 0 ? serverProducts : paginatedAdminProducts;
   const displayTotalProdPages = serverTotalProducts > 0 ? serverTotalProdPages : totalAdminProdPages;
@@ -757,6 +806,18 @@ export default function AdminPanel({
     return filteredUsers.slice(startIndex, startIndex + adminUsersPerPage);
   }, [filteredUsers, adminUserPage, adminUsersPerPage]);
 
+  // Debounce tìm kiếm người dùng 300ms
+  const [debouncedUserSearchQuery, setDebouncedUserSearchQuery] = useState(userSearchQuery);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedUserSearchQuery(userSearchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearchQuery]);
+
+  // Bộ nhớ đệm phân trang Người dùng (In-Memory Page Cache)
+  const userPageCacheRef = useRef<Map<string, { data: UserAccount[]; count: number; totalPages: number; stats?: any }>>(new Map());
+
   // Server-Side State cho Người dùng trong Admin
   const [serverUsers, setServerUsers] = useState<UserAccount[]>([]);
   const [serverTotalUsers, setServerTotalUsers] = useState<number>(0);
@@ -764,13 +825,23 @@ export default function AdminPanel({
   const [serverUserStats, setServerUserStats] = useState<any>(null);
 
   const fetchServerUsers = async (page = adminUserPage, limit = adminUsersPerPage) => {
+    const cacheKey = `${page}-${limit}-${userRoleFilter}-${userStatusFilter}-${debouncedUserSearchQuery}`;
+    if (userPageCacheRef.current.has(cacheKey)) {
+      const cached = userPageCacheRef.current.get(cacheKey)!;
+      setServerUsers(cached.data);
+      setServerTotalUsers(cached.count);
+      setServerTotalUserPages(cached.totalPages);
+      if (cached.stats) setServerUserStats(cached.stats);
+      return;
+    }
+
     try {
       const res = await api.getUsers({
         page,
         limit,
         role: userRoleFilter,
         status: userStatusFilter,
-        search: userSearchQuery
+        search: debouncedUserSearchQuery
       });
       if (res && res.data && res.data.length > 0) {
         setServerUsers(res.data);
@@ -779,6 +850,12 @@ export default function AdminPanel({
         if (res.stats) {
           setServerUserStats(res.stats);
         }
+        userPageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count: res.count ?? res.totalAllCount ?? res.data.length,
+          totalPages: res.totalPages || 1,
+          stats: res.stats
+        });
       }
     } catch (err) {
       console.error("Lỗi khi tải người dùng từ MongoDB:", err);
@@ -787,7 +864,7 @@ export default function AdminPanel({
 
   useEffect(() => {
     fetchServerUsers(adminUserPage, adminUsersPerPage);
-  }, [adminUserPage, adminUsersPerPage, userRoleFilter, userStatusFilter, userSearchQuery]);
+  }, [adminUserPage, adminUsersPerPage, userRoleFilter, userStatusFilter, debouncedUserSearchQuery]);
 
   const displayAdminUsers = serverUsers.length > 0 ? serverUsers : paginatedAdminUsers;
   const displayTotalUserCount = serverTotalUsers > 0 ? serverTotalUsers : filteredUsers.length;
@@ -1012,6 +1089,7 @@ export default function AdminPanel({
 
     if (editingProduct) {
       // Update (Cập nhật ngay vào serverProducts để giao diện thay đổi tức thì 0ms không cần reload trang)
+      productPageCacheRef.current.clear();
       const updated: Product = {
         ...editingProduct,
         name: formName.trim(),
@@ -1030,6 +1108,7 @@ export default function AdminPanel({
       onUpdateProduct(updated);
     } else {
       // Create (Thêm ngay vào serverProducts để hiển thị đầu danh sách)
+      productPageCacheRef.current.clear();
       const newProduct: Product = {
         id: "prod-" + Date.now(),
         name: formName.trim(),
@@ -1090,6 +1169,7 @@ export default function AdminPanel({
   // Confirm delete (Xóa ngay khỏi serverProducts)
   const handleConfirmDelete = () => {
     if (deletingProductId) {
+      productPageCacheRef.current.clear();
       setServerProducts((prev) => prev.filter((p) => p.id !== deletingProductId));
       setServerTotalProducts((prev) => Math.max(0, prev - 1));
       onDeleteProduct(deletingProductId);

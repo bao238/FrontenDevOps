@@ -115,6 +115,10 @@ export interface ProductQueryParams {
   category?: string;
   search?: string;
   stock?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  rating?: number;
+  sortBy?: string;
 }
 
 export interface OrderQueryParams {
@@ -160,6 +164,10 @@ export const api = {
       if (params?.category && params.category !== "Tất cả") query.append("category", params.category);
       if (params?.search && params.search.trim()) query.append("search", params.search.trim());
       if (params?.stock && params.stock !== "all") query.append("stock", params.stock);
+      if (params?.minPrice !== undefined && params.minPrice !== null) query.append("minPrice", String(params.minPrice));
+      if (params?.maxPrice !== undefined && params.maxPrice !== null) query.append("maxPrice", String(params.maxPrice));
+      if (params?.rating) query.append("rating", String(params.rating));
+      if (params?.sortBy && params.sortBy !== "default") query.append("sortBy", params.sortBy);
 
       const qs = query.toString() ? `?${query.toString()}` : "";
       const res = await fetch(`${API_BASE}/products${qs}`);

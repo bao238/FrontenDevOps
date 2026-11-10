@@ -164,7 +164,7 @@ export default function App() {
   const [selectedCartIds, setSelectedCartIds] = useState<string[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage, setItemsPerPage] = useState<number>(8);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(12);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [promoCode, setPromoCode] = useState<string>("");
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
@@ -1206,10 +1206,10 @@ export default function App() {
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredProducts, currentPage, itemsPerPage]);
 
-  // Server-Side State cho Cửa Hàng (Storefront): Chỉ lấy đúng 8-12 cuốn của trang hiện tại, tuyệt đối không lấy 10.000 cuốn gây tràn RAM
+  // Server-Side State cho Cửa Hàng (Storefront): Chỉ lấy đúng 12 cuốn của trang hiện tại từ 10.549 cuốn trong MongoDB
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
-  const [totalStoreProducts, setTotalStoreProducts] = useState<number>(0);
-  const [totalStorePages, setTotalStorePages] = useState<number>(1);
+  const [totalStoreProducts, setTotalStoreProducts] = useState<number>(10549);
+  const [totalStorePages, setTotalStorePages] = useState<number>(879);
   const [isLoadingStoreProducts, setIsLoadingStoreProducts] = useState<boolean>(false);
 
   // Debounce tìm kiếm cửa hàng 300ms
@@ -1224,9 +1224,27 @@ export default function App() {
   // Bộ nhớ đệm phân trang Cửa Hàng (In-Memory Page Cache) - Lật trang siêu tốc 0ms
   const storePageCacheRef = useRef<Map<string, { data: Product[]; count: number; totalPages: number }>>(new Map());
 
-  // Hàm tải dữ liệu phân trang máy chủ cho Cửa Hàng
+  // Reset trang về 1 khi người dùng đổi thể loại, từ khóa tìm kiếm hoặc bộ lọc giá/sao/sắp xếp
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, debouncedStoreSearch, selectedPriceRange, selectedMinRating, sortBy, onlyInStock]);
+
+  // Hàm tải dữ liệu phân trang máy chủ cho Cửa Hàng kết nối 100% MongoDB
   const fetchStoreProducts = async (page = currentPage, limit = itemsPerPage) => {
-    const cacheKey = `${page}-${limit}-${selectedCategory}-${debouncedStoreSearch}`;
+    // Chuyển đổi khoảng giá sang giá trị số
+    let minP: number | undefined;
+    let maxP: number | undefined;
+    if (selectedPriceRange === "under-100k") maxP = 100000;
+    else if (selectedPriceRange === "100k-250k") { minP = 100000; maxP = 250000; }
+    else if (selectedPriceRange === "250k-500k") { minP = 250000; maxP = 500000; }
+    else if (selectedPriceRange === "over-500k") minP = 500000;
+
+    let sortParam = "default";
+    if (sortBy === "price-asc") sortParam = "price_asc";
+    else if (sortBy === "price-desc") sortParam = "price_desc";
+    else if (sortBy === "rating") sortParam = "rating_desc";
+
+    const cacheKey = `${page}-${limit}-${selectedCategory}-${debouncedStoreSearch}-${selectedPriceRange}-${selectedMinRating}-${sortBy}-${onlyInStock}`;
     if (storePageCacheRef.current.has(cacheKey)) {
       const cached = storePageCacheRef.current.get(cacheKey)!;
       setStoreProducts(cached.data);
@@ -1241,16 +1259,23 @@ export default function App() {
         page,
         limit,
         category: selectedCategory,
-        search: debouncedStoreSearch
+        search: debouncedStoreSearch,
+        stock: onlyInStock ? "in_stock" : "all",
+        minPrice: minP,
+        maxPrice: maxP,
+        rating: selectedMinRating > 0 ? selectedMinRating : undefined,
+        sortBy: sortParam
       });
       if (res && res.data) {
         setStoreProducts(res.data);
-        setTotalStoreProducts(res.count ?? res.totalAllCount ?? res.data.length);
-        setTotalStorePages(res.totalPages || 1);
+        const count = res.count ?? res.totalAllCount ?? res.data.length;
+        const totalP = res.totalPages || Math.ceil(count / limit) || 1;
+        setTotalStoreProducts(count);
+        setTotalStorePages(totalP);
         storePageCacheRef.current.set(cacheKey, {
           data: res.data,
-          count: res.count ?? res.totalAllCount ?? res.data.length,
-          totalPages: res.totalPages || 1
+          count,
+          totalPages: totalP
         });
       }
     } catch (err) {
@@ -1262,7 +1287,7 @@ export default function App() {
 
   useEffect(() => {
     fetchStoreProducts(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, selectedCategory, debouncedStoreSearch]);
+  }, [currentPage, itemsPerPage, selectedCategory, debouncedStoreSearch, selectedPriceRange, selectedMinRating, sortBy, onlyInStock]);
 
   const displayStoreProducts = storeProducts.length > 0 ? storeProducts : paginatedProducts;
   const displayTotalStoreProducts = totalStoreProducts > 0 ? totalStoreProducts : filteredProducts.length;
@@ -2664,8 +2689,19 @@ export default function App() {
                 </div>
               )}
 
-              {/* Product Grid */}
-              {filteredProducts.length === 0 ? (
+              {/* Product Grid with Skeleton Loader */}
+              {isLoadingStoreProducts && displayStoreProducts.length === 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {Array.from({ length: itemsPerPage }, (_, i) => (
+                    <div key={`skel-${i}`} className="bg-white rounded-3xl border border-slate-200/80 p-3.5 shadow-sm space-y-3 animate-pulse">
+                      <div className="aspect-[3/4] bg-slate-200 rounded-2xl w-full" />
+                      <div className="h-4 bg-slate-200 rounded-md w-3/4" />
+                      <div className="h-3 bg-slate-200 rounded-md w-1/2" />
+                      <div className="h-6 bg-slate-200 rounded-xl w-2/3" />
+                    </div>
+                  ))}
+                </div>
+              ) : displayStoreProducts.length === 0 ? (
                 <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-300">
                   <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <h3 className="text-lg font-bold text-slate-700">Không tìm thấy sản phẩm</h3>
@@ -2678,7 +2714,7 @@ export default function App() {
                       setSelectedCategory("Tất cả");
                       setSortBy("default");
                     }}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors"
+                    className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
                   >
                     Xóa bộ lọc
                   </button>
@@ -2820,7 +2856,7 @@ export default function App() {
               )}
 
               {/* THANH ĐIỀU HƯỚNG PHÂN TRANG (PAGINATION CONTROLS) */}
-              {filteredProducts.length > 0 && (
+              {displayStoreProducts.length > 0 && (
                 <div className="mt-10 pt-6 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
                   {/* Thông tin số lượng hiển thị */}
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-500">
@@ -2877,54 +2913,60 @@ export default function App() {
                         <span className="hidden sm:inline">Trước</span>
                       </button>
 
-                      {/* Các nút số trang */}
-                      {Array.from({ length: displayTotalStorePages }, (_, i) => i + 1).map((page) => {
-                        if (
-                          page === 1 ||
-                          page === displayTotalStorePages ||
-                          (page >= currentPage - 1 && page <= currentPage + 1)
-                        ) {
+                      {/* Các nút số trang tối ưu O(1) hiển thị 5-7 nút, không tạo mảng 1.000 phần tử */}
+                      {(() => {
+                        const items: (number | string)[] = [];
+                        if (displayTotalStorePages <= 7) {
+                          for (let i = 1; i <= displayTotalStorePages; i++) items.push(i);
+                        } else {
+                          items.push(1);
+                          if (currentPage > 3) items.push("dots-prev");
+                          const start = Math.max(2, currentPage - 1);
+                          const end = Math.min(displayTotalStorePages - 1, currentPage + 1);
+                          for (let i = start; i <= end; i++) items.push(i);
+                          if (currentPage < displayTotalStorePages - 2) items.push("dots-next");
+                          items.push(displayTotalStorePages);
+                        }
+                        return items.map((item, idx) => {
+                          if (item === "dots-prev" || item === "dots-next") {
+                            return (
+                              <span key={`dots-${idx}`} className="px-1 text-slate-400 select-none">
+                                &hellip;
+                              </span>
+                            );
+                          }
+                          const pageNum = Number(item);
                           return (
                             <button
-                              key={page}
+                              key={pageNum}
                               onClick={() => {
-                                setCurrentPage(page);
+                                setCurrentPage(pageNum);
                                 document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth" });
                               }}
-                              className={`w-9 h-9 rounded-xl text-xs font-bold transition-all ${
-                                currentPage === page
+                              className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                currentPage === pageNum
                                   ? "bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 scale-105"
                                   : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 shadow-xs"
                               }`}
                             >
-                              {page}
+                              {pageNum}
                             </button>
                           );
-                        } else if (
-                          (page === currentPage - 2 && page > 1) ||
-                          (page === currentPage + 2 && page < displayTotalStorePages)
-                        ) {
-                          return (
-                            <span key={page} className="px-1 text-slate-400 text-xs font-bold">
-                              ...
-                            </span>
-                          );
-                        }
-                        return null;
-                      })}
+                        });
+                      })()}
 
                       {/* Nút Trang sau */}
                       <button
                         onClick={() => {
-                          const newPage = Math.min(totalPages, currentPage + 1);
+                          const newPage = Math.min(displayTotalStorePages, currentPage + 1);
                           setCurrentPage(newPage);
                           document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth" });
                         }}
-                        disabled={currentPage === totalPages}
+                        disabled={currentPage === displayTotalStorePages}
                         className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
-                          currentPage === totalPages
+                          currentPage === displayTotalStorePages
                             ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                            : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs"
+                            : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
                         }`}
                         title="Trang tiếp theo"
                       >

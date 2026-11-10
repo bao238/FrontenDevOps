@@ -2571,7 +2571,7 @@ export default function AdminPanel({
       {adminTab === "coupons" && <CouponsTab />}
 
       {/* 6. TAB BÁO CÁO & THỐNG KÊ DOANH THU (ANALYTICS) */}
-      {adminTab === "analytics" && <AnalyticsTab orders={orders} />}
+      {adminTab === "analytics" && <AnalyticsTab orders={serverOrders.length > 0 ? serverOrders : orders} />}
 
       {/* 7. TAB QUẢN LÝ THỂ LOẠI SÁCH (CATEGORIES) */}
       {adminTab === "categories" && <CategoriesTab />}

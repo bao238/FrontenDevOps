@@ -46,6 +46,46 @@ exports.getProducts = async (req, res) => {
       }
     }
 
+    // Loc theo khoang gia (Price Range)
+    if (req.query.minPrice !== undefined || req.query.maxPrice !== undefined) {
+      query.price = {};
+      if (req.query.minPrice !== undefined && req.query.minPrice !== '') {
+        query.price.$gte = Number(req.query.minPrice);
+      }
+      if (req.query.maxPrice !== undefined && req.query.maxPrice !== '') {
+        query.price.$lte = Number(req.query.maxPrice);
+      }
+    }
+
+    // Loc theo danh gia toi thieu (Min Rating)
+    if (req.query.rating && Number(req.query.rating) > 0) {
+      query.rating = { $gte: Number(req.query.rating) };
+    }
+
+    // Xac dinh tieu chi sap xep (Sort Option)
+    let sortOption = { createdAt: -1, _id: 1 };
+    if (req.query.sortBy) {
+      switch (req.query.sortBy) {
+        case 'price_asc':
+          sortOption = { price: 1, _id: 1 };
+          break;
+        case 'price_desc':
+          sortOption = { price: -1, _id: 1 };
+          break;
+        case 'rating_desc':
+          sortOption = { rating: -1, _id: 1 };
+          break;
+        case 'bestseller':
+          sortOption = { reviewsCount: -1, rating: -1, _id: 1 };
+          break;
+        case 'newest':
+          sortOption = { createdAt: -1, _id: 1 };
+          break;
+        default:
+          sortOption = { createdAt: -1, _id: 1 };
+      }
+    }
+
     // 3. Tinh tong so luong san pham thoa man dieu kien loc va tong so san pham toan he thong
     const totalCount = await Product.countDocuments(query);
     const totalAllCount = await Product.countDocuments();
@@ -64,7 +104,7 @@ exports.getProducts = async (req, res) => {
     // 4. Chi lay dung phan du lieu trang hien tai (skip / limit) va bo qua ebookContent nang de tranh tran RAM
     const products = await Product.find(query)
       .select('-ebookContent')
-      .sort({ createdAt: -1 })
+      .sort(sortOption)
       .skip(skip)
       .limit(limit)
       .lean();

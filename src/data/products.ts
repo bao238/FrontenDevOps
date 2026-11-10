@@ -13,6 +13,11 @@ export interface ReviewItem {
   likes: number;
   imageUrl?: string;
   userLiked?: boolean;
+  // Phản hồi từ Ban Quản Trị Nhà Sách BookStore
+  adminReply?: string | null;
+  repliedAt?: string | null;
+  // Trạng thái kiểm duyệt: approved (Hiển thị), hidden (Đã ẩn), flagged (Báo cáo vi phạm)
+  moderationStatus?: 'approved' | 'hidden' | 'flagged';
 }
 
 export interface Product {

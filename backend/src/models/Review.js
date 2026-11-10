@@ -14,7 +14,15 @@ const reviewSchema = new mongoose.Schema(
     content: { type: String, required: true, trim: true },
     verified: { type: Boolean, default: true },
     likes: { type: Number, default: 0 },
-    imageUrl: { type: String, default: null } // Ảnh chụp sách thực tế do độc giả tải lên
+    imageUrl: { type: String, default: null }, // Ảnh chụp sách thực tế do độc giả tải lên
+    adminReply: { type: String, default: null, trim: true }, // Phản hồi từ Ban Quản Trị Nhà Sách
+    repliedAt: { type: Date, default: null }, // Thời điểm Admin phản hồi nhận xét
+    moderationStatus: {
+      type: String,
+      enum: ['approved', 'hidden', 'flagged'],
+      default: 'approved',
+      index: true
+    } // Trạng thái kiểm duyệt: approved (Hiển thị), hidden (Đã ẩn), flagged (Báo cáo vi phạm)
   },
   { timestamps: true }
 );

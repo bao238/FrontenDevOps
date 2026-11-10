@@ -243,7 +243,16 @@ exports.getAllReviews = async (req, res) => {
 
     const query = {};
     if (req.query.rating && req.query.rating !== 'all') {
-      query.rating = Number(req.query.rating);
+      if (req.query.rating === '1-2') {
+        query.rating = { $in: [1, 2] };
+      } else if (req.query.rating === '4-5') {
+        query.rating = { $in: [4, 5] };
+      } else {
+        query.rating = Number(req.query.rating);
+      }
+    }
+    if (req.query.moderationStatus && req.query.moderationStatus !== 'all') {
+      query.moderationStatus = req.query.moderationStatus;
     }
     if (req.query.search && req.query.search.trim()) {
       const q = req.query.search.trim();
@@ -419,5 +428,58 @@ exports.updateReview = async (req, res) => {
   } catch (err) {
     console.error('[ProductController] Lỗi cập nhật đánh giá:', err.message);
     return res.status(500).json({ error: 'Lỗi cập nhật đánh giá', message: err.message });
+  }
+};
+
+// PUT /api/reviews/:id/reply
+// Admin phản hồi nhận xét đánh giá của khách hàng
+exports.replyToReview = async (req, res) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+  }
+
+  try {
+    const { reply } = req.body;
+    const review = await Review.findOne({ id: req.params.id });
+    if (!review) {
+      return res.status(404).json({ message: 'Không tìm thấy đánh giá trong MongoDB' });
+    }
+
+    review.adminReply = reply ? String(reply).trim() : null;
+    review.repliedAt = reply ? new Date() : null;
+    await review.save();
+
+    return res.json({ message: 'Phản hồi đánh giá thành công trên MongoDB', data: review });
+  } catch (err) {
+    console.error('[ProductController] Lỗi phản hồi đánh giá:', err.message);
+    return res.status(500).json({ error: 'Lỗi phản hồi đánh giá', message: err.message });
+  }
+};
+
+// PUT /api/reviews/:id/moderation
+// Admin thay đổi trạng thái kiểm duyệt đánh giá (approved, hidden, flagged)
+exports.updateReviewModeration = async (req, res) => {
+  if (!isDbConnected()) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
+  }
+
+  try {
+    const { status } = req.body;
+    if (!['approved', 'hidden', 'flagged'].includes(status)) {
+      return res.status(400).json({ error: 'Trạng thái kiểm duyệt không hợp lệ' });
+    }
+
+    const review = await Review.findOne({ id: req.params.id });
+    if (!review) {
+      return res.status(404).json({ message: 'Không tìm thấy đánh giá trong MongoDB' });
+    }
+
+    review.moderationStatus = status;
+    await review.save();
+
+    return res.json({ message: 'Cập nhật trạng thái kiểm duyệt thành công', data: review });
+  } catch (err) {
+    console.error('[ProductController] Lỗi cập nhật kiểm duyệt đánh giá:', err.message);
+    return res.status(500).json({ error: 'Lỗi cập nhật kiểm duyệt đánh giá', message: err.message });
   }
 };

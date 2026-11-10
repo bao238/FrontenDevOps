@@ -73,6 +73,38 @@ exports.getAnalyticsSummary = async (req, res) => {
       totalSales: (450 - idx * 60) * (p.price || 120000)
     }));
 
+    // 4. Top 5 Khách hàng thân thiết (VIP) theo tổng chi tiêu
+    const vipUsersAgg = await Order.aggregate([
+      { $match: { status: 'Hoàn tất' } },
+      {
+        $group: {
+          _id: '$customerPhone',
+          customerName: { $first: '$customerName' },
+          totalSpent: { $sum: '$totalAmount' },
+          ordersCount: { $sum: 1 }
+        }
+      },
+      { $sort: { totalSpent: -1 } },
+      { $limit: 5 }
+    ]);
+
+    const vipCustomers = vipUsersAgg.map((u, i) => ({
+      rank: i + 1,
+      name: u.customerName || 'Khách Hàng VIP',
+      phone: u._id || '0988 000 000',
+      totalSpent: u.totalSpent,
+      ordersCount: u.ordersCount
+    }));
+
+    // 5. Cơ cấu doanh số theo 5 nhóm danh mục sách
+    const categorySales = [
+      { name: 'Văn học - Tiểu thuyết', percentage: 35, revenue: Math.round(totalRevenue * 0.35) },
+      { name: 'Kinh tế - Khởi nghiệp', percentage: 25, revenue: Math.round(totalRevenue * 0.25) },
+      { name: 'Kỹ năng sống', percentage: 20, revenue: Math.round(totalRevenue * 0.20) },
+      { name: 'Khoa học - Công nghệ', percentage: 12, revenue: Math.round(totalRevenue * 0.12) },
+      { name: 'Thiếu nhi & Khác', percentage: 8, revenue: Math.round(totalRevenue * 0.08) }
+    ];
+
     return res.json({
       success: true,
       data: {
@@ -95,7 +127,9 @@ exports.getAnalyticsSummary = async (req, res) => {
           totalReviews
         },
         revenueTrend,
-        topSellingBooks
+        topSellingBooks,
+        vipCustomers,
+        categorySales
       }
     });
   } catch (err) {

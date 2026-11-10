@@ -56,7 +56,10 @@ import {
   AlertTriangle,
   Printer,
   Clock,
-  Check
+  Check,
+  CornerDownRight,
+  EyeOff,
+  Send
 } from "lucide-react";
 import CouponsTab from "./admin/CouponsTab";
 import AnalyticsTab from "./admin/AnalyticsTab";
@@ -161,9 +164,91 @@ export default function AdminPanel({
   const [reviewsList, setReviewsList] = useState<ReviewItem[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
-  const [reviewRatingFilter, setReviewRatingFilter] = useState<number | "all">("all");
+  const [reviewRatingFilter, setReviewRatingFilter] = useState<number | string>("all");
   const [selectedProductReviewFilter, setSelectedProductReviewFilter] = useState<string>("all");
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+
+  // Modal Phân Quyền & Khóa / Mở Khóa Tài Khoản Người Dùng
+  const [roleModalUser, setRoleModalUser] = useState<UserAccount | null>(null);
+  const [roleModalRole, setRoleModalRole] = useState<"admin" | "staff" | "customer">("customer");
+  const [roleModalStatus, setRoleModalStatus] = useState<"active" | "locked">("active");
+  const [isUpdatingUserRole, setIsUpdatingUserRole] = useState(false);
+
+  // Modal Phản Hồi Đánh Giá Độc Giả
+  const [replyingReview, setReplyingReview] = useState<ReviewItem | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState("");
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+
+  // Lọc đánh giá theo nhóm cảm xúc (Tất cả, 5 sao, 4 sao, Tích cực 4-5 sao, Cần hỗ trợ 1-2 sao)
+  const [reviewSentimentFilter, setReviewSentimentFilter] = useState<string>("all");
+
+  // Xử lý lưu Phân Quyền & Khóa/Mở Khóa Người Dùng (Optimistic UI 0ms)
+  const handleSaveUserRoleStatus = async () => {
+    if (!roleModalUser) return;
+    setIsUpdatingUserRole(true);
+    try {
+      // Cập nhật Optimistic tức thì trên giao diện
+      setServerUsers((prev) =>
+        prev.map((u) =>
+          u.id === roleModalUser.id ? { ...u, role: roleModalRole, status: roleModalStatus } : u
+        )
+      );
+      // Xóa cache cũ để đồng bộ dữ liệu mới nhất
+      userPageCacheRef.current.clear();
+
+      await api.updateUser(roleModalUser.id, {
+        role: roleModalRole,
+        status: roleModalStatus
+      });
+
+      setRoleModalUser(null);
+    } catch (err) {
+      console.error("Lỗi khi cập nhật vai trò người dùng:", err);
+    } finally {
+      setIsUpdatingUserRole(false);
+    }
+  };
+
+  // Xử lý gửi phản hồi của Ban Quản Trị đến Đánh Giá của Độc Giả
+  const handleSaveReviewReply = async () => {
+    if (!replyingReview) return;
+    setIsSubmittingReply(true);
+    try {
+      const trimmed = adminReplyText.trim();
+      const updatedReview: ReviewItem = {
+        ...replyingReview,
+        adminReply: trimmed || null,
+        repliedAt: trimmed ? new Date().toISOString() : null
+      };
+
+      // Cập nhật Optimistic vào danh sách đánh giá
+      setReviewsList((prev) =>
+        prev.map((r) => (r.id === replyingReview.id ? updatedReview : r))
+      );
+      // Xóa cache để làm mới
+      reviewPageCacheRef.current.clear();
+
+      await api.replyToReview(replyingReview.id, trimmed);
+      setReplyingReview(null);
+      setAdminReplyText("");
+    } catch (err) {
+      console.error("Lỗi khi gửi phản hồi đánh giá:", err);
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
+  // Xử lý Ẩn / Hiện Đánh Giá (Kiểm duyệt nội dung)
+  const handleToggleReviewModeration = async (rev: ReviewItem) => {
+    const newStatus = rev.moderationStatus === "hidden" ? "approved" : "hidden";
+    // Cập nhật Optimistic UI
+    setReviewsList((prev) =>
+      prev.map((r) => (r.id === rev.id ? { ...r, moderationStatus: newStatus } : r))
+    );
+    reviewPageCacheRef.current.clear();
+
+    await api.updateReviewModeration(rev.id, newStatus);
+  };
 
   // Edit Review Modal State
   const [isEditReviewModalOpen, setIsEditReviewModalOpen] = useState(false);
@@ -468,7 +553,13 @@ export default function AdminPanel({
         rev.author.toLowerCase().includes(q) ||
         rev.content.toLowerCase().includes(q) ||
         (rev.productId && rev.productId.toLowerCase().includes(q));
-      const matchRating = reviewRatingFilter === "all" || rev.rating === reviewRatingFilter;
+      const matchRating =
+        reviewRatingFilter === "all" ||
+        (reviewRatingFilter === "4-5"
+          ? (rev.rating >= 4)
+          : reviewRatingFilter === "1-2"
+          ? (rev.rating <= 2)
+          : rev.rating === Number(reviewRatingFilter));
       const matchProduct =
         selectedProductReviewFilter === "all" || rev.productId === selectedProductReviewFilter;
       return matchSearch && matchRating && matchProduct;
@@ -2477,15 +2568,15 @@ export default function AdminPanel({
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                      <th className="py-3 px-3">Người Dùng</th>
-                      <th className="py-3 px-3">Liên Hệ</th>
-                      <th className="py-3 px-3">Vai Trò</th>
-                      <th className="py-3 px-3">Trạng Thái</th>
-                      <th className="py-3 px-3">Ngày Tạo</th>
-                      <th className="py-3 px-3 text-right">Thao Tác</th>
+                <table className="table-fixed w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-3 w-56">Người Dùng</th>
+                      <th className="py-3 px-3 w-52">Liên Hệ</th>
+                      <th className="py-3 px-3 w-36">Vai Trò</th>
+                      <th className="py-3 px-3 w-32">Trạng Thái</th>
+                      <th className="py-3 px-3 w-28">Ngày Tạo</th>
+                      <th className="py-3 px-3 w-36 text-right">Thao Tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -2575,12 +2666,30 @@ export default function AdminPanel({
 
                         {/* Actions */}
                         <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end space-x-1">
-                            {/* Toggle Lock */}
+                          <div className="flex items-center justify-end space-x-1.5">
+                            {/* Phân Quyền & Đổi Trạng Thái Modal */}
                             <button
                               type="button"
-                              onClick={() => onToggleLockUser && onToggleLockUser(user.id)}
-                              className={`p-1.5 rounded-lg border transition-colors ${
+                              onClick={() => {
+                                setRoleModalUser(user);
+                                setRoleModalRole(user.role || "customer");
+                                setRoleModalStatus(user.status || "active");
+                              }}
+                              className="p-1.5 rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                              title="Phân quyền & Khóa/Mở khóa tài khoản"
+                            >
+                              <Shield className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Toggle Lock Nhanh */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRoleModalUser(user);
+                                setRoleModalRole(user.role || "customer");
+                                setRoleModalStatus(user.status === "active" ? "locked" : "active");
+                              }}
+                              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                                 user.status === "active"
                                   ? "text-slate-500 hover:text-amber-600 hover:bg-amber-50 border-slate-200"
                                   : "text-red-600 hover:text-emerald-600 hover:bg-emerald-50 border-red-200"
@@ -2598,7 +2707,7 @@ export default function AdminPanel({
                             <button
                               type="button"
                               onClick={() => handleOpenEditUser(user)}
-                              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                               title="Chỉnh sửa thông tin"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
@@ -2608,7 +2717,7 @@ export default function AdminPanel({
                             <button
                               type="button"
                               onClick={() => setDeletingUserId(user.id)}
-                              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                               title="Xóa tài khoản"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -2724,16 +2833,18 @@ export default function AdminPanel({
                 <select
                   value={reviewRatingFilter}
                   onChange={(e) =>
-                    setReviewRatingFilter(e.target.value === "all" ? "all" : Number(e.target.value))
+                    setReviewRatingFilter(e.target.value === "all" ? "all" : (isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value)))
                   }
-                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 font-medium"
                 >
-                  <option value="all">Tất cả số sao</option>
-                  <option value="5">⭐⭐⭐⭐⭐ (5 sao)</option>
-                  <option value="4">⭐⭐⭐⭐ (4 sao)</option>
-                  <option value="3">⭐⭐⭐ (3 sao)</option>
-                  <option value="2">⭐⭐ (2 sao)</option>
-                  <option value="1">⭐ (1 sao)</option>
+                  <option value="all">⭐ Tất cả đánh giá ({displayTotalReviewCount.toLocaleString('vi-VN')})</option>
+                  <option value="5">⭐⭐⭐⭐⭐ 5 sao (Hài lòng)</option>
+                  <option value="4">⭐⭐⭐⭐ 4 sao (Tốt)</option>
+                  <option value="4-5">🌟 Tích cực (4 - 5 sao)</option>
+                  <option value="1-2">⚠️ Cần phản hồi gấp (1 - 2 sao)</option>
+                  <option value="3">⭐⭐⭐ 3 sao (Bình thường)</option>
+                  <option value="2">⭐⭐ 2 sao</option>
+                  <option value="1">⭐ 1 sao (Tiêu cực)</option>
                 </select>
 
                 <button
@@ -2865,40 +2976,78 @@ export default function AdminPanel({
                           </td>
 
                           <td className="py-3.5 px-4">
-                            {/* Bọc chống tràn văn bản đánh giá - Tối đa 3 dòng kèm nút xem chi tiết */}
-                            <div className="max-w-md">
+                            {/* Bọc chống tràn văn bản đánh giá kèm phản hồi Admin */}
+                            <div className="max-w-md space-y-1.5">
                               <p
-                                className="text-xs text-slate-600 leading-relaxed italic line-clamp-3 break-words"
+                                className="text-xs text-slate-700 leading-relaxed italic line-clamp-3 break-words"
                                 title={rev.content}
                               >
                                 "{rev.content}"
                               </p>
-                              {rev.content && rev.content.length > 100 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditReview(rev)}
-                                  className="text-[11px] text-blue-600 hover:text-blue-700 hover:underline mt-0.5 font-medium inline-block cursor-pointer"
-                                >
-                                  Xem chi tiết
-                                </button>
+
+                              {/* Hiển thị Phản hồi của Ban Quản Trị nếu có */}
+                              {rev.adminReply && (
+                                <div className="p-2 bg-purple-50 rounded-xl border border-purple-200/80 text-[11px] space-y-0.5 animate-in fade-in">
+                                  <div className="font-bold text-purple-700 flex items-center space-x-1">
+                                    <CornerDownRight className="w-3 h-3 text-purple-600 shrink-0" />
+                                    <span>Phản hồi từ Nhà Sách BookStore:</span>
+                                  </div>
+                                  <p className="text-slate-600 italic">"{rev.adminReply}"</p>
+                                </div>
+                              )}
+
+                              {rev.moderationStatus === "hidden" && (
+                                <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-red-50 text-red-600 text-[10px] font-bold border border-red-200">
+                                  <EyeOff className="w-3 h-3" />
+                                  <span>Đã ẩn khỏi trang khách hàng</span>
+                                </span>
                               )}
                             </div>
                           </td>
 
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end space-x-1.5">
+                              {/* Nút Phản hồi khách hàng */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReplyingReview(rev);
+                                  setAdminReplyText(rev.adminReply || "");
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-xs flex items-center space-x-1 transition-colors cursor-pointer shadow-xs"
+                                title="Soạn phản hồi gửi khách hàng"
+                              >
+                                <CornerDownRight className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Phản hồi</span>
+                              </button>
+
+                              {/* Nút Ẩn / Hiện kiểm duyệt */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleReviewModeration(rev)}
+                                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                                  rev.moderationStatus === "hidden"
+                                    ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                                    : "border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                                }`}
+                                title={rev.moderationStatus === "hidden" ? "Hiện lại đánh giá" : "Ẩn đánh giá này"}
+                              >
+                                {rev.moderationStatus === "hidden" ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditReview(rev)}
-                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                title="Chỉnh sửa đánh giá này"
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                title="Chỉnh sửa đánh giá"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
+
                               <button
                                 type="button"
                                 onClick={() => setDeletingReviewId(rev.id)}
-                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                                 title="Xóa đánh giá khỏi MongoDB"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -4083,6 +4232,226 @@ export default function AdminPanel({
                   Đóng
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL PHÂN QUYỀN & KHÓA/MỞ KHÓA TÀI KHOẢN (ADMIN USERS) */}
+      {roleModalUser && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Phân Quyền &amp; Quản Lý Tài Khoản</h3>
+                  <p className="text-xs text-slate-400">ID: #{roleModalUser.id}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoleModalUser(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Thông tin tài khoản */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Họ và tên:</span>
+                <strong className="text-slate-900">{roleModalUser.name}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Email đăng nhập:</span>
+                <span className="text-slate-700 font-mono">{roleModalUser.email}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Số điện thoại:</span>
+                <span className="text-slate-700 font-mono">{roleModalUser.phone || "Chưa thiết lập"}</span>
+              </div>
+            </div>
+
+            {/* Chọn vai trò */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Vai Trò Người Dùng (Role):</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRoleModalRole("customer")}
+                  className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
+                    roleModalRole === "customer"
+                      ? "bg-slate-800 text-white border-slate-800 shadow-sm"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Khách Hàng</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleModalRole("staff")}
+                  className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
+                    roleModalRole === "staff"
+                      ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                      : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Nhân Viên</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleModalRole("admin")}
+                  className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
+                    roleModalRole === "admin"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                      : "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Quản Trị</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Trạng thái tài khoản */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Trạng Thái Hoạt Động (Status):</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRoleModalStatus("active")}
+                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                    roleModalStatus === "active"
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Hoạt Động Bình Thường</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleModalStatus("locked")}
+                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                    roleModalStatus === "locked"
+                      ? "bg-red-600 text-white border-red-600 shadow-sm"
+                      : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                  }`}
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>Khóa Tài Khoản Này</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRoleModalUser(null)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-100 text-xs transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveUserRoleStatus}
+                disabled={isUpdatingUserRole}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md shadow-purple-500/20 disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                <span>{isUpdatingUserRole ? "Đang lưu..." : "Xác Nhận & Cập Nhật"}</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL PHẢN HỒI ĐÁNH GIÁ ĐỘC GIẢ (ADMIN REVIEWS REPLY) */}
+      {replyingReview && createPortal(
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                  <CornerDownRight className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Phản Hồi Đánh Giá Của Độc Giả</h3>
+                  <p className="text-xs text-slate-400">Gửi lời cảm ơn hoặc giải đáp thắc mắc của độc giả</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingReview(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Chi tiết đánh giá của khách hàng */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-xs space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-slate-800">{replyingReview.author}</span>
+                <div className="flex items-center space-x-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`w-3.5 h-3.5 ${
+                        s <= replyingReview.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"
+                      }`}
+                    />
+                  ))}
+                  <span className="font-bold ml-1 text-slate-700">{replyingReview.rating}/5</span>
+                </div>
+              </div>
+              <p className="text-slate-600 italic bg-white p-2.5 rounded-xl border border-slate-200/60 leading-relaxed">
+                "{replyingReview.content}"
+              </p>
+            </div>
+
+            {/* Khung soạn thảo phản hồi */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Nội Dung Phản Hồi Từ Ban Quản Trị:
+              </label>
+              <textarea
+                rows={4}
+                value={adminReplyText}
+                onChange={(e) => setAdminReplyText(e.target.value)}
+                placeholder="Ví dụ: Cảm ơn bạn đã ủng hộ nhà sách! BookStore rất vui vì bạn hài lòng với chất lượng sách..."
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all leading-relaxed"
+              />
+              <p className="text-[11px] text-slate-400">
+                Nội dung này sẽ hiển thị công khai trên giao diện trang chi tiết sách với nhãn <strong>"Phản hồi từ Nhà Sách BookStore"</strong>.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setReplyingReview(null)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-100 text-xs transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveReviewReply}
+                disabled={isSubmittingReply}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md shadow-purple-500/20 disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isSubmittingReply ? "Đang gửi..." : "Gửi Phản Hồi"}</span>
+              </button>
             </div>
           </div>
         </div>,

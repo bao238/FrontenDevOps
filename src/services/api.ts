@@ -81,6 +81,18 @@ export interface AnalyticsSummary {
     quantitySold: number;
     totalSales: number;
   }>;
+  vipCustomers?: Array<{
+    rank: number;
+    name: string;
+    phone: string;
+    totalSpent: number;
+    ordersCount: number;
+  }>;
+  categorySales?: Array<{
+    name: string;
+    percentage: number;
+    revenue: number;
+  }>;
 }
 
 // Kieu du lieu phan trang Server-Side
@@ -142,6 +154,7 @@ export interface ReviewQueryParams {
   rating?: number | string;
   search?: string;
   productId?: string;
+  moderationStatus?: string;
 }
 
 export const api = {
@@ -399,6 +412,7 @@ export const api = {
       if (params?.rating && params.rating !== "all") query.append("rating", String(params.rating));
       if (params?.search && params.search.trim()) query.append("search", params.search.trim());
       if (params?.productId && params.productId !== "all") query.append("productId", params.productId);
+      if (params?.moderationStatus && params.moderationStatus !== "all") query.append("moderationStatus", params.moderationStatus);
 
       const qs = query.toString() ? `?${query.toString()}` : "";
       const res = await fetch(`${API_BASE}/reviews${qs}`);
@@ -545,5 +559,38 @@ export const api = {
       console.error("❌ [API] Lỗi lấy báo cáo doanh thu:", err);
     }
     return null;
-  }
+  },
+  // 19. Admin phan hoi danh gia doc gia
+  async replyToReview(reviewId: string, reply: string): Promise<{ message: string; data: ReviewItem } | null> {
+    try {
+      const res = await fetch(`${API_BASE}/reviews/${reviewId}/reply`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reply })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.error("❌ [API] Loi phan hoi danh gia:", err);
+    }
+    return null;
+  },
+
+  // 20. Admin kiem duyet danh gia (approved, hidden, flagged)
+  async updateReviewModeration(reviewId: string, status: "approved" | "hidden" | "flagged"): Promise<{ message: string; data: ReviewItem } | null> {
+    try {
+      const res = await fetch(`${API_BASE}/reviews/${reviewId}/moderation`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.error("❌ [API] Loi cap nhat kiem duyet danh gia:", err);
+    }
+    return null;
+  },
 };

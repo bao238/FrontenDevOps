@@ -17,6 +17,7 @@ export interface AdminPaginationProps {
 /**
  * Component phân trang chuẩn cho tất cả các bảng quản trị nội bộ BookStore
  * Đảm bảo hiển thị chuẩn 10 mục / trang theo đúng yêu cầu đề bài
+ * Tối ưu thuật toán hiển thị nút bấm O(1) để xử lý mượt mà dữ liệu lớn (10.000+ sản phẩm, 25.000+ đơn hàng và đánh giá)
  */
 export default function AdminPagination({
   currentPage,
@@ -37,10 +38,10 @@ export default function AdminPagination({
         <span>
           Hiển thị{" "}
           <strong className="text-slate-900 font-bold">
-            {startItem} - {endItem}
+            {startItem.toLocaleString("vi-VN")} - {endItem.toLocaleString("vi-VN")}
           </strong>{" "}
           trên tổng số{" "}
-          <strong className="text-slate-900 font-bold">{totalItems}</strong>{" "}
+          <strong className="text-slate-900 font-bold">{totalItems.toLocaleString("vi-VN")}</strong>{" "}
           {itemLabel}
         </span>
         {onPerPageChange && (
@@ -81,40 +82,51 @@ export default function AdminPagination({
             <span>Trước</span>
           </button>
 
-          {/* Danh sách số trang */}
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-            if (
-              page === 1 ||
-              page === totalPages ||
-              (page >= currentPage - 1 && page <= currentPage + 1)
-            ) {
+          {/* Danh sách số trang tối ưu O(1), không tạo mảng hàng nghìn phần tử làm đơ UI */}
+          {(() => {
+            const items: (number | string)[] = [];
+            if (totalPages <= 7) {
+              for (let i = 1; i <= totalPages; i++) items.push(i);
+            } else {
+              items.push(1);
+              if (currentPage > 3) {
+                items.push("dots-prev");
+              }
+              const start = Math.max(2, currentPage - 1);
+              const end = Math.min(totalPages - 1, currentPage + 1);
+              for (let i = start; i <= end; i++) {
+                items.push(i);
+              }
+              if (currentPage < totalPages - 2) {
+                items.push("dots-next");
+              }
+              items.push(totalPages);
+            }
+            return items.map((item, idx) => {
+              if (item === "dots-prev" || item === "dots-next") {
+                return (
+                  <span key={`dots-${idx}`} className="px-1 text-slate-400 select-none">
+                    &hellip;
+                  </span>
+                );
+              }
+              const pageNum = Number(item);
               return (
                 <button
-                  key={page}
+                  key={pageNum}
                   type="button"
-                  onClick={() => onPageChange(page)}
+                  onClick={() => onPageChange(pageNum)}
                   className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    currentPage === page
+                    currentPage === pageNum
                       ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
                       : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300"
                   }`}
                 >
-                  {page}
+                  {pageNum}
                 </button>
               );
-            }
-            if (
-              (page === currentPage - 2 && page > 1) ||
-              (page === currentPage + 2 && page < totalPages)
-            ) {
-              return (
-                <span key={page} className="px-1 text-slate-400">
-                  &hellip;
-                </span>
-              );
-            }
-            return null;
-          })}
+            });
+          })()}
 
           {/* Nút Chuyển sang trang sau */}
           <button

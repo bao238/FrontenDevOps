@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Package,
   Truck,
@@ -7,6 +7,7 @@ import {
   XCircle,
   Search,
   ArrowLeft,
+  ChevronLeft,
   ChevronRight,
   RotateCcw,
   ShoppingBag,
@@ -126,7 +127,7 @@ interface MyOrdersPageProps {
   orders: OrderRecord[];
   currentUser: UserProfile | null;
   onContinueShopping: () => void;
-  onTrackOrder: (order: OrderRecord) => void;
+  onTrackOrder?: (order: OrderRecord) => void;
   onReorder: (order: OrderRecord) => void;
   onOpenAuth: () => void;
   onPrintInvoice?: (order: OrderRecord) => void;
@@ -233,6 +234,30 @@ export default function MyOrdersPage({
       return matchTab && matchQuery;
     });
   }, [orders, selectedTab, searchQuery]);
+
+  // Phân trang danh sách đơn hàng cho người dùng
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [ordersPerPage, setOrdersPerPage] = useState<number>(5);
+
+  // Tự động chuyển về trang 1 khi đổi bộ lọc tab hoặc từ khóa tìm kiếm
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTab, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ordersPerPage));
+
+  // Đảm bảo không ở trang vượt quá tổng số trang hiện có
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Danh sách đơn hàng tương ứng theo trang hiện tại
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * ordersPerPage;
+    return filteredOrders.slice(startIndex, startIndex + ordersPerPage);
+  }, [filteredOrders, currentPage, ordersPerPage]);
 
   // Xử lý gửi đánh giá đơn hàng
   const handleSubmitReview = (e: React.FormEvent) => {
@@ -581,7 +606,7 @@ export default function MyOrdersPage({
         </div>
       ) : (
         <div className="space-y-4 sm:space-y-5">
-          {filteredOrders.map((ord) => {
+          {paginatedOrders.map((ord) => {
             const statusInfo = getOrderStatusInfo(ord);
             const StatusIcon = statusInfo.icon;
             const isShipping =
@@ -810,16 +835,6 @@ export default function MyOrdersPage({
                         </button>
                       )}
 
-                      {/* Nút Tra cứu lộ trình */}
-                      <button
-                        type="button"
-                        onClick={() => onTrackOrder(ord)}
-                        className="px-3 py-2 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
-                      >
-                        <Truck className="w-3.5 h-3.5" />
-                        <span>Tra Cứu</span>
-                      </button>
-
                       {/* Nút Mua lại đơn này */}
                       <button
                         type="button"
@@ -835,7 +850,127 @@ export default function MyOrdersPage({
               </div>
             );
           })}
+
+        {/* PHÂN TRANG DANH SÁCH ĐƠN HÀNG CỦA KHÁCH */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              Hiển thị{" "}
+              <strong className="text-slate-900 font-bold">
+                {filteredOrders.length === 0
+                  ? 0
+                  : (currentPage - 1) * ordersPerPage + 1}{" "}
+                -{" "}
+                {Math.min(
+                  currentPage * ordersPerPage,
+                  filteredOrders.length
+                )}
+              </strong>{" "}
+              trên tổng số{" "}
+              <strong className="text-slate-900 font-bold">
+                {filteredOrders.length}
+              </strong>{" "}
+              đơn hàng
+            </span>
+            <span className="text-slate-300 hidden sm:inline">&bull;</span>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-slate-400">Xem mỗi trang:</span>
+              <select
+                value={ordersPerPage}
+                onChange={(e) => {
+                  setOrdersPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value={5}>5 đơn / trang</option>
+                <option value={10}>10 đơn / trang</option>
+                <option value={20}>20 đơn / trang</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Điều hướng chuyển trang */}
+          {totalPages > 1 && (
+            <div className="flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const newPage = Math.max(1, currentPage - 1);
+                  setCurrentPage(newPage);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                disabled={currentPage === 1}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
+                  currentPage === 1
+                    ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                    : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
+                }`}
+                title="Trang trước"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Trước</span>
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage(page);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                }
+                if (
+                  (page === currentPage - 2 && page > 1) ||
+                  (page === currentPage + 2 && page < totalPages)
+                ) {
+                  return (
+                    <span key={page} className="px-1 text-slate-400">
+                      &hellip;
+                    </span>
+                  );
+                }
+                return null;
+              })}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const newPage = Math.min(totalPages, currentPage + 1);
+                  setCurrentPage(newPage);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
+                  currentPage === totalPages
+                    ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                    : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
+                }`}
+                title="Trang sau"
+              >
+                <span>Sau</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
+      </div>
       )}
 
       {/* MODAL ĐÁNH GIÁ SẢN PHẨM & DỊCH VỤ */}

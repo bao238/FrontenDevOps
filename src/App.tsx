@@ -76,7 +76,6 @@ import CartPage from "./components/CartPage";
 import PaymentQRModal from "./components/PaymentQRModal";
 import PaymentSimulatorModal from "./components/PaymentSimulatorModal";
 import WishlistModal from "./components/WishlistModal";
-import OrderTrackingModal from "./components/OrderTrackingModal";
 import MyOrdersPage, { OrderTabKey } from "./components/MyOrdersPage";
 import ProfilePage from "./components/ProfilePage";
 import InvoiceModal from "./components/InvoiceModal";
@@ -195,8 +194,6 @@ export default function App() {
     }
   });
   const [isWishlistOpen, setIsWishlistOpen] = useState<boolean>(false);
-  const [isOrderTrackingOpen, setIsOrderTrackingOpen] = useState<boolean>(false);
-  const [selectedTrackingOrder, setSelectedTrackingOrder] = useState<OrderRecord | null>(null);
   const [isPaymentQROpen, setIsPaymentQROpen] = useState<boolean>(false);
 
   // Trạng thái Cổng thanh toán mô phỏng VNPAY & MoMo Sandbox
@@ -1406,7 +1403,9 @@ export default function App() {
     } catch (err) {
       console.error(err);
     }
-    showToast("Đã đăng xuất toàn bộ tài khoản thành công!");
+    // Tự động điều hướng ra trang chủ khi đăng xuất khỏi Admin
+    switchTab("products");
+    showToast("Đã đăng xuất khỏi trang quản trị và quay về trang chủ!");
   };
 
   // NẾU ĐANG Ở TRANG /admin: HIỂN THỊ GIAO DIỆN ADMIN RIÊNG BIỆT (KHÔNG CÓ HEADER/CART CỦA CỬA HÀNG)
@@ -1421,162 +1420,70 @@ export default function App() {
           </div>
         )}
 
-        {!isAdminLoggedIn ? (
-          /* 1. Màn hình Đăng Nhập Quản Trị độc lập (Toàn màn hình, bảo mật) */
-          <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-slate-950 text-slate-100 relative overflow-hidden">
-            <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
-
-            <div className="max-w-md w-full relative z-10">
-              <div className="bg-slate-900/95 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 space-y-6">
-                <div className="text-center space-y-2">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20">
-                    <ShieldCheck className="w-8 h-8" />
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                    BookStore Admin Portal
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Cổng Quản Trị Nhà Sách &bull; Quản lý sách, độc giả &amp; đơn hàng
-                  </p>
-                </div>
-
-                {adminLoginError && (
-                  <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 flex items-start space-x-2 animate-in fade-in">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{adminLoginError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleAdminLogin} className="space-y-4 text-xs">
-                  <div>
-                    <label className="block font-semibold text-slate-300 mb-1.5">
-                      Tài khoản hoặc Email Admin
-                    </label>
-                    <div className="relative">
-                      <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        required
-                        placeholder="admin@bookstore.vn hoặc admin"
-                        value={adminUsername}
-                        onChange={(e) => setAdminUsername(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-300 mb-1.5">
-                      Mật khẩu quản trị
-                    </label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type={adminShowPassword ? "text" : "password"}
-                        required
-                        placeholder="admin123"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        className="w-full pl-10 pr-10 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setAdminShowPassword(!adminShowPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                      >
-                        {adminShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    <span>Đăng Nhập Quản Trị</span>
-                  </button>
-
-                  <div className="pt-3 border-t border-slate-800 text-center">
-                    <button
-                      type="button"
-                      onClick={() => switchTab("products")}
-                      className="text-xs text-slate-400 hover:text-white transition-colors"
-                    >
-                      &larr; Quay lại Website Cửa Hàng
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
+        {/* Giao diện Trang Quản Trị Độc Lập (Đã bỏ màn hình đăng nhập theo yêu cầu) */}
+        <div className="min-h-screen flex flex-col justify-between">
+            {/* Header riêng của Admin */}
+            <header className="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-xl shadow-md">
+                  B
+                </div>
+                <div>
+                  <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight flex items-center space-x-2">
+                    <span>BookStore Admin Console</span>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-bold uppercase">
+                      Hệ Thống Quản Trị Nhà Sách
+                    </span>
+                  </h1>
+                  <p className="text-[11px] text-slate-400">Trang quản trị nội bộ nhà sách &bull; /admin</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => switchTab("products")}
+                  className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                  <span>Về Cửa Hàng</span>
+                </button>
+                <button
+                  onClick={handleAdminLogout}
+                  className="flex items-center space-x-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            </header>
+
+            {/* Nội dung AdminPanel */}
+            <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+              <AdminPanel
+                products={products}
+                onAddProduct={handleAddProduct}
+                onUpdateProduct={handleUpdateProduct}
+                onDeleteProduct={handleDeleteProduct}
+                onResetDefaultProducts={handleResetDefaultProducts}
+                orders={orders}
+                onUpdateOrderStatus={handleUpdateOrderStatus}
+                onDeleteOrder={handleDeleteOrder}
+                onSwitchToStore={() => switchTab("products")}
+                onAdminLogout={handleAdminLogout}
+                users={users}
+                onAddUser={handleAddUser}
+                onUpdateUser={handleUpdateUser}
+                onDeleteUser={handleDeleteUser}
+                onToggleLockUser={handleToggleLockUser}
+                onResetDefaultUsers={handleResetDefaultUsers}
+              />
+            </main>
+
+            {/* Footer riêng của Admin */}
+            <footer className="bg-slate-900 border-t border-slate-800 text-slate-500 text-xs py-4 px-6 text-center">
+              BookStore Admin Console &bull; Quản lý sách &amp; đơn hàng nội bộ
+            </footer>
           </div>
-        ) : (
-          /* 2. Giao diện Trang Quản Trị Độc Lập khi đã đăng nhập */
-          <div className="min-h-screen flex flex-col justify-between">
-            {/* Header riêng của Admin */}
-            <header className="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-xl shadow-md">
-                  B
-                </div>
-                <div>
-                  <h1 className="text-base sm:text-lg font-black tracking-tight leading-tight flex items-center space-x-2">
-                    <span>BookStore Admin Console</span>
-                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-bold uppercase">
-                      Hệ Thống Quản Trị Nhà Sách
-                    </span>
-                  </h1>
-                  <p className="text-[11px] text-slate-400">Trang quản trị nội bộ nhà sách &bull; /admin</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => switchTab("products")}
-                  className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
-                >
-                  <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                  <span>Về Cửa Hàng</span>
-                </button>
-                <button
-                  onClick={handleAdminLogout}
-                  className="flex items-center space-x-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Đăng xuất</span>
-                </button>
-              </div>
-            </header>
-
-            {/* Nội dung AdminPanel */}
-            <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
-              <AdminPanel
-                products={products}
-                onAddProduct={handleAddProduct}
-                onUpdateProduct={handleUpdateProduct}
-                onDeleteProduct={handleDeleteProduct}
-                onResetDefaultProducts={handleResetDefaultProducts}
-                orders={orders}
-                onUpdateOrderStatus={handleUpdateOrderStatus}
-                onDeleteOrder={handleDeleteOrder}
-                onSwitchToStore={() => switchTab("products")}
-                onAdminLogout={handleAdminLogout}
-                users={users}
-                onAddUser={handleAddUser}
-                onUpdateUser={handleUpdateUser}
-                onDeleteUser={handleDeleteUser}
-                onToggleLockUser={handleToggleLockUser}
-                onResetDefaultUsers={handleResetDefaultUsers}
-              />
-            </main>
-
-            {/* Footer riêng của Admin */}
-            <footer className="bg-slate-900 border-t border-slate-800 text-slate-500 text-xs py-4 px-6 text-center">
-              BookStore Admin Console &bull; Quản lý sách &amp; đơn hàng nội bộ
-            </footer>
-          </div>
-        )}
       </div>
     );
   }
@@ -1614,17 +1521,6 @@ export default function App() {
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
                 <span>Quản trị {currentUser?.role === "admin" ? "(Admin)" : ""}</span>
-              </button>
-              <span className="text-slate-600 hidden sm:inline">&bull;</span>
-              <button
-                onClick={() => {
-                  setSelectedTrackingOrder(null);
-                  setIsOrderTrackingOpen(true);
-                }}
-                className="hover:text-amber-300 transition-colors flex items-center space-x-1"
-              >
-                <Truck className="w-3.5 h-3.5 text-blue-400" />
-                <span>Tra cứu đơn</span>
               </button>
               <span className="text-slate-600 hidden sm:inline">&bull;</span>
               <span className="hidden sm:flex items-center space-x-1 text-slate-300">
@@ -1990,18 +1886,6 @@ export default function App() {
                 >
                   <span>📞</span>
                   <span>Liên Hệ &amp; Hỗ Trợ Độc Giả</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsMobileNavOpen(false);
-                    setSelectedTrackingOrder(null);
-                    setIsOrderTrackingOpen(true);
-                  }}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-left flex items-center space-x-2 text-slate-700 hover:bg-slate-50 transition-all"
-                >
-                  <Truck className="w-4 h-4 text-blue-600" />
-                  <span>Tra Cứu Hành Trình Đơn Hàng</span>
                 </button>
               </div>
             )}
@@ -2962,10 +2846,6 @@ export default function App() {
             currentUser={currentUser}
             initialTab={ordersTabSelection}
             onContinueShopping={() => switchTab("products")}
-            onTrackOrder={(ord) => {
-              setSelectedTrackingOrder(ord);
-              setIsOrderTrackingOpen(true);
-            }}
             onReorder={handleReorder}
             onOpenAuth={() => {
               setAuthTab("login");
@@ -3814,17 +3694,6 @@ export default function App() {
           isOpen={Boolean(selectedInvoiceOrder)}
           order={selectedInvoiceOrder}
           onClose={() => setSelectedInvoiceOrder(null)}
-        />
-
-        {/* MODAL TRA CỨU TIẾN TRÌNH ĐƠN HÀNG */}
-        <OrderTrackingModal
-          isOpen={isOrderTrackingOpen}
-          onClose={() => {
-            setIsOrderTrackingOpen(false);
-            setSelectedTrackingOrder(null);
-          }}
-          orders={orders}
-          selectedOrder={selectedTrackingOrder}
         />
       </div>
 

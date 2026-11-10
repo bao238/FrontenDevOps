@@ -23,6 +23,8 @@ import {
   SlidersHorizontal,
   Layers,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Phone,
   MapPin,
@@ -177,6 +179,51 @@ export default function AdminPanel({
   const [adminOrderFilter, setAdminOrderFilter] = useState<
     "all" | "Chờ xác nhận" | "Chờ lấy hàng" | "Chờ giao hàng" | "Hoàn tất" | "Đã hủy"
   >("all");
+  // Phân trang danh sách đơn hàng trong Admin
+  const [adminOrderPage, setAdminOrderPage] = useState<number>(1);
+  const [adminOrdersPerPage, setAdminOrdersPerPage] = useState<number>(5);
+
+  // Lọc danh sách đơn hàng theo trạng thái
+  const filteredAdminOrders = useMemo(() => {
+    return orders.filter((ord) => {
+      if (adminOrderFilter === "Chờ xác nhận") {
+        return ord.status === "Chờ xác nhận" || (ord.status === "Đang xử lý" && !ord.pickupTime);
+      }
+      if (adminOrderFilter === "Chờ lấy hàng") {
+        return ord.status === "Chờ lấy hàng";
+      }
+      if (adminOrderFilter === "Chờ giao hàng") {
+        return ord.status === "Chờ giao hàng" || (ord.status === "Đang giao" && !ord.receivedAt);
+      }
+      if (adminOrderFilter === "Hoàn tất") {
+        return ord.status === "Hoàn tất" || Boolean(ord.receivedAt);
+      }
+      if (adminOrderFilter === "Đã hủy") {
+        return ord.status === "Đã hủy";
+      }
+      return true;
+    });
+  }, [orders, adminOrderFilter]);
+
+  // Tự động chuyển về trang 1 khi đổi bộ lọc trạng thái
+  useEffect(() => {
+    setAdminOrderPage(1);
+  }, [adminOrderFilter]);
+
+  const totalAdminOrderPages = Math.max(1, Math.ceil(filteredAdminOrders.length / adminOrdersPerPage));
+
+  // Đảm bảo không ở trang vượt quá tổng số trang hiện có
+  useEffect(() => {
+    if (adminOrderPage > totalAdminOrderPages) {
+      setAdminOrderPage(totalAdminOrderPages);
+    }
+  }, [adminOrderPage, totalAdminOrderPages]);
+
+  // Cắt danh sách đơn hàng cho trang hiện tại
+  const paginatedAdminOrders = useMemo(() => {
+    const startIndex = (adminOrderPage - 1) * adminOrdersPerPage;
+    return filteredAdminOrders.slice(startIndex, startIndex + adminOrdersPerPage);
+  }, [filteredAdminOrders, adminOrderPage, adminOrdersPerPage]);
 
   // Tải danh sách đánh giá từ MongoDB
   const fetchReviews = async () => {
@@ -1267,7 +1314,7 @@ export default function AdminPanel({
             ))}
           </div>
 
-          {orders.length === 0 ? (
+          {filteredAdminOrders.length === 0 ? (
             <div className="text-center py-12 text-slate-400 space-y-2">
               <ShoppingBag className="w-12 h-12 stroke-1 mx-auto text-slate-300" />
               <p className="font-semibold text-slate-600 text-sm">Chưa có đơn hàng nào</p>
@@ -1277,26 +1324,7 @@ export default function AdminPanel({
             </div>
           ) : (
             <div className="space-y-4">
-              {orders
-                .filter((ord) => {
-                  if (adminOrderFilter === "Chờ xác nhận") {
-                    return ord.status === "Chờ xác nhận" || (ord.status === "Đang xử lý" && !ord.pickupTime);
-                  }
-                  if (adminOrderFilter === "Chờ lấy hàng") {
-                    return ord.status === "Chờ lấy hàng";
-                  }
-                  if (adminOrderFilter === "Chờ giao hàng") {
-                    return ord.status === "Chờ giao hàng" || (ord.status === "Đang giao" && !ord.receivedAt);
-                  }
-                  if (adminOrderFilter === "Hoàn tất") {
-                    return ord.status === "Hoàn tất" || Boolean(ord.receivedAt);
-                  }
-                  if (adminOrderFilter === "Đã hủy") {
-                    return ord.status === "Đã hủy";
-                  }
-                  return true;
-                })
-                .map((ord) => {
+              {paginatedAdminOrders.map((ord) => {
                   const isPendingConfirm =
                     ord.status === "Chờ xác nhận" || (ord.status === "Đang xử lý" && !ord.pickupTime);
                   const isPickup = ord.status === "Chờ lấy hàng";
@@ -1502,10 +1530,119 @@ export default function AdminPanel({
                     </div>
                   );
                 })}
+
+            {/* PHÂN TRANG ĐƠN HÀNG TRONG ADMIN */}
+            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+              <div className="flex flex-wrap items-center gap-2">
+                <span>
+                  Hiển thị{" "}
+                  <strong className="text-slate-900 font-bold">
+                    {filteredAdminOrders.length === 0
+                      ? 0
+                      : (adminOrderPage - 1) * adminOrdersPerPage + 1}{" "}
+                    -{" "}
+                    {Math.min(
+                      adminOrderPage * adminOrdersPerPage,
+                      filteredAdminOrders.length
+                    )}
+                  </strong>{" "}
+                  trên tổng số{" "}
+                  <strong className="text-slate-900 font-bold">
+                    {filteredAdminOrders.length}
+                  </strong>{" "}
+                  đơn hàng
+                </span>
+                <span className="text-slate-300 hidden sm:inline">&bull;</span>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-slate-400">Xem mỗi trang:</span>
+                  <select
+                    value={adminOrdersPerPage}
+                    onChange={(e) => {
+                      setAdminOrdersPerPage(Number(e.target.value));
+                      setAdminOrderPage(1);
+                    }}
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-xs"
+                  >
+                    <option value={5}>5 đơn / trang</option>
+                    <option value={10}>10 đơn / trang</option>
+                    <option value={20}>20 đơn / trang</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Các nút chuyển trang */}
+              {totalAdminOrderPages > 1 && (
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setAdminOrderPage((prev) => Math.max(1, prev - 1))}
+                    disabled={adminOrderPage === 1}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
+                      adminOrderPage === 1
+                        ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                        : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
+                    }`}
+                    title="Trang trước"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Trước</span>
+                  </button>
+
+                  {Array.from({ length: totalAdminOrderPages }, (_, i) => i + 1).map((page) => {
+                    if (
+                      page === 1 ||
+                      page === totalAdminOrderPages ||
+                      (page >= adminOrderPage - 1 && page <= adminOrderPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          type="button"
+                          onClick={() => setAdminOrderPage(page)}
+                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            adminOrderPage === page
+                              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                              : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    }
+                    if (
+                      (page === adminOrderPage - 2 && page > 1) ||
+                      (page === adminOrderPage + 2 && page < totalAdminOrderPages)
+                    ) {
+                      return (
+                        <span key={page} className="px-1 text-slate-400">
+                          &hellip;
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => setAdminOrderPage((prev) => Math.min(totalAdminOrderPages, prev + 1))}
+                    disabled={adminOrderPage === totalAdminOrderPages}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
+                      adminOrderPage === totalAdminOrderPages
+                        ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                        : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
+                    }`}
+                    title="Trang sau"
+                  >
+                    <span>Sau</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
+    )}
 
       {/* TAB 3: USER MANAGEMENT (QUẢN LÝ NGƯỜI DÙNG) */}
       {adminTab === "users" && (

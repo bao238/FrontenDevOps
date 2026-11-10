@@ -86,15 +86,19 @@ export default function OrderTrackingModal({
     }).format(amount);
   };
 
-  // Xác định bước hiện tại trong lộ trình giao hàng (0: Hủy, 1: Xử lý, 2: Giao hàng, 3: Hoàn tất)
+  // Xác định bước hiện tại trong lộ trình giao hàng (1: Chờ xác nhận, 2: Chờ lấy hàng, 3: Đang giao, 4: Hoàn tất)
   const getTimelineStep = (status: string) => {
     switch (status) {
+      case "Chờ xác nhận":
       case "Đang xử lý":
         return 1;
-      case "Đang giao":
+      case "Chờ lấy hàng":
         return 2;
-      case "Hoàn tất":
+      case "Chờ giao hàng":
+      case "Đang giao":
         return 3;
+      case "Hoàn tất":
+        return 4;
       case "Đã hủy":
         return -1;
       default:
@@ -254,7 +258,13 @@ export default function OrderTrackingModal({
                         className="bg-blue-600 h-full transition-all duration-500"
                         style={{
                           width:
-                            currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%"
+                            currentStep === 1
+                              ? "0%"
+                              : currentStep === 2
+                              ? "33%"
+                              : currentStep === 3
+                              ? "66%"
+                              : "100%"
                         }}
                       />
                     </div>
@@ -270,40 +280,56 @@ export default function OrderTrackingModal({
                       >
                         <Clock className="w-4 h-4" />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700 mt-1.5">
-                        Đã đặt hàng
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 mt-1.5 text-center">
+                        Chờ xác nhận
                       </span>
                     </div>
 
-                    {/* Bước 2: Đang giao */}
+                    {/* Bước 2: Chờ lấy hàng */}
                     <div className="flex flex-col items-center z-10">
                       <div
                         className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shadow-sm ${
                           currentStep >= 2
+                            ? "bg-purple-600 text-white"
+                            : "bg-slate-200 text-slate-500"
+                        }`}
+                      >
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 mt-1.5 text-center">
+                        Chờ lấy hàng
+                      </span>
+                    </div>
+
+                    {/* Bước 3: Đang giao */}
+                    <div className="flex flex-col items-center z-10">
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shadow-sm ${
+                          currentStep >= 3
                             ? "bg-blue-600 text-white"
                             : "bg-slate-200 text-slate-500"
                         }`}
                       >
                         <Truck className="w-4 h-4" />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700 mt-1.5">
-                        Đang giao hàng
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 mt-1.5 text-center">
+                        Chờ giao hàng
                       </span>
                     </div>
 
-                    {/* Bước 3: Hoàn tất */}
+                    {/* Bước 4: Hoàn tất */}
                     <div className="flex flex-col items-center z-10">
                       <div
                         className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shadow-sm ${
-                          currentStep >= 3
+                          currentStep >= 4
                             ? "bg-emerald-600 text-white"
                             : "bg-slate-200 text-slate-500"
                         }`}
                       >
                         <CheckCircle2 className="w-4 h-4" />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700 mt-1.5">
-                        Giao thành công
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 mt-1.5 text-center">
+                        Đã nhận hàng
                       </span>
                     </div>
                   </div>

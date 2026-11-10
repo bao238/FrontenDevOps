@@ -3,7 +3,7 @@ const OrderItem = require('../models/OrderItem');
 const Product = require('../models/Product');
 const { isDbConnected } = require('../config/db');
 
-// GET /api/orders
+// GET /api/orders (Lấy toàn bộ danh sách đơn hàng)
 exports.getOrders = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
@@ -48,13 +48,13 @@ exports.getAllOrderItems = async (req, res) => {
   }
 };
 
-// POST /api/orders
+// POST /api/orders (Tạo đơn hàng mới)
 exports.createOrder = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
-  const { customerInfo, items, totalAmount, paymentMethod, userId } = req.body;
+  const { customerInfo, items, totalAmount, paymentMethod, userId, status, pickupTime, shippingCarrier } = req.body;
   const orderId = `ORD-${Date.now().toString().slice(-6)}`;
 
   const newOrder = {
@@ -64,12 +64,21 @@ exports.createOrder = async (req, res) => {
     customerInfo: {
       fullName: customerInfo?.fullName || 'Khách vãng lai',
       phone: customerInfo?.phone || '',
-      address: customerInfo?.address || ''
+      address: customerInfo?.address || '',
+      note: customerInfo?.note || ''
     },
     items: items || [],
     totalAmount: Number(totalAmount) || 0,
     paymentMethod: paymentMethod || 'Thanh toán khi nhận hàng (COD)',
-    status: 'Đang xử lý'
+    status: status || 'Chờ xác nhận',
+    isPaid: Boolean(req.body.isPaid),
+    pickupTime: pickupTime || null,
+    shippingCarrier: shippingCarrier || 'Giao Hàng Nhanh (GHN)',
+    isReviewed: false,
+    reviewRating: 0,
+    reviewComment: '',
+    reviewedAt: null,
+    receivedAt: null
   };
 
   try {
@@ -111,16 +120,27 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-// PUT /api/orders/:id/status
+// PUT /api/orders/:id/status (Cập nhật trạng thái và thông tin vận chuyển/đánh giá đơn hàng)
 exports.updateOrderStatus = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
   }
 
   try {
+    const updateData = {};
+    if (req.body.status !== undefined) updateData.status = req.body.status;
+    if (req.body.pickupTime !== undefined) updateData.pickupTime = req.body.pickupTime;
+    if (req.body.shippingCarrier !== undefined) updateData.shippingCarrier = req.body.shippingCarrier;
+    if (req.body.isReviewed !== undefined) updateData.isReviewed = req.body.isReviewed;
+    if (req.body.reviewRating !== undefined) updateData.reviewRating = req.body.reviewRating;
+    if (req.body.reviewComment !== undefined) updateData.reviewComment = req.body.reviewComment;
+    if (req.body.reviewedAt !== undefined) updateData.reviewedAt = req.body.reviewedAt;
+    if (req.body.receivedAt !== undefined) updateData.receivedAt = req.body.receivedAt;
+    if (req.body.isPaid !== undefined) updateData.isPaid = req.body.isPaid;
+
     const updated = await Order.findOneAndUpdate(
       { id: req.params.id },
-      { $set: { status: req.body.status } },
+      { $set: updateData },
       { new: true }
     );
 
@@ -134,7 +154,7 @@ exports.updateOrderStatus = async (req, res) => {
   }
 };
 
-// DELETE /api/orders/:id
+// DELETE /api/orders/:id (Xóa đơn hàng)
 exports.deleteOrder = async (req, res) => {
   if (!isDbConnected()) {
     return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });

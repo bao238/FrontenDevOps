@@ -11,7 +11,8 @@ const orderSchema = new mongoose.Schema(
     customerInfo: {
       fullName: { type: String, required: true },
       phone: { type: String, default: '' },
-      address: { type: String, default: '' }
+      address: { type: String, default: '' },
+      note: { type: String, default: '' }
     },
     items: [
       {
@@ -21,11 +22,24 @@ const orderSchema = new mongoose.Schema(
     ],
     totalAmount: { type: Number, required: true },
     paymentMethod: { type: String, default: 'Thanh toán khi nhận hàng (COD)' },
+    // Trạng thái đơn hàng: hỗ trợ 4 bước mới (Chờ xác nhận -> Chờ lấy hàng -> Chờ giao hàng -> Hoàn tất/Đánh giá) và tương thích ngược
     status: {
       type: String,
-      enum: ['Đang xử lý', 'Đang giao', 'Hoàn tất', 'Đã hủy'],
-      default: 'Đang xử lý'
-    }
+      enum: ['Chờ xác nhận', 'Chờ lấy hàng', 'Chờ giao hàng', 'Hoàn tất', 'Đã hủy', 'Đang xử lý', 'Đang giao'],
+      default: 'Chờ xác nhận'
+    },
+    isPaid: { type: Boolean, default: false },
+    // Thời gian hẹn shipper đến lấy hàng (dạng chuỗi ISO hoặc ngày giờ)
+    pickupTime: { type: String, default: null },
+    // Đơn vị vận chuyển được chọn
+    shippingCarrier: { type: String, default: 'Giao Hàng Nhanh (GHN)' },
+    // Trạng thái đánh giá của khách hàng sau khi nhận hàng
+    isReviewed: { type: Boolean, default: false },
+    reviewRating: { type: Number, default: 0 },
+    reviewComment: { type: String, default: '' },
+    reviewedAt: { type: String, default: null },
+    // Thời gian khách hàng bấm "Đã nhận được hàng"
+    receivedAt: { type: String, default: null }
   },
   { timestamps: true }
 );

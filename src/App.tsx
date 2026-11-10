@@ -72,7 +72,7 @@ import PaymentQRModal from "./components/PaymentQRModal";
 import PaymentSimulatorModal from "./components/PaymentSimulatorModal";
 import WishlistModal from "./components/WishlistModal";
 import OrderTrackingModal from "./components/OrderTrackingModal";
-import MyOrdersPage from "./components/MyOrdersPage";
+import MyOrdersPage, { OrderTabKey } from "./components/MyOrdersPage";
 import ProfilePage from "./components/ProfilePage";
 import InvoiceModal from "./components/InvoiceModal";
 import BlogPage from "./components/BlogPage";
@@ -93,13 +93,22 @@ export interface UserProfile {
   role?: string;
 }
 
+export type OrderStatus =
+  | "Chờ xác nhận"
+  | "Chờ lấy hàng"
+  | "Chờ giao hàng"
+  | "Hoàn tất"
+  | "Đã hủy"
+  | "Đang xử lý"
+  | "Đang giao";
+
 export interface OrderRecord {
   id: string;
   date: string;
   items: CartItem[];
   totalAmount: number;
   paymentMethod: string;
-  status: "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy";
+  status: OrderStatus;
   customerInfo: {
     fullName: string;
     phone: string;
@@ -108,6 +117,17 @@ export interface OrderRecord {
   };
   // Trạng thái đã thanh toán hay chưa (Chỉ khi đã thanh toán mới được xem/in hóa đơn)
   isPaid?: boolean;
+  // Thời gian hẹn shipper đến lấy hàng (chuỗi ISO)
+  pickupTime?: string;
+  // Đơn vị vận chuyển được chọn
+  shippingCarrier?: string;
+  // Trạng thái đánh giá
+  isReviewed?: boolean;
+  reviewRating?: number;
+  reviewComment?: string;
+  reviewedAt?: string;
+  // Thời gian khách hàng xác nhận đã nhận hàng
+  receivedAt?: string;
 }
 
 export default function App() {
@@ -135,6 +155,8 @@ export default function App() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState<boolean>(false);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
+  // Tab được chọn trong trang Đơn Hàng (Chờ xác nhận, Chờ lấy hàng, Chờ giao hàng, Đánh giá, all)
+  const [ordersTabSelection, setOrdersTabSelection] = useState<OrderTabKey>("all");
   const [users, setUsers] = useState<UserAccount[]>([]);
 
   // Wishlist, Order Tracking & Payment QR States
@@ -349,6 +371,48 @@ export default function App() {
       const savedOrders = localStorage.getItem("bookstore_orders") || localStorage.getItem("dinhbao_orders");
       if (savedOrders) {
         setOrders(JSON.parse(savedOrders));
+      } else {
+        // Khởi tạo 2 đơn hàng mẫu chuẩn theo hình ảnh 1 & 2 của người dùng
+        const defaultOrders: OrderRecord[] = [
+          {
+            id: "ORD-813124",
+            date: "2026-11-03",
+            items: [
+              { product: INITIAL_BOOKS[0], quantity: 1 },
+              { product: INITIAL_BOOKS[1] || INITIAL_BOOKS[0], quantity: 1 }
+            ],
+            totalAmount: 147000,
+            paymentMethod: "banking",
+            status: "Chờ xác nhận",
+            isPaid: false,
+            customerInfo: {
+              fullName: "Quản Lý BookStore",
+              phone: "0905 123 456",
+              address: "11 Đặng Thai Mai, TP. Đà Nẵng",
+              note: "Giao trong giờ hành chính"
+            }
+          },
+          {
+            id: "ORD-2026-002",
+            date: "2026-10-20",
+            items: [
+              { product: INITIAL_BOOKS[2] || INITIAL_BOOKS[0], quantity: 1 }
+            ],
+            totalAmount: 260000,
+            paymentMethod: "Chuyển khoản ngân hàng (QR Code)",
+            status: "Chờ giao hàng",
+            isPaid: true,
+            pickupTime: new Date(Date.now() - 3600000).toISOString(),
+            shippingCarrier: "Giao Hàng Nhanh (GHN)",
+            customerInfo: {
+              fullName: "Lê Thị Thu Thảo",
+              phone: "0977 112 233",
+              address: "45 Lê Duẩn, TP. Đà Nẵng"
+            }
+          }
+        ];
+        setOrders(defaultOrders);
+        localStorage.setItem("bookstore_orders", JSON.stringify(defaultOrders));
       }
     } catch {
       // ignore
@@ -361,7 +425,7 @@ export default function App() {
       }
     });
     api.getOrders().then((ordList) => {
-      if (ordList && Array.isArray(ordList)) {
+      if (ordList && Array.isArray(ordList) && ordList.length > 0) {
         setOrders(ordList);
       }
     });
@@ -370,6 +434,43 @@ export default function App() {
         setUsers(userList);
       }
     });
+  }, []);
+
+  // Timer tự động kiểm tra thời gian lấy hàng:
+  // "tới thời gian lấy hàng rồi thì sẽ tự chuyển sang chờ giao hàng"
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setOrders((prevOrders) => {
+        let hasChanges = false;
+        const updated = prevOrders.map((ord) => {
+          if (ord.status === "Chờ lấy hàng" && ord.pickupTime) {
+            const pickupTs = new Date(ord.pickupTime).getTime();
+            if (now >= pickupTs) {
+              hasChanges = true;
+              api.updateOrderStatus(ord.id, "Chờ giao hàng").catch(console.error);
+              return {
+                ...ord,
+                status: "Chờ giao hàng" as const,
+              };
+            }
+          }
+          return ord;
+        });
+
+        if (hasChanges) {
+          try {
+            localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+          } catch {
+            // ignore
+          }
+          return updated;
+        }
+        return prevOrders;
+      });
+    }, 2000);
+
+    return () => clearInterval(timer);
   }, []);
 
   // Format VND currency
@@ -870,9 +971,10 @@ export default function App() {
       items: [...cart],
       totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod,
-      status: "Đang xử lý",
+      status: "Chờ xác nhận", // Đơn hàng mới đặt sẽ tự động vào ô "Chờ xác nhận"
       customerInfo: { ...customerInfo },
       isPaid: false,
+      isReviewed: false,
     };
 
     const updatedOrders = [newOrder, ...orders];
@@ -959,18 +1061,21 @@ export default function App() {
     showToast("Đã đồng bộ lại danh sách sản phẩm từ MongoDB!");
   };
 
+  // Cập nhật trạng thái đơn hàng (Admin hoặc hệ thống)
   const handleUpdateOrderStatus = (
     orderId: string,
-    newStatus: "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy"
+    newStatus: OrderStatus,
+    extraData?: any
   ) => {
-    api.updateOrderStatus(orderId, newStatus).catch(console.error);
+    api.updateOrderStatus(orderId, newStatus, extraData).catch(console.error);
     const updated = orders.map((ord) =>
       ord.id === orderId
         ? {
             ...ord,
             status: newStatus,
             // Nếu đơn hoàn tất thì đánh dấu đã thanh toán thành công
-            isPaid: newStatus === "Hoàn tất" ? true : ord.isPaid
+            isPaid: newStatus === "Hoàn tất" ? true : ord.isPaid,
+            ...(extraData || {}),
           }
         : ord
     );
@@ -981,6 +1086,93 @@ export default function App() {
       // ignore
     }
     showToast(`Đã đổi trạng thái đơn #${orderId} thành "${newStatus}"!`);
+  };
+
+  // Xác nhận đã nhận hàng (Ở phần chờ giao hàng -> chuyển sang Đánh giá)
+  const handleConfirmReceived = (orderId: string) => {
+    const updated = orders.map((ord) => {
+      if (ord.id === orderId) {
+        return {
+          ...ord,
+          status: "Hoàn tất" as const,
+          receivedAt: new Date().toISOString(),
+          isReviewed: false,
+          isPaid: true,
+        };
+      }
+      return ord;
+    });
+
+    setOrders(updated);
+    try {
+      localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+    api.updateOrderStatus(orderId, "Hoàn tất", {
+      receivedAt: new Date().toISOString(),
+      isReviewed: false,
+      isPaid: true,
+    }).catch(console.error);
+    showToast(`Xác nhận đã nhận hàng đơn #${orderId}! Đơn đã chuyển sang phần Đánh giá.`);
+  };
+
+  // Gửi nhận xét đánh giá đơn hàng (Nếu chưa đánh giá thì hiện số, đánh giá rồi thì ko hiện nữa)
+  const handleReviewOrder = (orderId: string, rating: number, comment: string) => {
+    const updated = orders.map((ord) => {
+      if (ord.id === orderId) {
+        return {
+          ...ord,
+          isReviewed: true,
+          reviewRating: rating,
+          reviewComment: comment,
+          reviewedAt: new Date().toLocaleDateString("vi-VN"),
+        };
+      }
+      return ord;
+    });
+
+    setOrders(updated);
+    try {
+      localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+    api.updateOrderStatus(orderId, "Hoàn tất", {
+      isReviewed: true,
+      reviewRating: rating,
+      reviewComment: comment,
+      reviewedAt: new Date().toLocaleDateString("vi-VN"),
+    }).catch(console.error);
+    showToast(`Đã gửi đánh giá đơn #${orderId} thành công!`);
+  };
+
+  // Kích hoạt shipper lấy hàng sớm (phục vụ test nhanh chuyển từ Chờ lấy hàng sang Chờ giao hàng)
+  const handleTriggerPickup = (orderId: string) => {
+    const updated = orders.map((ord) => {
+      if (ord.id === orderId) {
+        return {
+          ...ord,
+          status: "Chờ giao hàng" as const,
+        };
+      }
+      return ord;
+    });
+
+    setOrders(updated);
+    try {
+      localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+    api.updateOrderStatus(orderId, "Chờ giao hàng").catch(console.error);
+    showToast(`Shipper đã lấy gói sách #${orderId}! Đã chuyển sang Chờ giao hàng.`);
+  };
+
+  // Điều hướng chuyển trang Đơn Hàng kèm theo Tab cụ thể (Chờ xác nhận, Chờ lấy hàng, Chờ giao hàng, Đánh giá)
+  const handleNavigateToOrders = (tabKey: OrderTabKey = "all") => {
+    setOrdersTabSelection(tabKey);
+    switchTab("orders");
   };
 
   const handleDeleteOrder = (orderId: string) => {
@@ -2716,11 +2908,12 @@ export default function App() {
           />
         )}
 
-        {/* TAB 5: ĐƠN HÀNG CỦA TÔI (MY ORDERS TRANG RIÊNG BIỆT) */}
+        {/* TAB 5: ĐƠN HÀNG CỦA TÔI (MY ORDERS TRANG RIÊNG BIỆT - 4 Ô GỘP SHOPEE) */}
         {activeTab === "orders" && (
           <MyOrdersPage
             orders={orders}
             currentUser={currentUser}
+            initialTab={ordersTabSelection}
             onContinueShopping={() => switchTab("products")}
             onTrackOrder={(ord) => {
               setSelectedTrackingOrder(ord);
@@ -2732,6 +2925,9 @@ export default function App() {
               setIsAuthModalOpen(true);
             }}
             onPrintInvoice={(ord) => setSelectedInvoiceOrder(ord)}
+            onConfirmReceived={handleConfirmReceived}
+            onReviewOrder={handleReviewOrder}
+            onTriggerPickup={handleTriggerPickup}
             onPayOrder={(ord) => {
               setCurrentOrderId(ord.id);
               setPaymentOrderTotal(ord.totalAmount);
@@ -2750,9 +2946,10 @@ export default function App() {
           <ProfilePage
             currentUser={currentUser}
             onUpdateProfile={handleUpdateProfile}
+            orders={orders}
             ordersCount={orders.length}
             wishlistCount={wishlist.length}
-            onNavigateToOrders={() => switchTab("orders")}
+            onNavigateToOrders={handleNavigateToOrders}
             onNavigateToWishlist={() => setIsWishlistOpen(true)}
             onOpenAuth={() => {
               setAuthTab("login");

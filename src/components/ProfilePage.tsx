@@ -21,14 +21,88 @@ import {
   ChevronRight,
   AlertCircle
 } from "lucide-react";
-import { UserProfile } from "../App";
+import { UserProfile, OrderRecord } from "../App";
+import { OrderTabKey } from "./MyOrdersPage";
+
+// 4 Icon chuẩn nét vẽ vector tương đồng 100% với Hình 2 (Shopee)
+const ConfirmIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 48 48"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <rect x="8" y="16" width="32" height="24" rx="2" />
+    <path d="M14 16V10a1.5 1.5 0 0 1 1.5-1.5h15l5.5 5.5v2" />
+    <rect x="25" y="24" width="15" height="8" rx="1.5" />
+    <circle cx="28.5" cy="28" r="1" fill="currentColor" />
+  </svg>
+);
+
+const PickupBoxIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 48 48"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M9 16h30v22H9z" />
+    <path d="M9 16l4-6h22l4 6" />
+    <path d="M24 10v28" />
+    <path d="M18 24h12" />
+  </svg>
+);
+
+const ShippingTruckIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 48 48"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M6 14h24v20H6z" />
+    <path d="M30 20h8l4 6v8h-12z" />
+    <path d="M30 22h7l3 4h-10z" />
+    <circle cx="14" cy="35" r="3.5" />
+    <circle cx="36" cy="35" r="3.5" />
+    <path d="M6 34h4.5M17.5 34h15M39.5 34H42" />
+  </svg>
+);
+
+const ReviewStarIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 48 48"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <circle cx="24" cy="24" r="18" />
+    <path
+      d="M24 13l3.2 6.5 7.2 1-5.2 5.1 1.2 7.2-6.4-3.4-6.4 3.4 1.2-7.2-5.2-5.1 7.2-1z"
+      fill="none"
+    />
+  </svg>
+);
 
 interface ProfilePageProps {
   currentUser: UserProfile | null;
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
+  orders?: OrderRecord[];
   ordersCount: number;
   wishlistCount: number;
-  onNavigateToOrders: () => void;
+  onNavigateToOrders: (tab?: OrderTabKey) => void;
   onNavigateToWishlist: () => void;
   onOpenAuth: () => void;
   onLogout: () => void;
@@ -46,6 +120,7 @@ const PRESET_AVATARS = [
 export default function ProfilePage({
   currentUser,
   onUpdateProfile,
+  orders = [],
   ordersCount,
   wishlistCount,
   onNavigateToOrders,
@@ -54,6 +129,20 @@ export default function ProfilePage({
   onLogout,
   onContinueShopping,
 }: ProfilePageProps) {
+  // Tính số lượng badge cho 4 ô theo đúng yêu cầu đề bài
+  const pendingConfirmCount = orders.filter(
+    (o) => o.status === "Chờ xác nhận" || (o.status === "Đang xử lý" && !o.pickupTime)
+  ).length;
+
+  const pendingPickupCount = orders.filter((o) => o.status === "Chờ lấy hàng").length;
+
+  const pendingShippingCount = orders.filter(
+    (o) => o.status === "Chờ giao hàng" || (o.status === "Đang giao" && !o.receivedAt)
+  ).length;
+
+  const pendingReviewCount = orders.filter(
+    (o) => (o.status === "Hoàn tất" || Boolean(o.receivedAt)) && !o.isReviewed
+  ).length;
   // Tab con trong trang hồ sơ
   const [activeSubTab, setActiveSubTab] = useState<"info" | "security" | "rewards">("info");
 
@@ -235,25 +324,105 @@ export default function ProfilePage({
         </div>
       </div>
 
-      {/* 3 Thẻ Chỉ Số Nhanh (Clickable) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Đơn hàng */}
-        <div
-          onClick={onNavigateToOrders}
-          className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group flex items-center justify-between"
-        >
-          <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Package className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="block text-xs text-slate-400 font-medium">Đơn hàng của bạn</span>
-              <span className="text-xl font-black text-slate-900">{ordersCount} đơn</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+      {/* KHỐI ĐƠN MUA GỘP 4 Ô CHUẨN GIAO DIỆN HÌNH ẢNH 2 (SHOPEE STYLE) */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-6 transition-all">
+        {/* Header khối Đơn mua */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+            Đơn mua
+          </h3>
+          <button
+            type="button"
+            onClick={() => onNavigateToOrders("all")}
+            className="text-xs sm:text-sm font-semibold text-slate-500 hover:text-blue-600 transition-colors flex items-center space-x-1 cursor-pointer group"
+          >
+            <span>Xem lịch sử mua hàng</span>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </div>
 
+        {/* 4 Ô trạng thái chuẩn hình ảnh 2 */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-4 pt-5">
+          {/* Ô 1: Chờ xác nhận */}
+          <button
+            type="button"
+            onClick={() => onNavigateToOrders("Chờ xác nhận")}
+            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            <div className="relative">
+              <ConfirmIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              {pendingConfirmCount > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                  {pendingConfirmCount}
+                </span>
+              )}
+            </div>
+            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+              Chờ xác nhận
+            </span>
+          </button>
+
+          {/* Ô 2: Chờ lấy hàng */}
+          <button
+            type="button"
+            onClick={() => onNavigateToOrders("Chờ lấy hàng")}
+            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            <div className="relative">
+              <PickupBoxIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              {pendingPickupCount > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  {pendingPickupCount}
+                </span>
+              )}
+            </div>
+            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+              Chờ lấy hàng
+            </span>
+          </button>
+
+          {/* Ô 3: Chờ giao hàng (hiện badge đỏ nếu > 0 như ảnh 2) */}
+          <button
+            type="button"
+            onClick={() => onNavigateToOrders("Chờ giao hàng")}
+            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            <div className="relative">
+              <ShippingTruckIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              {pendingShippingCount > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  {pendingShippingCount}
+                </span>
+              )}
+            </div>
+            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+              Chờ giao hàng
+            </span>
+          </button>
+
+          {/* Ô 4: Đánh giá (chỉ hiện số khi chưa đánh giá, đánh giá rồi thì ko hiện nữa) */}
+          <button
+            type="button"
+            onClick={() => onNavigateToOrders("Đánh giá")}
+            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            <div className="relative">
+              <ReviewStarIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              {pendingReviewCount > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                  {pendingReviewCount}
+                </span>
+              )}
+            </div>
+            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+              Đánh giá
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2 Thẻ Chỉ Số Nhanh (Sách yêu thích & Điểm thưởng) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Sách yêu thích */}
         <div
           onClick={onNavigateToWishlist}

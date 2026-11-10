@@ -50,7 +50,9 @@ import {
   Upload,
   Link2,
   AlertTriangle,
-  Printer
+  Printer,
+  Clock,
+  Check
 } from "lucide-react";
 import CouponsTab from "./admin/CouponsTab";
 import AnalyticsTab from "./admin/AnalyticsTab";
@@ -62,13 +64,22 @@ interface CartItem {
   quantity: number;
 }
 
+export type AdminOrderStatus =
+  | "Chờ xác nhận"
+  | "Chờ lấy hàng"
+  | "Chờ giao hàng"
+  | "Hoàn tất"
+  | "Đã hủy"
+  | "Đang xử lý"
+  | "Đang giao";
+
 export interface OrderRecord {
   id: string;
   date: string;
   items: CartItem[];
   totalAmount: number;
   paymentMethod: string;
-  status: "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy";
+  status: AdminOrderStatus;
   customerInfo: {
     fullName: string;
     phone: string;
@@ -76,6 +87,13 @@ export interface OrderRecord {
     note?: string;
   };
   isPaid?: boolean;
+  pickupTime?: string;
+  shippingCarrier?: string;
+  isReviewed?: boolean;
+  reviewRating?: number;
+  reviewComment?: string;
+  reviewedAt?: string;
+  receivedAt?: string;
 }
 
 interface AdminPanelProps {
@@ -85,7 +103,7 @@ interface AdminPanelProps {
   onDeleteProduct: (id: string) => void;
   onResetDefaultProducts: () => void;
   orders: OrderRecord[];
-  onUpdateOrderStatus: (orderId: string, newStatus: "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy") => void;
+  onUpdateOrderStatus: (orderId: string, newStatus: AdminOrderStatus, extraData?: any) => void;
   onDeleteOrder: (orderId: string) => void;
   onSwitchToStore: () => void;
   onAdminLogout?: () => void;
@@ -151,6 +169,14 @@ export default function AdminPanel({
   const [isSavingReview, setIsSavingReview] = useState(false);
   // Modal In Hóa Đơn trong Admin
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<OrderRecord | null>(null);
+
+  // Quản lý Modal Hẹn Giờ Lấy Hàng Cho Shipper & Bộ Lọc Đơn Hàng trong Admin
+  const [pickupModalOrder, setPickupModalOrder] = useState<OrderRecord | null>(null);
+  const [pickupDateTime, setPickupDateTime] = useState<string>("");
+  const [pickupCarrier, setPickupCarrier] = useState<string>("Giao Hàng Nhanh (GHN)");
+  const [adminOrderFilter, setAdminOrderFilter] = useState<
+    "all" | "Chờ xác nhận" | "Chờ lấy hàng" | "Chờ giao hàng" | "Hoàn tất" | "Đã hủy"
+  >("all");
 
   // Tải danh sách đánh giá từ MongoDB
   const fetchReviews = async () => {
@@ -1175,11 +1201,70 @@ export default function AdminPanel({
       {/* TAB 2: ORDERS MANAGEMENT */}
       {adminTab === "orders" && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900">
-              Danh Sách Đơn Hàng Đã Đặt ({orders.length})
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Quản Lý Đơn Hàng Mua Sách ({orders.length} đơn)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Xác nhận đơn, hẹn giờ shipper đến lấy hàng và cập nhật hành trình giao nhận
+              </p>
+            </div>
             <span className="text-xs text-slate-400 font-mono">Dữ liệu lưu tự động MongoDB Container</span>
+          </div>
+
+          {/* Bộ lọc trạng thái đơn hàng trong Admin */}
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: "all", label: "Tất cả", count: orders.length },
+              {
+                id: "Chờ xác nhận",
+                label: "Chờ xác nhận",
+                count: orders.filter((o) => o.status === "Chờ xác nhận" || (o.status === "Đang xử lý" && !o.pickupTime)).length,
+              },
+              {
+                id: "Chờ lấy hàng",
+                label: "Chờ lấy hàng",
+                count: orders.filter((o) => o.status === "Chờ lấy hàng").length,
+              },
+              {
+                id: "Chờ giao hàng",
+                label: "Chờ giao hàng",
+                count: orders.filter((o) => o.status === "Chờ giao hàng" || (o.status === "Đang giao" && !o.receivedAt)).length,
+              },
+              {
+                id: "Hoàn tất",
+                label: "Hoàn tất / Đã giao",
+                count: orders.filter((o) => o.status === "Hoàn tất" || o.receivedAt).length,
+              },
+              {
+                id: "Đã hủy",
+                label: "Đã hủy",
+                count: orders.filter((o) => o.status === "Đã hủy").length,
+              },
+            ].map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setAdminOrderFilter(st.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                  adminOrderFilter === st.id
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <span>{st.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                    adminOrderFilter === st.id
+                      ? "bg-white/20 text-white"
+                      : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {st.count}
+                </span>
+              </button>
+            ))}
           </div>
 
           {orders.length === 0 ? (
@@ -1192,133 +1277,231 @@ export default function AdminPanel({
             </div>
           ) : (
             <div className="space-y-4">
-              {orders.map((ord) => (
-                <div
-                  key={ord.id}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 text-xs space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
-                    <div className="flex items-center space-x-3">
-                      <span className="font-bold font-mono text-blue-600 text-sm">
-                        #{ord.id}
-                      </span>
-                      <span className="text-slate-500 text-xs">
-                        Ngày đặt: {ord.date}
-                      </span>
-                    </div>
+              {orders
+                .filter((ord) => {
+                  if (adminOrderFilter === "Chờ xác nhận") {
+                    return ord.status === "Chờ xác nhận" || (ord.status === "Đang xử lý" && !ord.pickupTime);
+                  }
+                  if (adminOrderFilter === "Chờ lấy hàng") {
+                    return ord.status === "Chờ lấy hàng";
+                  }
+                  if (adminOrderFilter === "Chờ giao hàng") {
+                    return ord.status === "Chờ giao hàng" || (ord.status === "Đang giao" && !ord.receivedAt);
+                  }
+                  if (adminOrderFilter === "Hoàn tất") {
+                    return ord.status === "Hoàn tất" || Boolean(ord.receivedAt);
+                  }
+                  if (adminOrderFilter === "Đã hủy") {
+                    return ord.status === "Đã hủy";
+                  }
+                  return true;
+                })
+                .map((ord) => {
+                  const isPendingConfirm =
+                    ord.status === "Chờ xác nhận" || (ord.status === "Đang xử lý" && !ord.pickupTime);
+                  const isPickup = ord.status === "Chờ lấy hàng";
+                  const isShipping =
+                    ord.status === "Chờ giao hàng" || (ord.status === "Đang giao" && !ord.receivedAt);
+                  const isDone = ord.status === "Hoàn tất" || Boolean(ord.receivedAt);
 
-                    <div className="flex items-center space-x-2">
-                      <span className="text-slate-500 font-medium">Trạng thái:</span>
-                      <select
-                        value={ord.status}
-                        onChange={(e) =>
-                          onUpdateOrderStatus(
-                            ord.id,
-                            e.target.value as "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Đã hủy"
-                          )
-                        }
-                        className={`font-bold px-2.5 py-1 rounded-lg border text-xs focus:outline-none cursor-pointer ${
-                          ord.status === "Hoàn tất"
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                            : ord.status === "Đang giao"
-                            ? "bg-blue-100 text-blue-800 border-blue-300"
-                            : ord.status === "Đã hủy"
-                            ? "bg-red-100 text-red-800 border-red-300"
-                            : "bg-amber-100 text-amber-800 border-amber-300"
-                        }`}
-                      >
-                        <option value="Đang xử lý">Đang xử lý</option>
-                        <option value="Đang giao">Đang giao</option>
-                        <option value="Hoàn tất">Hoàn tất</option>
-                        <option value="Đã hủy">Đã hủy</option>
-                      </select>
-
-                      {/* Nút In Hóa Đơn trong Admin - Rõ ràng trạng thái đã thanh toán */}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInvoiceOrder(ord)}
-                        className={`px-2.5 py-1 border rounded-lg text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer ${
-                          ord.isPaid || ord.status === "Hoàn tất"
-                            ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
-                            : "bg-slate-100 text-slate-400 border-slate-200"
-                        }`}
-                        title={
-                          ord.isPaid || ord.status === "Hoàn tất"
-                            ? "In hóa đơn bán lẻ (Đã thanh toán)"
-                            : "Đơn hàng này chưa thanh toán"
-                        }
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>
-                          In Hóa Đơn {ord.isPaid || ord.status === "Hoàn tất" ? "(Đã TT)" : "(Chưa TT)"}
-                        </span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (window.confirm("Bạn có chắc muốn xóa đơn hàng này?")) {
-                            onDeleteOrder(ord.id);
-                          }
-                        }}
-                        className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors ml-2"
-                        title="Xóa đơn hàng"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Customer Information */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Khách hàng:</span>
-                      <strong className="text-slate-800 font-bold">{ord.customerInfo.fullName}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Số điện thoại:</span>
-                      <strong className="text-slate-800 font-bold">{ord.customerInfo.phone}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Địa chỉ giao:</span>
-                      <span className="text-slate-700">{ord.customerInfo.address}</span>
-                    </div>
-                  </div>
-
-                  {/* Items List */}
-                  <div className="divide-y divide-slate-200/50">
-                    {ord.items.map((it) => (
-                      <div key={it.product.id} className="py-2 flex justify-between items-center">
-                        <div className="flex items-center space-x-2">
-                          <img
-                            src={it.product.imageUrl}
-                            alt={it.product.name}
-                            className="w-8 h-8 rounded-lg object-cover"
-                          />
-                          <span className="text-slate-800 font-medium">
-                            {it.product.name} <strong className="text-blue-600">x{it.quantity}</strong>
+                  return (
+                    <div
+                      key={ord.id}
+                      className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 text-xs space-y-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
+                        <div className="flex items-center space-x-3">
+                          <span className="font-bold font-mono text-blue-600 text-sm">
+                            #{ord.id}
+                          </span>
+                          <span className="text-slate-500 text-xs">
+                            Ngày đặt: {ord.date}
                           </span>
                         </div>
-                        <span className="font-semibold text-slate-800">
-                          {formatVND(it.product.price * it.quantity)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
 
-                  {/* Total & Payment method */}
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
-                    <span className="text-slate-500">
-                      Hình thức: <strong className="text-slate-800 uppercase">{ord.paymentMethod}</strong>
-                    </span>
-                    <div className="text-right">
-                      <span className="text-slate-500 mr-2">Tổng thanh toán:</span>
-                      <span className="font-extrabold text-red-600 text-sm">
-                        {formatVND(ord.totalAmount)}
-                      </span>
+                        {/* Thao tác trạng thái nhanh và dropdown */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* 1. NÚT XÁC NHẬN & HẸN GIỜ LẤY HÀNG (CHO ĐƠN CHỜ XÁC NHẬN) */}
+                          {isPendingConfirm && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPickupModalOrder(ord);
+                                const defaultTime = new Date(Date.now() + 15 * 60000);
+                                setPickupDateTime(defaultTime.toISOString().slice(0, 16));
+                                setPickupCarrier(ord.shippingCarrier || "Giao Hàng Nhanh (GHN)");
+                              }}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer transform hover:-translate-y-0.5"
+                              title="Xác nhận đơn và chọn thời gian shipper lấy hàng"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Xác Nhận &amp; Hẹn Giờ Lấy Hàng</span>
+                            </button>
+                          )}
+
+                          {/* 2. NÚT CHUYỂN SANG GIAO HÀNG (CHO ĐƠN CHỜ LẤY HÀNG) */}
+                          {isPickup && (
+                            <button
+                              type="button"
+                              onClick={() => onUpdateOrderStatus(ord.id, "Chờ giao hàng")}
+                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer"
+                              title="Shipper đã nhận gói hàng, chuyển sang Đang Giao"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>Shipper Đã Lấy (Giao Ngay)</span>
+                            </button>
+                          )}
+
+                          {/* 3. NÚT XÁC NHẬN GIAO THÀNH CÔNG (CHO ĐƠN ĐANG GIAO) */}
+                          {isShipping && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateOrderStatus(ord.id, "Hoàn tất", {
+                                  receivedAt: new Date().toISOString(),
+                                })
+                              }
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer"
+                              title="Đánh dấu đơn hàng đã giao thành công tới khách"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Xác Nhận Đã Giao Thành Công</span>
+                            </button>
+                          )}
+
+                          <span className="text-slate-500 font-medium">Trạng thái:</span>
+                          <select
+                            value={ord.status}
+                            onChange={(e) =>
+                              onUpdateOrderStatus(
+                                ord.id,
+                                e.target.value as AdminOrderStatus
+                              )
+                            }
+                            className={`font-bold px-2.5 py-1 rounded-lg border text-xs focus:outline-none cursor-pointer ${
+                              isDone
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                : isShipping
+                                ? "bg-blue-100 text-blue-800 border-blue-300"
+                                : isPickup
+                                ? "bg-purple-100 text-purple-800 border-purple-300"
+                                : ord.status === "Đã hủy"
+                                ? "bg-red-100 text-red-800 border-red-300"
+                                : "bg-amber-100 text-amber-800 border-amber-300"
+                            }`}
+                          >
+                            <option value="Chờ xác nhận">Chờ xác nhận</option>
+                            <option value="Chờ lấy hàng">Chờ lấy hàng</option>
+                            <option value="Chờ giao hàng">Chờ giao hàng</option>
+                            <option value="Hoàn tất">Hoàn tất / Đã giao</option>
+                            <option value="Đã hủy">Đã hủy</option>
+                          </select>
+
+                          {/* Nút In Hóa Đơn trong Admin */}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedInvoiceOrder(ord)}
+                            className={`px-2.5 py-1 border rounded-lg text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer ${
+                              ord.isPaid || isDone
+                                ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
+                                : "bg-slate-100 text-slate-400 border-slate-200"
+                            }`}
+                            title={
+                              ord.isPaid || isDone
+                                ? "In hóa đơn bán lẻ (Đã thanh toán)"
+                                : "Đơn hàng này chưa thanh toán"
+                            }
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>
+                              In Hóa Đơn {ord.isPaid || isDone ? "(Đã TT)" : "(Chưa TT)"}
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (window.confirm("Bạn có chắc muốn xóa đơn hàng này?")) {
+                                onDeleteOrder(ord.id);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors ml-1 cursor-pointer"
+                            title="Xóa đơn hàng"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Banner hiển thị chi tiết lịch hẹn lấy hàng nếu có */}
+                      {isPickup && ord.pickupTime && (
+                        <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 flex items-center justify-between text-xs">
+                          <span className="flex items-center space-x-1.5 font-bold">
+                            <Clock className="w-4 h-4 text-purple-600" />
+                            <span>Lịch shipper lấy hàng: {new Date(ord.pickupTime).toLocaleString("vi-VN")} ({ord.shippingCarrier || "Giao Hàng Nhanh"})</span>
+                          </span>
+                          <span className="text-[11px] text-purple-600 bg-white px-2 py-0.5 rounded border border-purple-200">
+                            Tự động chuyển sang Chờ giao khi đến giờ
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Customer Information */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">Khách hàng:</span>
+                          <strong className="text-slate-800 font-bold">{ord.customerInfo.fullName}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">Số điện thoại:</span>
+                          <strong className="text-slate-800 font-bold">{ord.customerInfo.phone}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">Địa chỉ giao:</span>
+                          <span className="text-slate-700">{ord.customerInfo.address}</span>
+                        </div>
+                      </div>
+
+                      {/* Items List */}
+                      <div className="divide-y divide-slate-200/50">
+                        {ord.items.map((it) => (
+                          <div key={it.product.id} className="py-2 flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                              <img
+                                src={it.product.imageUrl}
+                                alt={it.product.name}
+                                className="w-8 h-8 rounded-lg object-cover"
+                              />
+                              <span className="text-slate-800 font-medium">
+                                {it.product.name} <strong className="text-blue-600">x{it.quantity}</strong>
+                              </span>
+                            </div>
+                            <span className="font-semibold text-slate-800">
+                              {formatVND(it.product.price * it.quantity)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Total & Payment method */}
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
+                        <span className="text-slate-500">
+                          Hình thức: <strong className="text-slate-800 uppercase">{ord.paymentMethod}</strong>
+                          {ord.isReviewed && (
+                            <span className="ml-2 text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded">
+                              ⭐ Khách đã đánh giá ({ord.reviewRating || 5}/5 sao)
+                            </span>
+                          )}
+                        </span>
+                        <div className="text-right">
+                          <span className="text-slate-500 mr-2">Tổng thanh toán:</span>
+                          <span className="font-extrabold text-red-600 text-sm">
+                            {formatVND(ord.totalAmount)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
           )}
         </div>
@@ -2664,6 +2847,165 @@ export default function AdminPanel({
           </div>
         </div>,
         document.body
+      )}
+
+      {/* MODAL HẸN GIỜ LẤY HÀNG CHO SHIPPER (ADMIN) */}
+      {pickupModalOrder && (
+        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Xác Nhận &amp; Hẹn Giờ Shipper
+                  </h3>
+                  <p className="text-xs text-slate-400">Đơn hàng #{pickupModalOrder.id}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPickupModalOrder(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Thông tin tóm tắt đơn hàng */}
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Khách hàng:</span>
+                <strong className="text-slate-800">{pickupModalOrder.customerInfo.fullName}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Số điện thoại:</span>
+                <span className="text-slate-700">{pickupModalOrder.customerInfo.phone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Địa chỉ:</span>
+                <span className="text-slate-700 truncate max-w-[200px]" title={pickupModalOrder.customerInfo.address}>
+                  {pickupModalOrder.customerInfo.address}
+                </span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-slate-200">
+                <span className="text-slate-500">Tổng thanh toán:</span>
+                <strong className="text-red-600 font-black">{formatVND(pickupModalOrder.totalAmount)}</strong>
+              </div>
+            </div>
+
+            {/* Chọn thời gian lấy hàng */}
+            <div className="space-y-2 text-xs">
+              <label className="block font-bold text-slate-800">
+                Thời gian shipper đến kho lấy sách:
+              </label>
+              <input
+                type="datetime-local"
+                value={pickupDateTime}
+                onChange={(e) => setPickupDateTime(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+
+              {/* Các nút chọn nhanh thời gian */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-slate-400 block">Chọn nhanh lịch hẹn:</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = new Date(Date.now() + 60000);
+                      setPickupDateTime(t.toISOString().slice(0, 16));
+                    }}
+                    className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold text-left transition-colors cursor-pointer"
+                  >
+                    ⚡ Lấy ngay (+1 phút)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = new Date(Date.now() + 15 * 60000);
+                      setPickupDateTime(t.toISOString().slice(0, 16));
+                    }}
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium text-left transition-colors cursor-pointer"
+                  >
+                    🕒 Sau 15 phút
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = new Date(Date.now() + 30 * 60000);
+                      setPickupDateTime(t.toISOString().slice(0, 16));
+                    }}
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium text-left transition-colors cursor-pointer"
+                  >
+                    🕒 Sau 30 phút
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = new Date(Date.now() + 60 * 60000);
+                      setPickupDateTime(t.toISOString().slice(0, 16));
+                    }}
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium text-left transition-colors cursor-pointer"
+                  >
+                    🕒 Sau 1 giờ
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Chọn đơn vị vận chuyển */}
+            <div className="space-y-1.5 text-xs">
+              <label className="block font-bold text-slate-800">
+                Đơn vị vận chuyển liên kết:
+              </label>
+              <select
+                value={pickupCarrier}
+                onChange={(e) => setPickupCarrier(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="Giao Hàng Nhanh (GHN)">Giao Hàng Nhanh (GHN)</option>
+                <option value="Viettel Post">Viettel Post</option>
+                <option value="Shopee Xpress">Shopee Xpress</option>
+                <option value="Giao Hàng Tiết Kiệm (GHTK)">Giao Hàng Tiết Kiệm (GHTK)</option>
+                <option value="J&T Express">J&amp;T Express</option>
+              </select>
+            </div>
+
+            {/* Nút hành động */}
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPickupModalOrder(null)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-100 text-xs transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!pickupModalOrder) return;
+                  const finalPickupTime = pickupDateTime
+                    ? new Date(pickupDateTime).toISOString()
+                    : new Date(Date.now() + 15 * 60000).toISOString();
+
+                  onUpdateOrderStatus(pickupModalOrder.id, "Chờ lấy hàng", {
+                    pickupTime: finalPickupTime,
+                    shippingCarrier: pickupCarrier,
+                  });
+                  setPickupModalOrder(null);
+                }}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 text-xs transition-all flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Xác Nhận &amp; Lưu Lịch Shipper</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* MODAL IN HÓA ĐƠN TRONG ADMIN */}

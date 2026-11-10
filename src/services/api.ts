@@ -9,6 +9,7 @@ export interface OrderPayload {
     fullName: string;
     phone: string;
     address: string;
+    note?: string;
   };
   items: Array<{
     product: Product;
@@ -16,6 +17,9 @@ export interface OrderPayload {
   }>;
   totalAmount: number;
   paymentMethod: string;
+  status?: string;
+  pickupTime?: string;
+  shippingCarrier?: string;
 }
 
 // Kiểu dữ liệu Mã giảm giá (Coupons)
@@ -159,12 +163,12 @@ export const api = {
     return await res.json();
   },
 
-  // 8. Cập nhật trạng thái đơn hàng
-  async updateOrderStatus(id: string, status: string) {
+  // 8. Cập nhật trạng thái và dữ liệu liên quan của đơn hàng
+  async updateOrderStatus(id: string, status: string, extraData?: Record<string, any>) {
     const res = await fetch(`${API_BASE}/orders/${id}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status, ...extraData })
     });
     return await res.json();
   },

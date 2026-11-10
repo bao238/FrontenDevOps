@@ -119,6 +119,9 @@ export interface OrderRecord {
     address: string;
     note?: string;
   };
+  // Tài khoản sở hữu đơn hàng (để cô lập dữ liệu theo tài khoản)
+  userId?: string;
+  userEmail?: string;
   // Trạng thái đã thanh toán hay chưa (Chỉ khi đã thanh toán mới được xem/in hóa đơn)
   isPaid?: boolean;
   // Thời gian hẹn shipper đến lấy hàng (chuỗi ISO)
@@ -143,6 +146,19 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
   const [cart, setCart] = useState<CartItem[]>([]);
+  // Lưu giỏ hàng theo tài khoản riêng biệt để tránh rò rỉ giữa các tài khoản
+  const saveUserCart = (newCart: CartItem[], user: UserProfile | null) => {
+    try {
+      if (user && user.id) {
+        localStorage.setItem("bookstore_cart_" + user.id, JSON.stringify(newCart));
+      } else {
+        localStorage.setItem("bookstore_cart_guest", JSON.stringify(newCart));
+      }
+    } catch (err) {
+      console.error("Lỗi khi lưu giỏ hàng:", err);
+    }
+  };
+
   // Danh sách ID các sản phẩm trong giỏ hàng được tick chọn để mua trước
   const [selectedCartIds, setSelectedCartIds] = useState<string[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -348,6 +364,7 @@ export default function App() {
   const handleClearCart = () => {
     setCart([]);
     setSelectedCartIds([]);
+    saveUserCart([], currentUser);
     showToast("Đã làm trống giỏ hàng thành công!");
   };
 
@@ -388,6 +405,21 @@ export default function App() {
           fullName: parsed.name || "",
           phone: parsed.phone || "",
         }));
+
+        // Khôi phục giỏ hàng của tài khoản đã đăng nhập
+        const savedUserCart = localStorage.getItem("bookstore_cart_" + parsed.id);
+        if (savedUserCart) {
+          try {
+            setCart(JSON.parse(savedUserCart));
+          } catch {
+            setCart([]);
+          }
+        }
+
+        // Nếu tài khoản không phải là admin thì tắt phiên admin
+        if (parsed.role !== "admin" && parsed.role !== "staff") {
+          setIsAdminLoggedIn(false);
+        }
       }
 
       const savedOrders = localStorage.getItem("bookstore_orders") || localStorage.getItem("dinhbao_orders");
@@ -557,6 +589,7 @@ export default function App() {
         phone: existing.phone,
         avatarUrl: existing.avatarUrl || "/default-avatar.png",
         memberSince: existing.createdAt || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
+        role: existing.role || "user",
       };
       setCurrentUser(loggedUser);
       localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
@@ -569,6 +602,30 @@ export default function App() {
       setIsAuthModalOpen(false);
       setLoginPassword("");
       setAuthError(null);
+
+      // Khôi phục giỏ hàng của tài khoản vừa đăng nhập (giỏ hàng của ai thì của người đó)
+      const userSavedCart = localStorage.getItem("bookstore_cart_" + loggedUser.id);
+      if (userSavedCart) {
+        try {
+          setCart(JSON.parse(userSavedCart));
+        } catch {
+          setCart([]);
+        }
+      } else {
+        setCart([]);
+      }
+      setSelectedCartIds([]);
+
+      // Nếu là tài khoản người dùng bình thường: Tắt quyền và phiên quản trị Admin
+      if (existing.role !== "admin" && existing.role !== "staff") {
+        setIsAdminLoggedIn(false);
+        try {
+          localStorage.removeItem("bookstore_admin_session");
+          localStorage.removeItem("bookstore_admin_user");
+        } catch {
+          // ignore
+        }
+      }
 
       // NẾU LÀ TÀI KHOẢN ADMIN HOẶC STAFF -> TỰ ĐỘNG CHUYỂN QUA TRANG /admin VÀ KÍCH HOẠT PHIÊN QUẢN TRỊ
       if (existing.role === "admin" || existing.role === "staff") {
@@ -678,7 +735,11 @@ export default function App() {
       phone: newAccount.phone,
       avatarUrl: "/default-avatar.png",
       memberSince: newAccount.createdAt,
+      role: "user",
     };
+    setIsAdminLoggedIn(false);
+    setCart([]);
+    setSelectedCartIds([]);
 
     setCurrentUser(newUser);
     localStorage.setItem("bookstore_user", JSON.stringify(newUser));
@@ -697,6 +758,8 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setIsAdminLoggedIn(false);
+    setCart([]);
+    setSelectedCartIds([]);
     localStorage.removeItem("bookstore_user");
     localStorage.removeItem("bookstore_admin_session");
     localStorage.removeItem("bookstore_admin_user");
@@ -704,7 +767,7 @@ export default function App() {
     localStorage.removeItem("dinhbao_admin_session");
     localStorage.removeItem("dinhbao_admin_user");
     setIsUserMenuOpen(false);
-    showToast("Đã đăng xuất tài khoản thành công.");
+    showToast("Đã đăng xuất tài khoản thành công. Giỏ hàng và đơn hàng đã được xóa khỏi phiên.");
   };
 
   // Add to Cart
@@ -714,15 +777,19 @@ export default function App() {
       return;
     }
     setCart((prev) => {
+      let nextCart: CartItem[];
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        return prev.map((item) =>
+        nextCart = prev.map((item) =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
+      } else {
+        nextCart = [...prev, { product, quantity }];
       }
-      return [...prev, { product, quantity }];
+      saveUserCart(nextCart, currentUser);
+      return nextCart;
     });
     // Tự động tick chọn cuốn sách vừa thêm vào giỏ hàng
     setSelectedCartIds((prev) => (prev.includes(product.id) ? prev : [...prev, product.id]));
@@ -741,13 +808,18 @@ export default function App() {
           return item;
         })
         .filter(Boolean) as CartItem[];
+      saveUserCart(updated, currentUser);
       return updated;
     });
   };
 
   // Remove from cart
   const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    setCart((prev) => {
+      const updated = prev.filter((item) => item.product.id !== productId);
+      saveUserCart(updated, currentUser);
+      return updated;
+    });
     setSelectedCartIds((prev) => prev.filter((id) => id !== productId));
     showToast("Đã xóa sản phẩm khỏi giỏ hàng");
   };
@@ -855,6 +927,25 @@ export default function App() {
     setSelectedBookFormat("Tất cả");
     setSearchQuery("");
   };
+
+  // Lọc danh sách đơn hàng cho người dùng hiện tại (Cô lập đơn hàng theo từng tài khoản)
+  const userScopedOrders = useMemo(() => {
+    // Khi đã đăng xuất (chưa đăng nhập): Không hiển thị đơn hàng của tài khoản trước đó
+    if (!currentUser) {
+      return [];
+    }
+    return orders.filter((ord) => {
+      // 1. Khớp theo mã định danh tài khoản (userId)
+      if (ord.userId && ord.userId === currentUser.id) return true;
+      // 2. Khớp theo email tài khoản
+      if (ord.userEmail && ord.userEmail.toLowerCase() === currentUser.email.toLowerCase()) return true;
+      // 3. Khớp theo số điện thoại đã lưu trong hồ sơ
+      if (currentUser.phone && ord.customerInfo?.phone && ord.customerInfo.phone === currentUser.phone) return true;
+      // 4. Khớp theo họ tên người nhận (chỉ khi đơn chưa có userId của người khác)
+      if (!ord.userId && ord.customerInfo?.fullName?.toLowerCase() === currentUser.name.toLowerCase()) return true;
+      return false;
+    });
+  }, [orders, currentUser]);
 
   // Filter & Sort Products (Đã nâng cấp lọc theo Thể loại & Loại quyển sách)
   const filteredProducts = useMemo(() => {
@@ -1023,6 +1114,8 @@ export default function App() {
       paymentMethod: customerInfo.paymentMethod,
       status: "Chờ xác nhận", // Đơn hàng mới đặt sẽ tự động vào ô "Chờ xác nhận"
       customerInfo: { ...customerInfo },
+      userId: currentUser?.id,
+      userEmail: currentUser?.email,
       isPaid: false,
       isReviewed: false,
     };
@@ -1044,7 +1137,11 @@ export default function App() {
     }).catch(console.error);
 
     // Xóa khỏi giỏ hàng CHỈ các sản phẩm đã được tick mua, GIỮ LẠI các sản phẩm chưa tick mua
-    setCart((prev) => prev.filter((item) => !selectedCartIds.includes(item.product.id)));
+    setCart((prev) => {
+      const remainingCart = prev.filter((item) => !selectedCartIds.includes(item.product.id));
+      saveUserCart(remainingCart, currentUser);
+      return remainingCart;
+    });
     setSelectedCartIds([]);
     setAppliedDiscount(0);
     setPromoCode("");
@@ -1393,6 +1490,8 @@ export default function App() {
     setIsAdminLoggedIn(false);
     setCurrentUser(null);
     setIsUserMenuOpen(false);
+    setCart([]);
+    setSelectedCartIds([]);
     try {
       localStorage.removeItem("bookstore_admin_session");
       localStorage.removeItem("bookstore_admin_user");
@@ -1676,11 +1775,11 @@ export default function App() {
                             }`}
                           >
                             <Package className="w-4 h-4 text-indigo-600" />
-                            <span>Đơn hàng của tôi ({orders.length})</span>
+                            <span>Đơn hàng của tôi ({userScopedOrders.length})</span>
                           </button>
 
-                          {/* Nút Vào Trang Quản Trị Hệ Thống Nổi Bật */}
-                          {(currentUser.role === "admin" || currentUser.role === "staff" || isAdminLoggedIn) ? (
+                          {/* Nút Vào Trang Quản Trị Hệ Thống (CHỈ hiển thị cho tài khoản Quản trị, KHÔNG hiện cho user thường) */}
+                          {(currentUser.role === "admin" || currentUser.role === "staff") && (
                             <button
                               onClick={() => {
                                 setIsUserMenuOpen(false);
@@ -1695,17 +1794,6 @@ export default function App() {
                               <span className="text-[10px] bg-purple-600 text-white px-1.5 py-0.2 rounded font-black">
                                 ADMIN
                               </span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setIsUserMenuOpen(false);
-                                switchTab("admin");
-                              }}
-                              className="w-full px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 rounded-xl flex items-center space-x-2 transition-colors mt-1"
-                            >
-                              <Lock className="w-4 h-4 text-slate-400" />
-                              <span>Đăng nhập Quản Trị</span>
                             </button>
                           )}
                         </div>
@@ -1760,8 +1848,8 @@ export default function App() {
             {/* Menu Điều Hướng Rút Gọn Trên Mobile / Tablet */}
             {isMobileNavOpen && (
               <div className="lg:hidden pt-3 mt-3 border-t border-slate-100 flex flex-col space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                {/* Nút Admin trong Mobile Menu */}
-                {(currentUser?.role === "admin" || currentUser?.role === "staff" || isAdminLoggedIn) ? (
+                {/* Nút Admin trong Mobile Menu (Chỉ hiển thị cho tài khoản Quản trị) */}
+                {(currentUser?.role === "admin" || currentUser?.role === "staff") && (
                   <button
                     onClick={() => {
                       setIsMobileNavOpen(false);
@@ -1776,17 +1864,6 @@ export default function App() {
                     <span className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded font-black">
                       ADMIN
                     </span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setIsMobileNavOpen(false);
-                      switchTab("admin");
-                    }}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-left flex items-center space-x-2 text-slate-700 hover:bg-slate-50 transition-all"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-purple-600" />
-                    <span>Cổng Quản Trị Viên (Admin)</span>
                   </button>
                 )}
 
@@ -2810,7 +2887,7 @@ export default function App() {
         {/* TAB 5: ĐƠN HÀNG CỦA TÔI (MY ORDERS TRANG RIÊNG BIỆT - 4 Ô GỘP SHOPEE) */}
         {activeTab === "orders" && (
           <MyOrdersPage
-            orders={orders}
+            orders={userScopedOrders}
             currentUser={currentUser}
             initialTab={ordersTabSelection}
             onContinueShopping={() => switchTab("products")}
@@ -2841,8 +2918,8 @@ export default function App() {
           <ProfilePage
             currentUser={currentUser}
             onUpdateProfile={handleUpdateProfile}
-            orders={orders}
-            ordersCount={orders.length}
+            orders={userScopedOrders}
+            ordersCount={userScopedOrders.length}
             wishlistCount={wishlist.length}
             onNavigateToOrders={handleNavigateToOrders}
             onNavigateToWishlist={() => setIsWishlistOpen(true)}

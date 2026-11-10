@@ -59,6 +59,7 @@ import {
 import CouponsTab from "./admin/CouponsTab";
 import AnalyticsTab from "./admin/AnalyticsTab";
 import CategoriesTab from "./admin/CategoriesTab";
+import AdminPagination from "./admin/AdminPagination";
 import InvoiceModal from "./InvoiceModal";
 
 interface CartItem {
@@ -181,7 +182,7 @@ export default function AdminPanel({
   >("all");
   // Phân trang danh sách đơn hàng trong Admin
   const [adminOrderPage, setAdminOrderPage] = useState<number>(1);
-  const [adminOrdersPerPage, setAdminOrdersPerPage] = useState<number>(5);
+  const [adminOrdersPerPage, setAdminOrdersPerPage] = useState<number>(10);
 
   // Lọc danh sách đơn hàng theo trạng thái
   const filteredAdminOrders = useMemo(() => {
@@ -311,6 +312,23 @@ export default function AdminPanel({
       return matchSearch && matchRating && matchProduct;
     });
   }, [reviewsList, reviewSearchQuery, reviewRatingFilter, selectedProductReviewFilter]);
+
+  // Phân trang danh sách đánh giá từ MongoDB (mặc định 10 đánh giá / trang)
+  const [adminReviewPage, setAdminReviewPage] = useState<number>(1);
+  const [adminReviewsPerPage, setAdminReviewsPerPage] = useState<number>(10);
+  useEffect(() => {
+    setAdminReviewPage(1);
+  }, [reviewSearchQuery, reviewRatingFilter, selectedProductReviewFilter]);
+  const totalAdminReviewPages = Math.max(1, Math.ceil(filteredReviews.length / adminReviewsPerPage));
+  useEffect(() => {
+    if (adminReviewPage > totalAdminReviewPages) {
+      setAdminReviewPage(totalAdminReviewPages);
+    }
+  }, [adminReviewPage, totalAdminReviewPages]);
+  const paginatedAdminReviews = useMemo(() => {
+    const startIndex = (adminReviewPage - 1) * adminReviewsPerPage;
+    return filteredReviews.slice(startIndex, startIndex + adminReviewsPerPage);
+  }, [filteredReviews, adminReviewPage, adminReviewsPerPage]);
 
   // Thống kê đánh giá
   const reviewStats = useMemo(() => {
@@ -546,6 +564,23 @@ export default function AdminPanel({
     });
   }, [products, selectedCategory, searchQuery, selectedStockFilter]);
 
+  // Phân trang danh sách sản phẩm trong Admin (mặc định 10 cuốn / trang)
+  const [adminProdPage, setAdminProdPage] = useState<number>(1);
+  const [adminProdPerPage, setAdminProdPerPage] = useState<number>(10);
+  useEffect(() => {
+    setAdminProdPage(1);
+  }, [selectedCategory, searchQuery, selectedStockFilter]);
+  const totalAdminProdPages = Math.max(1, Math.ceil(filteredProducts.length / adminProdPerPage));
+  useEffect(() => {
+    if (adminProdPage > totalAdminProdPages) {
+      setAdminProdPage(totalAdminProdPages);
+    }
+  }, [adminProdPage, totalAdminProdPages]);
+  const paginatedAdminProducts = useMemo(() => {
+    const startIndex = (adminProdPage - 1) * adminProdPerPage;
+    return filteredProducts.slice(startIndex, startIndex + adminProdPerPage);
+  }, [filteredProducts, adminProdPage, adminProdPerPage]);
+
   // Statistics
   const totalRevenue = useMemo(() => {
     return orders
@@ -579,6 +614,23 @@ export default function AdminPanel({
       return matchQuery && matchRole && matchStatus;
     });
   }, [users, userSearchQuery, userRoleFilter, userStatusFilter]);
+
+  // Phân trang danh sách người dùng trong Admin (mặc định 10 người dùng / trang)
+  const [adminUserPage, setAdminUserPage] = useState<number>(1);
+  const [adminUsersPerPage, setAdminUsersPerPage] = useState<number>(10);
+  useEffect(() => {
+    setAdminUserPage(1);
+  }, [userSearchQuery, userRoleFilter, userStatusFilter]);
+  const totalAdminUserPages = Math.max(1, Math.ceil(filteredUsers.length / adminUsersPerPage));
+  useEffect(() => {
+    if (adminUserPage > totalAdminUserPages) {
+      setAdminUserPage(totalAdminUserPages);
+    }
+  }, [adminUserPage, totalAdminUserPages]);
+  const paginatedAdminUsers = useMemo(() => {
+    const startIndex = (adminUserPage - 1) * adminUsersPerPage;
+    return filteredUsers.slice(startIndex, startIndex + adminUsersPerPage);
+  }, [filteredUsers, adminUserPage, adminUsersPerPage]);
 
   const userStats = useMemo(() => {
     const total = users.length;
@@ -1123,7 +1175,7 @@ export default function AdminPanel({
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((p) => (
+                  paginatedAdminProducts.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Name & Thumbnail */}
                       <td className="py-3 px-4">
@@ -1242,6 +1294,20 @@ export default function AdminPanel({
               </tbody>
             </table>
           </div>
+
+          {/* Thanh phân trang sản phẩm chuẩn 10 cuốn / trang */}
+          <AdminPagination
+            currentPage={adminProdPage}
+            totalPages={totalAdminProdPages}
+            totalItems={filteredProducts.length}
+            itemsPerPage={adminProdPerPage}
+            itemLabel="sản phẩm"
+            onPageChange={setAdminProdPage}
+            onPerPageChange={(per) => {
+              setAdminProdPerPage(per);
+              setAdminProdPage(1);
+            }}
+          />
         </div>
       )}
 
@@ -1531,114 +1597,19 @@ export default function AdminPanel({
                   );
                 })}
 
-            {/* PHÂN TRANG ĐƠN HÀNG TRONG ADMIN */}
-            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-              <div className="flex flex-wrap items-center gap-2">
-                <span>
-                  Hiển thị{" "}
-                  <strong className="text-slate-900 font-bold">
-                    {filteredAdminOrders.length === 0
-                      ? 0
-                      : (adminOrderPage - 1) * adminOrdersPerPage + 1}{" "}
-                    -{" "}
-                    {Math.min(
-                      adminOrderPage * adminOrdersPerPage,
-                      filteredAdminOrders.length
-                    )}
-                  </strong>{" "}
-                  trên tổng số{" "}
-                  <strong className="text-slate-900 font-bold">
-                    {filteredAdminOrders.length}
-                  </strong>{" "}
-                  đơn hàng
-                </span>
-                <span className="text-slate-300 hidden sm:inline">&bull;</span>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-slate-400">Xem mỗi trang:</span>
-                  <select
-                    value={adminOrdersPerPage}
-                    onChange={(e) => {
-                      setAdminOrdersPerPage(Number(e.target.value));
-                      setAdminOrderPage(1);
-                    }}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-xs"
-                  >
-                    <option value={5}>5 đơn / trang</option>
-                    <option value={10}>10 đơn / trang</option>
-                    <option value={20}>20 đơn / trang</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Các nút chuyển trang */}
-              {totalAdminOrderPages > 1 && (
-                <div className="flex items-center space-x-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setAdminOrderPage((prev) => Math.max(1, prev - 1))}
-                    disabled={adminOrderPage === 1}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
-                      adminOrderPage === 1
-                        ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                        : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
-                    }`}
-                    title="Trang trước"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    <span>Trước</span>
-                  </button>
-
-                  {Array.from({ length: totalAdminOrderPages }, (_, i) => i + 1).map((page) => {
-                    if (
-                      page === 1 ||
-                      page === totalAdminOrderPages ||
-                      (page >= adminOrderPage - 1 && page <= adminOrderPage + 1)
-                    ) {
-                      return (
-                        <button
-                          key={page}
-                          type="button"
-                          onClick={() => setAdminOrderPage(page)}
-                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                            adminOrderPage === page
-                              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
-                              : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    }
-                    if (
-                      (page === adminOrderPage - 2 && page > 1) ||
-                      (page === adminOrderPage + 2 && page < totalAdminOrderPages)
-                    ) {
-                      return (
-                        <span key={page} className="px-1 text-slate-400">
-                          &hellip;
-                        </span>
-                      );
-                    }
-                    return null;
-                  })}
-
-                  <button
-                    type="button"
-                    onClick={() => setAdminOrderPage((prev) => Math.min(totalAdminOrderPages, prev + 1))}
-                    disabled={adminOrderPage === totalAdminOrderPages}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
-                      adminOrderPage === totalAdminOrderPages
-                        ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                        : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
-                    }`}
-                    title="Trang sau"
-                  >
-                    <span>Sau</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Thanh phân trang đơn hàng chuẩn 10 đơn / trang */}
+            <AdminPagination
+              currentPage={adminOrderPage}
+              totalPages={totalAdminOrderPages}
+              totalItems={filteredAdminOrders.length}
+              itemsPerPage={adminOrdersPerPage}
+              itemLabel="đơn hàng"
+              onPageChange={setAdminOrderPage}
+              onPerPageChange={(per) => {
+                setAdminOrdersPerPage(per);
+                setAdminOrderPage(1);
+              }}
+            />
           </div>
         )}
       </div>
@@ -1800,7 +1771,7 @@ export default function AdminPanel({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredUsers.map((user) => (
+                    {paginatedAdminUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
                         {/* Avatar & Name */}
                         <td className="py-3 px-3">
@@ -1932,7 +1903,21 @@ export default function AdminPanel({
                 </table>
               </div>
             )}
-          </div>
+          
+              {/* Thanh phân trang người dùng chuẩn 10 người dùng / trang */}
+              <AdminPagination
+                currentPage={adminUserPage}
+                totalPages={totalAdminUserPages}
+                totalItems={filteredUsers.length}
+                itemsPerPage={adminUsersPerPage}
+                itemLabel="người dùng"
+                onPageChange={setAdminUserPage}
+                onPerPageChange={(per) => {
+                  setAdminUsersPerPage(per);
+                  setAdminUserPage(1);
+                }}
+              />
+            </div>
         </div>
       )}
 
@@ -2110,7 +2095,7 @@ export default function AdminPanel({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {filteredReviews.map((rev) => {
+                    {paginatedAdminReviews.map((rev) => {
                       const relatedProduct = products.find((p) => p.id === rev.productId);
                       return (
                         <tr key={rev.id} className="hover:bg-slate-50/80 transition-colors">
@@ -2188,7 +2173,21 @@ export default function AdminPanel({
                 </table>
               </div>
             )}
-          </div>
+          
+              {/* Thanh phân trang đánh giá chuẩn 10 nhận xét / trang */}
+              <AdminPagination
+                currentPage={adminReviewPage}
+                totalPages={totalAdminReviewPages}
+                totalItems={filteredReviews.length}
+                itemsPerPage={adminReviewsPerPage}
+                itemLabel="đánh giá"
+                onPageChange={setAdminReviewPage}
+                onPerPageChange={(per) => {
+                  setAdminReviewsPerPage(per);
+                  setAdminReviewPage(1);
+                }}
+              />
+            </div>
         </div>
       )}
 

@@ -21,6 +21,7 @@ import {
   Tag
 } from "lucide-react";
 import { api, CategoryItem } from "../../services/api";
+import AdminPagination from "./AdminPagination";
 
 const ICON_OPTIONS = [
   { label: "Sách mở (BookOpen)", value: "BookOpen" },
@@ -162,6 +163,23 @@ export default function CategoriesTab() {
     });
   }, [categories, searchQuery]);
 
+  // Phân trang danh sách thể loại sách (mặc định 10 thể loại / trang)
+  const [categoryPage, setCategoryPage] = useState<number>(1);
+  const [categoriesPerPage, setCategoriesPerPage] = useState<number>(10);
+  useEffect(() => {
+    setCategoryPage(1);
+  }, [searchQuery]);
+  const totalCategoryPages = Math.max(1, Math.ceil(filteredCategories.length / categoriesPerPage));
+  useEffect(() => {
+    if (categoryPage > totalCategoryPages) {
+      setCategoryPage(totalCategoryPages);
+    }
+  }, [categoryPage, totalCategoryPages]);
+  const paginatedCategories = useMemo(() => {
+    const startIndex = (categoryPage - 1) * categoriesPerPage;
+    return filteredCategories.slice(startIndex, startIndex + categoriesPerPage);
+  }, [filteredCategories, categoryPage, categoriesPerPage]);
+
   // Hàm hiển thị icon theo tên
   const renderCategoryIcon = (iconName?: string) => {
     switch (iconName) {
@@ -245,8 +263,9 @@ export default function CategoriesTab() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCategories.map((cat) => (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedCategories.map((cat) => (
             <div
               key={cat._id || cat.slug}
               className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
@@ -292,6 +311,21 @@ export default function CategoriesTab() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Thanh phân trang thể loại chuẩn 10 mục / trang */}
+        <AdminPagination
+          currentPage={categoryPage}
+          totalPages={totalCategoryPages}
+          totalItems={filteredCategories.length}
+          itemsPerPage={categoriesPerPage}
+          itemLabel="thể loại"
+          onPageChange={setCategoryPage}
+          onPerPageChange={(per) => {
+            setCategoriesPerPage(per);
+            setCategoryPage(1);
+          }}
+        />
         </div>
       )}
 

@@ -11,7 +11,7 @@ import {
   Save,
   CheckCircle2,
   Package,
-  Heart,
+  ShoppingBag,
   Sparkles,
   ArrowRight,
   LogOut,
@@ -101,9 +101,9 @@ interface ProfilePageProps {
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   orders?: OrderRecord[];
   ordersCount: number;
-  wishlistCount: number;
+  wishlistCount?: number;
   onNavigateToOrders: (tab?: OrderTabKey) => void;
-  onNavigateToWishlist: () => void;
+  onNavigateToWishlist?: () => void;
   onOpenAuth: () => void;
   onLogout: () => void;
   onContinueShopping: () => void;
@@ -122,7 +122,7 @@ export default function ProfilePage({
   onUpdateProfile,
   orders = [],
   ordersCount,
-  wishlistCount,
+  wishlistCount = 0,
   onNavigateToOrders,
   onNavigateToWishlist,
   onOpenAuth,
@@ -421,24 +421,25 @@ export default function ProfilePage({
         </div>
       </div>
 
-      {/* 2 Thẻ Chỉ Số Nhanh (Sách yêu thích & Điểm thưởng) */}
+      {/* 2 Thẻ Chỉ Số Nhanh (Đơn hàng của tôi & Điểm thưởng) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Sách yêu thích */}
+        {/* Đơn hàng của tôi (thay thế cho Sách yêu thích) */}
         <div
-          onClick={onNavigateToWishlist}
-          className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-rose-300 transition-all cursor-pointer group flex items-center justify-between"
+          onClick={() => onNavigateToOrders("all")}
+          className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group flex items-center justify-between"
         >
           <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Heart className="w-6 h-6 fill-rose-500" />
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <ShoppingBag className="w-6 h-6" />
             </div>
             <div>
-              <span className="block text-xs text-slate-400 font-medium">Sách yêu thích</span>
-              <span className="text-xl font-black text-slate-900">{wishlistCount} cuốn</span>
+              <span className="block text-xs text-slate-400 font-medium">Đơn hàng của tôi</span>
+              <span className="text-xl font-black text-slate-900">{ordersCount} đơn</span>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-rose-600 group-hover:translate-x-1 transition-all" />
+          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
         </div>
+
 
         {/* Điểm thưởng & Hạng thẻ */}
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">

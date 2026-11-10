@@ -19,6 +19,7 @@ import {
   Power
 } from "lucide-react";
 import { api, CouponItem } from "../../services/api";
+import AdminPagination from "./AdminPagination";
 
 export default function CouponsTab() {
   const [coupons, setCoupons] = useState<CouponItem[]>([]);
@@ -187,6 +188,23 @@ export default function CouponsTab() {
     });
   }, [coupons, searchQuery, statusFilter]);
 
+  // Phân trang danh sách coupon (mặc định 10 coupon / trang)
+  const [couponPage, setCouponPage] = useState<number>(1);
+  const [couponsPerPage, setCouponsPerPage] = useState<number>(10);
+  useEffect(() => {
+    setCouponPage(1);
+  }, [searchQuery, statusFilter]);
+  const totalCouponPages = Math.max(1, Math.ceil(filteredCoupons.length / couponsPerPage));
+  useEffect(() => {
+    if (couponPage > totalCouponPages) {
+      setCouponPage(totalCouponPages);
+    }
+  }, [couponPage, totalCouponPages]);
+  const paginatedCoupons = useMemo(() => {
+    const startIndex = (couponPage - 1) * couponsPerPage;
+    return filteredCoupons.slice(startIndex, startIndex + couponsPerPage);
+  }, [filteredCoupons, couponPage, couponsPerPage]);
+
   // Định dạng hiển thị tiền VNĐ
   const formatVND = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -269,8 +287,9 @@ export default function CouponsTab() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCoupons.map((coupon) => {
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedCoupons.map((coupon) => {
             const isExpired =
               coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
             const isMaxedOut =
@@ -393,6 +412,21 @@ export default function CouponsTab() {
               </div>
             );
           })}
+        </div>
+
+        {/* Thanh phân trang mã giảm giá chuẩn 10 mã / trang */}
+        <AdminPagination
+          currentPage={couponPage}
+          totalPages={totalCouponPages}
+          totalItems={filteredCoupons.length}
+          itemsPerPage={couponsPerPage}
+          itemLabel="mã giảm giá"
+          onPageChange={setCouponPage}
+          onPerPageChange={(per) => {
+            setCouponsPerPage(per);
+            setCouponPage(1);
+          }}
+        />
         </div>
       )}
 

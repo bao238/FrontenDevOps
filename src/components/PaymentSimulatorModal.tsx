@@ -93,40 +93,55 @@ export default function PaymentSimulatorModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-900/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
-        {/* Header cổng thanh toán theo nhận diện thương hiệu */}
+        {/* Header cổng thanh toán theo nhận diện thương hiệu: bố cục chuẩn, chống rớt dòng NAPAS */}
         <div
-          className={`px-6 py-4 flex items-center justify-between text-white ${
+          className={`px-5 py-4 text-white relative ${
             isVnPay
               ? "bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700"
               : "bg-gradient-to-r from-[#a50064] to-[#d82d8b]"
           }`}
         >
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-lg">
+          <div className="flex items-center space-x-3 pr-10">
+            {/* Logo đại diện MBBank hoặc MoMo */}
+            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-lg shrink-0 shadow-inner">
               {isVnPay ? "MB" : "M"}
             </div>
-            <div>
-              <h3 className="font-extrabold text-base sm:text-lg flex items-center space-x-2">
-                <span>{isVnPay ? "Cổng Thanh Toán VietQR / MBBank" : "Cổng Thanh Toán Ví MoMo"}</span>
-                <span className="text-[10px] bg-white/30 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
-                  Napas 247
-                </span>
-              </h3>
-              <p className="text-xs text-white/80">Quét mã bằng ứng dụng mọi ngân hàng tại Việt Nam</p>
+            
+            {/* Tên cổng thanh toán và badge Napas 247 được cố định kích thước, không bị rớt dòng */}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-extrabold text-base sm:text-lg leading-tight tracking-tight text-white drop-shadow-xs">
+                  {isVnPay ? "Cổng VietQR / MBBank" : "Cổng Thanh Toán MoMo"}
+                </h3>
+                {isVnPay && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-white/25 border border-white/35 text-[10px] font-extrabold tracking-wider uppercase text-white shadow-xs whitespace-nowrap shrink-0">
+                    Napas 247
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-white/85 mt-0.5 font-medium truncate">
+                {isVnPay
+                  ? "Chuyển khoản nhanh 24/7 qua mọi ứng dụng ngân hàng"
+                  : "Quét mã thanh toán tức thì qua App MoMo"}
+              </p>
             </div>
           </div>
+
+          {/* Nút đóng Modal đặt ở góc trên bên phải */}
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-white/20"
+            title="Đóng cửa sổ thanh toán"
           >
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
 
         {/* Thân Modal: Thông tin giao dịch & Mã QR MBBank */}
-        <div className="p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+        <div className="p-5 sm:p-6 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
           {/* Hộp đếm ngược thời gian thanh toán */}
-          <div className="flex items-center justify-between bg-amber-50 border border-amber-200/80 rounded-2xl px-4 py-2.5 text-xs text-amber-900">
+          <div className="flex items-center justify-between bg-amber-50 border border-amber-200/80 rounded-2xl px-4 py-2.5 text-xs text-amber-900 shadow-xs">
             <div className="flex items-center space-x-2 font-medium">
               <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
               <span>Giao dịch hết hạn sau:</span>
@@ -137,16 +152,17 @@ export default function PaymentSimulatorModal({
           </div>
 
           {/* Khung quét mã QR */}
-          <div className="flex flex-col items-center justify-center p-3 sm:p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+          <div className="flex flex-col items-center justify-center p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
             {isVnPay && (
-              <div className="flex items-center justify-center space-x-1.5 mb-3 bg-slate-200/70 p-1 rounded-xl text-xs">
+              /* Bộ nút chuyển đổi tab xem: chia đều 50% - 50% cân đối hoàn hảo */
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/80 rounded-xl w-full max-w-sm mx-auto mb-3.5 text-xs">
                 <button
                   type="button"
                   onClick={() => setQrMode("card")}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  className={`w-full py-1.5 px-2 rounded-lg font-bold text-center transition-all cursor-pointer ${
                     qrMode === "card"
-                      ? "bg-white text-blue-700 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-white text-blue-700 shadow-xs ring-1 ring-black/5"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
                   }`}
                 >
                   Mã QR MBBank (Gốc)
@@ -154,10 +170,10 @@ export default function PaymentSimulatorModal({
                 <button
                   type="button"
                   onClick={() => setQrMode("dynamic")}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  className={`w-full py-1.5 px-2 rounded-lg font-bold text-center transition-all cursor-pointer ${
                     qrMode === "dynamic"
-                      ? "bg-white text-blue-700 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-white text-blue-700 shadow-xs ring-1 ring-black/5"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
                   }`}
                 >
                   QR Tự Điền Số Tiền
@@ -188,8 +204,8 @@ export default function PaymentSimulatorModal({
               )}
             </div>
 
-            <p className="mt-2.5 text-xs text-slate-500 flex items-center space-x-1.5 font-medium">
-              <Smartphone className="w-3.5 h-3.5 text-slate-600" />
+            <p className="mt-3 text-xs text-slate-500 flex items-center space-x-1.5 font-medium text-center">
+              <Smartphone className="w-3.5 h-3.5 text-slate-600 shrink-0" />
               <span>
                 Mở App {isVnPay ? "Ngân hàng bất kỳ (MBBank, VCB, Techcombank...)" : "Ví MoMo"} để quét mã
               </span>
@@ -197,7 +213,7 @@ export default function PaymentSimulatorModal({
           </div>
 
           {/* Chi tiết hóa đơn thanh toán */}
-          <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-xs text-slate-700 border border-slate-200">
+          <div className="bg-slate-50/90 rounded-2xl p-4 space-y-2.5 text-xs text-slate-700 border border-slate-200">
             <div className="flex justify-between items-center pb-2 border-b border-slate-200/80">
               <span className="text-slate-500">Đơn vị thụ hưởng:</span>
               <span className="font-bold text-slate-900 text-right">
@@ -209,11 +225,11 @@ export default function PaymentSimulatorModal({
               <div className="flex justify-between items-center pb-2 border-b border-slate-200/80">
                 <span className="text-slate-500">Số tài khoản:</span>
                 <div className="flex items-center space-x-1.5">
-                  <span className="font-mono font-bold text-blue-600">0347934359</span>
+                  <span className="font-mono font-bold text-blue-600 text-sm">0347934359</span>
                   <button
                     type="button"
                     onClick={handleCopyAcc}
-                    className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors cursor-pointer"
+                    className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
                     title="Sao chép số tài khoản"
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -232,7 +248,7 @@ export default function PaymentSimulatorModal({
                 <button
                   type="button"
                   onClick={handleCopyCode}
-                  className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors cursor-pointer"
+                  className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-purple-600 transition-colors cursor-pointer"
                   title="Sao chép mã đơn hàng"
                 >
                   <Copy className="w-3.5 h-3.5" />
@@ -241,9 +257,9 @@ export default function PaymentSimulatorModal({
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-1">
-              <span className="text-slate-500 text-sm font-medium">Số tiền thanh toán:</span>
-              <span className="text-lg font-black text-red-600">
+            <div className="flex justify-between items-center pt-0.5">
+              <span className="text-slate-500 text-xs sm:text-sm font-medium">Số tiền thanh toán:</span>
+              <span className="text-lg sm:text-xl font-black text-red-600">
                 {amount > 0 ? amount.toLocaleString("vi-VN") : "0"} đ
               </span>
             </div>

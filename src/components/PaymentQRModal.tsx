@@ -64,7 +64,7 @@ export default function PaymentQRModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto custom-scrollbar">
       <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 my-8">
         {/* Header Modal */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
@@ -73,9 +73,14 @@ export default function PaymentQRModal({
               <QrCode className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                Thanh Toán Chuyển Khoản VietQR
-              </h3>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                  Thanh Toán VietQR
+                </h3>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold tracking-wider uppercase whitespace-nowrap shrink-0">
+                  Napas 247
+                </span>
+              </div>
               <p className="text-xs text-slate-400">
                 Quét mã QR bằng ứng dụng ngân hàng bất kỳ
               </p>
@@ -93,29 +98,29 @@ export default function PaymentQRModal({
         <div className="mt-5 space-y-5 text-xs sm:text-sm">
           {/* Khung hiển thị Mã QR */}
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col items-center">
-            {/* Bộ nút chuyển đổi tab xem: Mã QR MBBank chính thức hoặc QR VietQR tự động */}
-            <div className="flex items-center justify-center space-x-1.5 mb-3 bg-slate-200/70 p-1 rounded-xl text-xs">
+            {/* Bộ nút chuyển đổi tab xem: Mã QR MBBank chính thức hoặc QR VietQR tự động chia đều đối xứng 50/50 */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/80 rounded-xl w-full max-w-sm mx-auto mb-3 text-xs">
               <button
                 type="button"
                 onClick={() => setQrType("card")}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`w-full py-1.5 px-2 rounded-lg font-bold text-center transition-all cursor-pointer ${
                   qrType === "card"
-                    ? "bg-white text-blue-700 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-blue-700 shadow-xs ring-1 ring-black/5"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
                 }`}
               >
-                Mã QR MBBank (Theo thẻ gốc)
+                Mã QR MBBank (Gốc)
               </button>
               <button
                 type="button"
                 onClick={() => setQrType("dynamic")}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`w-full py-1.5 px-2 rounded-lg font-bold text-center transition-all cursor-pointer ${
                   qrType === "dynamic"
-                    ? "bg-white text-blue-700 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-blue-700 shadow-xs ring-1 ring-black/5"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
                 }`}
               >
-                QR Động (Tự điền số tiền)
+                QR Tự Điền Số Tiền
               </button>
             </div>
 

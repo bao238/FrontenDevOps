@@ -92,9 +92,19 @@ export interface PaginatedResponse<T> {
   currentPage: number;
   stats?: {
     total: number;
-    inStock: number;
-    lowStock: number;
-    outOfStock: number;
+    inStock?: number;
+    lowStock?: number;
+    outOfStock?: number;
+    pending?: number;
+    pickup?: number;
+    shipping?: number;
+    completed?: number;
+    canceled?: number;
+    adminCount?: number;
+    staffCount?: number;
+    customerCount?: number;
+    lockedCount?: number;
+    [key: string]: any;
   };
   data: T[];
 }
@@ -232,6 +242,7 @@ export const api = {
           totalAllCount: json.totalAllCount ?? json.count ?? 0,
           totalPages: json.totalPages || 1,
           currentPage: json.currentPage || (params?.page || 1),
+          stats: json.stats,
           data: json.data || []
         };
       }
@@ -292,6 +303,7 @@ export const api = {
           totalAllCount: json.totalAllCount ?? json.count ?? 0,
           totalPages: json.totalPages || 1,
           currentPage: json.currentPage || (params?.page || 1),
+          stats: json.stats,
           data: json.data || []
         };
       }
@@ -390,6 +402,7 @@ export const api = {
           totalAllCount: json.totalAllCount ?? json.count ?? 0,
           totalPages: json.totalPages || 1,
           currentPage: json.currentPage || (params?.page || 1),
+          stats: json.stats,
           data: json.data || []
         };
       }

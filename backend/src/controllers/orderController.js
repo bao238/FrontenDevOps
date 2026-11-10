@@ -29,6 +29,25 @@ exports.getOrders = async (req, res) => {
 
     const totalCount = await Order.countDocuments(query);
     const totalAllCount = await Order.countDocuments();
+
+    // Thong ke so luong don hang theo tung trang thai chuan xac tu MongoDB
+    const [pendingCount, pickupCount, shippingCount, completedCount, canceledCount] = await Promise.all([
+      Order.countDocuments({ status: 'Chờ xác nhận' }),
+      Order.countDocuments({ status: 'Chờ lấy hàng' }),
+      Order.countDocuments({ status: 'Chờ giao hàng' }),
+      Order.countDocuments({ status: 'Hoàn tất' }),
+      Order.countDocuments({ status: 'Đã hủy' })
+    ]);
+
+    const stats = {
+      total: totalAllCount,
+      pending: pendingCount,
+      pickup: pickupCount,
+      shipping: shippingCount,
+      completed: completedCount,
+      canceled: canceledCount
+    };
+
     const orders = await Order.find(query)
       .select('-trackingTimelineFull')
       .sort({ createdAt: -1 })
@@ -42,6 +61,7 @@ exports.getOrders = async (req, res) => {
       totalAllCount,
       totalPages: Math.ceil(totalCount / limit) || 1,
       currentPage: page,
+      stats,
       data: orders
     });
   } catch (err) {

@@ -223,6 +223,14 @@ export default function AdminPanel({
   const [serverOrders, setServerOrders] = useState<OrderRecord[]>([]);
   const [serverTotalOrders, setServerTotalOrders] = useState<number>(0);
   const [serverTotalOrderPages, setServerTotalOrderPages] = useState<number>(1);
+  const [serverOrderStats, setServerOrderStats] = useState<{
+    total: number;
+    pending: number;
+    pickup: number;
+    shipping: number;
+    completed: number;
+    canceled: number;
+  } | null>(null);
 
   const fetchServerOrders = async (page = adminOrderPage, limit = adminOrdersPerPage) => {
     try {
@@ -235,6 +243,9 @@ export default function AdminPanel({
         setServerOrders(res.data);
         setServerTotalOrders(res.count ?? res.totalAllCount ?? res.data.length);
         setServerTotalOrderPages(res.totalPages || 1);
+        if (res.stats) {
+          setServerOrderStats(res.stats as any);
+        }
       }
     } catch (err) {
       console.error("Lỗi khi tải đơn hàng từ MongoDB:", err);
@@ -255,6 +266,20 @@ export default function AdminPanel({
       setAdminOrderPage(displayTotalOrderPages);
     }
   }, [adminOrderPage, displayTotalOrderPages]);
+
+  // Cập nhật trạng thái đơn hàng thời gian thực (Real-time UI Update 0ms)
+  const handleUpdateOrderStatusRealtime = (orderId: string, newStatus: AdminOrderStatus, extraData?: any) => {
+    setServerOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, ...extraData } : o))
+    );
+    onUpdateOrderStatus(orderId, newStatus, extraData);
+  };
+
+  const handleDeleteOrderRealtime = (orderId: string) => {
+    setServerOrders((prev) => prev.filter((o) => o.id !== orderId));
+    setServerTotalOrders((prev) => Math.max(0, prev - 1));
+    onDeleteOrder(orderId);
+  };
 
   // State phan trang danh gia Server-Side
   const [adminReviewPage, setAdminReviewPage] = useState<number>(1);
@@ -650,7 +675,7 @@ export default function AdminPanel({
         setServerTotalProducts(res.count ?? res.totalAllCount ?? res.data.length);
         setServerTotalProdPages(res.totalPages || 1);
         if (res.stats) {
-          setServerProdStats(res.stats);
+          setServerProdStats(res.stats as any);
         }
       }
     } catch (err) {
@@ -736,6 +761,7 @@ export default function AdminPanel({
   const [serverUsers, setServerUsers] = useState<UserAccount[]>([]);
   const [serverTotalUsers, setServerTotalUsers] = useState<number>(0);
   const [serverTotalUserPages, setServerTotalUserPages] = useState<number>(1);
+  const [serverUserStats, setServerUserStats] = useState<any>(null);
 
   const fetchServerUsers = async (page = adminUserPage, limit = adminUsersPerPage) => {
     try {
@@ -750,6 +776,9 @@ export default function AdminPanel({
         setServerUsers(res.data);
         setServerTotalUsers(res.count ?? res.totalAllCount ?? res.data.length);
         setServerTotalUserPages(res.totalPages || 1);
+        if (res.stats) {
+          setServerUserStats(res.stats);
+        }
       }
     } catch (err) {
       console.error("Lỗi khi tải người dùng từ MongoDB:", err);
@@ -772,13 +801,22 @@ export default function AdminPanel({
   }, [adminUserPage, displayTotalUserPages]);
 
   const userStats = useMemo(() => {
-    const total = users.length;
+    if (serverUserStats) {
+      return {
+        total: serverUserStats.total || serverTotalUsers || displayTotalUserCount,
+        adminCount: serverUserStats.adminCount || 0,
+        staffCount: serverUserStats.staffCount || 0,
+        customerCount: serverUserStats.customerCount || 0,
+        lockedCount: serverUserStats.lockedCount || 0,
+      };
+    }
+    const total = displayTotalUserCount;
     const adminCount = users.filter((u) => u.role === "admin").length;
     const staffCount = users.filter((u) => u.role === "staff").length;
     const customerCount = users.filter((u) => u.role === "customer").length;
     const lockedCount = users.filter((u) => u.status === "locked").length;
     return { total, adminCount, staffCount, customerCount, lockedCount };
-  }, [users]);
+  }, [users, serverUserStats, displayTotalUserCount, serverTotalUsers]);
 
   // Open Create User Modal
   const handleOpenCreateUser = () => {
@@ -858,42 +896,45 @@ export default function AdminPanel({
     }
 
     if (editingUser) {
-      if (onUpdateUser) {
-        onUpdateUser({
-          ...editingUser,
-          name: cleanName,
-          email: cleanEmail,
-          phone: cleanPhone,
-          password: userFormPassword.trim() || editingUser.password,
-          role: userFormRole,
-          status: userFormStatus,
-          address: userFormAddress.trim(),
-          avatarUrl: cleanAvatar,
-        });
-      }
+      const updatedUser: UserAccount = {
+        ...editingUser,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: userFormPassword.trim() || editingUser.password,
+        role: userFormRole,
+        status: userFormStatus,
+        address: userFormAddress.trim(),
+        avatarUrl: cleanAvatar,
+      };
+      setServerUsers((prev) => prev.map((u) => (u.id === editingUser.id ? updatedUser : u)));
+      if (onUpdateUser) onUpdateUser(updatedUser);
     } else {
-      if (onAddUser) {
-        onAddUser({
-          id: "usr-" + Date.now(),
-          name: cleanName,
-          email: cleanEmail,
-          phone: cleanPhone,
-          password: userFormPassword.trim() || "123456",
-          role: userFormRole,
-          status: userFormStatus,
-          address: userFormAddress.trim(),
-          avatarUrl: cleanAvatar,
-          createdAt: new Date().toLocaleDateString("vi-VN"),
-        });
-      }
+      const newUser: UserAccount = {
+        id: "usr-" + Date.now(),
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: userFormPassword.trim() || "123456",
+        role: userFormRole,
+        status: userFormStatus,
+        address: userFormAddress.trim(),
+        avatarUrl: cleanAvatar,
+        createdAt: new Date().toLocaleDateString("vi-VN"),
+      };
+      setServerUsers((prev) => [newUser, ...prev]);
+      setServerTotalUsers((prev) => prev + 1);
+      if (onAddUser) onAddUser(newUser);
     }
     setIsUserModalOpen(false);
   };
 
   // Confirm Delete User
   const handleConfirmDeleteUser = () => {
-    if (deletingUserId && onDeleteUser) {
-      onDeleteUser(deletingUserId);
+    if (deletingUserId) {
+      setServerUsers((prev) => prev.filter((u) => u.id !== deletingUserId));
+      setServerTotalUsers((prev) => Math.max(0, prev - 1));
+      if (onDeleteUser) onDeleteUser(deletingUserId);
       setDeletingUserId(null);
     }
   };
@@ -970,7 +1011,7 @@ export default function AdminPanel({
     const qty = Number(formStockQuantity) || 0;
 
     if (editingProduct) {
-      // Update
+      // Update (Cập nhật ngay vào serverProducts để giao diện thay đổi tức thì 0ms không cần reload trang)
       const updated: Product = {
         ...editingProduct,
         name: formName.trim(),
@@ -985,9 +1026,10 @@ export default function AdminPanel({
         featured: formFeatured,
         specs: formSpecs,
       };
+      setServerProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? updated : p)));
       onUpdateProduct(updated);
     } else {
-      // Create
+      // Create (Thêm ngay vào serverProducts để hiển thị đầu danh sách)
       const newProduct: Product = {
         id: "prod-" + Date.now(),
         name: formName.trim(),
@@ -1004,21 +1046,25 @@ export default function AdminPanel({
         featured: formFeatured,
         specs: formSpecs,
       };
+      setServerProducts((prev) => [newProduct, ...prev]);
+      setServerTotalProducts((prev) => prev + 1);
       onAddProduct(newProduct);
     }
 
     setIsModalOpen(false);
   };
 
-  // Cập nhật nhanh số lượng tồn kho trực tiếp từ bảng sản phẩm
+  // Cập nhật nhanh số lượng tồn kho trực tiếp từ bảng sản phẩm (Cập nhật giao diện lập tức 0ms)
   const handleUpdateStockQuantity = (product: Product, deltaOrAbsolute: number, isAbsolute = false) => {
     const currentStock = product.stockQuantity ?? (product.inStock ? 25 : 0);
     const newQty = Math.max(0, isAbsolute ? deltaOrAbsolute : currentStock + deltaOrAbsolute);
-    onUpdateProduct({
+    const updated: Product = {
       ...product,
       stockQuantity: newQty,
       inStock: newQty > 0,
-    });
+    };
+    setServerProducts((prev) => prev.map((p) => (p.id === product.id ? updated : p)));
+    onUpdateProduct(updated);
   };
 
   // Add Specification row
@@ -1041,20 +1087,24 @@ export default function AdminPanel({
     });
   };
 
-  // Confirm delete
+  // Confirm delete (Xóa ngay khỏi serverProducts)
   const handleConfirmDelete = () => {
     if (deletingProductId) {
+      setServerProducts((prev) => prev.filter((p) => p.id !== deletingProductId));
+      setServerTotalProducts((prev) => Math.max(0, prev - 1));
       onDeleteProduct(deletingProductId);
       setDeletingProductId(null);
     }
   };
 
-  // Quick toggle in-stock
+  // Quick toggle in-stock (Đổi trạng thái ngay trên giao diện)
   const handleToggleStock = (product: Product) => {
-    onUpdateProduct({
+    const updated: Product = {
       ...product,
       inStock: !product.inStock,
-    });
+    };
+    setServerProducts((prev) => prev.map((p) => (p.id === product.id ? updated : p)));
+    onUpdateProduct(updated);
   };
 
   return (
@@ -1459,7 +1509,7 @@ export default function AdminPanel({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Quản Lý Đơn Hàng Mua Sách ({orders.length} đơn)
+                Quản Lý Đơn Hàng Mua Sách ({(serverOrderStats?.total || displayTotalOrderCount).toLocaleString('vi-VN')} đơn)
               </h3>
               <p className="text-xs text-slate-400">
                 Xác nhận đơn, hẹn giờ shipper đến lấy hàng và cập nhật hành trình giao nhận
@@ -1468,34 +1518,34 @@ export default function AdminPanel({
             <span className="text-xs text-slate-400 font-mono">Dữ liệu lưu tự động MongoDB Container</span>
           </div>
 
-          {/* Bộ lọc trạng thái đơn hàng trong Admin */}
+          {/* Bộ lọc trạng thái đơn hàng trong Admin (Đồng bộ số liệu chuẩn xác từ MongoDB) */}
           <div className="flex flex-wrap items-center gap-2">
             {[
-              { id: "all", label: "Tất cả", count: orders.length },
+              { id: "all", label: "Tất cả", count: (serverOrderStats?.total || displayTotalOrderCount).toLocaleString('vi-VN') },
               {
                 id: "Chờ xác nhận",
                 label: "Chờ xác nhận",
-                count: orders.filter((o) => o.status === "Chờ xác nhận" || (o.status === "Đang xử lý" && !o.pickupTime)).length,
+                count: (serverOrderStats ? serverOrderStats.pending : orders.filter((o) => o.status === "Chờ xác nhận" || (o.status === "Đang xử lý" && !o.pickupTime)).length).toLocaleString('vi-VN'),
               },
               {
                 id: "Chờ lấy hàng",
                 label: "Chờ lấy hàng",
-                count: orders.filter((o) => o.status === "Chờ lấy hàng").length,
+                count: (serverOrderStats ? serverOrderStats.pickup : orders.filter((o) => o.status === "Chờ lấy hàng").length).toLocaleString('vi-VN'),
               },
               {
                 id: "Chờ giao hàng",
                 label: "Chờ giao hàng",
-                count: orders.filter((o) => o.status === "Chờ giao hàng" || (o.status === "Đang giao" && !o.receivedAt)).length,
+                count: (serverOrderStats ? serverOrderStats.shipping : orders.filter((o) => o.status === "Chờ giao hàng" || (o.status === "Đang giao" && !o.receivedAt)).length).toLocaleString('vi-VN'),
               },
               {
                 id: "Hoàn tất",
                 label: "Hoàn tất / Đã giao",
-                count: orders.filter((o) => o.status === "Hoàn tất" || o.receivedAt).length,
+                count: (serverOrderStats ? serverOrderStats.completed : orders.filter((o) => o.status === "Hoàn tất" || o.receivedAt).length).toLocaleString('vi-VN'),
               },
               {
                 id: "Đã hủy",
                 label: "Đã hủy",
-                count: orders.filter((o) => o.status === "Đã hủy").length,
+                count: (serverOrderStats ? serverOrderStats.canceled : orders.filter((o) => o.status === "Đã hủy").length).toLocaleString('vi-VN'),
               },
             ].map((st) => (
               <button
@@ -1579,7 +1629,7 @@ export default function AdminPanel({
                           {isPickup && (
                             <button
                               type="button"
-                              onClick={() => onUpdateOrderStatus(ord.id, "Chờ giao hàng")}
+                              onClick={() => handleUpdateOrderStatusRealtime(ord.id, "Chờ giao hàng")}
                               className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer"
                               title="Shipper đã nhận gói hàng, chuyển sang Đang Giao"
                             >
@@ -1593,7 +1643,7 @@ export default function AdminPanel({
                             <button
                               type="button"
                               onClick={() =>
-                                onUpdateOrderStatus(ord.id, "Hoàn tất", {
+                                handleUpdateOrderStatusRealtime(ord.id, "Hoàn tất", {
                                   receivedAt: new Date().toISOString(),
                                 })
                               }
@@ -1609,7 +1659,7 @@ export default function AdminPanel({
                           <select
                             value={ord.status}
                             onChange={(e) =>
-                              onUpdateOrderStatus(
+                              handleUpdateOrderStatusRealtime(
                                 ord.id,
                                 e.target.value as AdminOrderStatus
                               )
@@ -1657,7 +1707,7 @@ export default function AdminPanel({
                           <button
                             onClick={() => {
                               if (window.confirm("Bạn có chắc muốn xóa đơn hàng này?")) {
-                                onDeleteOrder(ord.id);
+                                handleDeleteOrderRealtime(ord.id);
                               }
                             }}
                             className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors ml-1 cursor-pointer"
@@ -2307,7 +2357,11 @@ export default function AdminPanel({
                           </td>
 
                           <td className="py-3.5 px-4 max-w-xs sm:max-w-md">
-                            <p className="text-xs text-slate-600 leading-relaxed italic">
+                            {/* Bọc chống tràn văn bản đánh giá - Tối đa 2 dòng, hover xem đầy đủ */}
+                            <p
+                              className="text-xs text-slate-600 leading-relaxed italic line-clamp-2 hover:line-clamp-none transition-all cursor-pointer"
+                              title={rev.content}
+                            >
                               "{rev.content}"
                             </p>
                           </td>
@@ -3294,7 +3348,7 @@ export default function AdminPanel({
                     ? new Date(pickupDateTime).toISOString()
                     : new Date(Date.now() + 15 * 60000).toISOString();
 
-                  onUpdateOrderStatus(pickupModalOrder.id, "Chờ lấy hàng", {
+                  handleUpdateOrderStatusRealtime(pickupModalOrder.id, "Chờ lấy hàng", {
                     pickupTime: finalPickupTime,
                     shippingCarrier: pickupCarrier,
                   });

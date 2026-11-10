@@ -134,6 +134,23 @@ exports.getUsers = async (req, res) => {
 
     const totalCount = await User.countDocuments(query);
     const totalAllCount = await User.countDocuments();
+
+    // Thong ke nguoi dung theo vai tro va trang thai truc tiep tu MongoDB
+    const [adminCount, staffCount, customerCount, lockedCount] = await Promise.all([
+      User.countDocuments({ role: 'admin' }),
+      User.countDocuments({ role: 'staff' }),
+      User.countDocuments({ role: 'customer' }),
+      User.countDocuments({ status: 'locked' })
+    ]);
+
+    const stats = {
+      total: totalAllCount,
+      adminCount,
+      staffCount,
+      customerCount,
+      lockedCount
+    };
+
     const users = await User.find(query)
       .select('-userPayload -profileBio -password')
       .sort({ createdAt: -1 })
@@ -159,6 +176,7 @@ exports.getUsers = async (req, res) => {
       totalAllCount,
       totalPages: Math.ceil(totalCount / limit) || 1,
       currentPage: page,
+      stats,
       data: formatted
     });
   } catch (err) {

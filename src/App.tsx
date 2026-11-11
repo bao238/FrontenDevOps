@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api } from "./services/api";
+import { applyRatingBalancing, calculateAverageRating } from "./utils/ratingBalancer";
 
 // Ánh xạ icon/emoji trực quan cho 11 thể loại sách mở rộng
 const CATEGORY_ICONS: Record<string, string> = {
@@ -140,7 +141,10 @@ export interface OrderRecord {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile">("products");
-  const [products, setProducts] = useState<Product[]>(INITIAL_BOOKS);
+  const [products, setProducts] = useState<Product[]>(() => applyRatingBalancing(INITIAL_BOOKS));
+
+  // Điểm sao trung bình toàn hệ thống được cân bằng chuẩn xác 4.9/5
+  const siteAverageRating = useMemo(() => calculateAverageRating(products), [products]);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
@@ -2386,7 +2390,7 @@ export default function App() {
                   {/* Floating Star Rating Badge */}
                   <div className="absolute top-2 right-4 z-20 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl border border-white/60 text-slate-900 text-xs font-black flex items-center space-x-1.5 animate-pulse">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <span>4.9/5 Đánh Giá</span>
+                    <span>{siteAverageRating.toFixed(1)}/5 Đánh Giá</span>
                   </div>
                 </div>
               </div>
@@ -2732,7 +2736,7 @@ export default function App() {
                             {prod.reviewsCount && prod.reviewsCount > 0 ? (
                               <div className="flex items-center text-amber-500 font-bold text-xs">
                                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 mr-1" />
-                                <span>{prod.rating || 5.0}</span>
+                                <span>{typeof prod.rating === "number" ? prod.rating.toFixed(1) : "5.0"}</span>
                                 <span className="text-slate-400 text-[10px] ml-1 font-normal">
                                   ({prod.reviewsCount})
                                 </span>

@@ -132,11 +132,11 @@ export default function ProductDetailPage({
     );
   };
 
-  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (nếu có 0 đánh giá thì trả về 0)
+  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (nếu chưa có nhận xét thì dùng điểm đã cân bằng của sách)
   const hasReviews = reviews.length > 0;
   const currentRating = hasReviews
     ? Number((reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / reviews.length).toFixed(1))
-    : 0;
+    : (typeof product.rating === "number" ? Number(product.rating.toFixed(1)) : 4.9);
 
   // Lọc danh sách nhận xét theo tiêu chí
   const filteredReviewsList = reviews.filter((r) => {
@@ -380,10 +380,10 @@ export default function ProductDetailPage({
 
             {/* Star Ratings Summary */}
             <div className="flex items-center space-x-3 text-xs pb-2 border-b border-slate-100">
-              {hasReviews ? (
+              {hasReviews || (product.reviewsCount && product.reviewsCount > 0) ? (
                 <div className="flex items-center space-x-1 text-amber-500 font-bold">
                   <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span>{currentRating}</span>
+                  <span>{currentRating.toFixed(1)}</span>
                 </div>
               ) : (
                 <span className="text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md text-[11px]">
@@ -395,7 +395,11 @@ export default function ProductDetailPage({
                 onClick={() => setActiveTab("reviews")}
                 className="text-blue-600 font-semibold hover:underline"
               >
-                {hasReviews ? `${reviews.length} đánh giá thực tế` : "Viết đánh giá đầu tiên"}
+                {hasReviews
+                  ? `${reviews.length} đánh giá từ độc giả`
+                  : product.reviewsCount
+                  ? `${product.reviewsCount} đánh giá từ độc giả`
+                  : "Viết đánh giá đầu tiên"}
               </button>
               <span className="text-slate-300">&bull;</span>
               <span className="text-slate-500">Mã SP: <strong className="font-mono text-slate-700">{product.id}</strong></span>

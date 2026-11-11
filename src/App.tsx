@@ -392,6 +392,7 @@ export default function App() {
     const oldEmail = currentUser.email;
     const newProf: UserProfile = { ...currentUser, ...updated };
     setCurrentUser(newProf);
+    showToast("Cập nhật thông tin hồ sơ và ảnh đại diện thành công!");
     try {
       localStorage.setItem("bookstore_user", JSON.stringify(newProf));
     } catch (err) {
@@ -505,7 +506,7 @@ export default function App() {
       const savedUser = localStorage.getItem("bookstore_user") || localStorage.getItem("dinhbao_user");
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        if (!parsed.avatarUrl || parsed.avatarUrl.includes("unsplash.com")) {
+        if (!parsed.avatarUrl) {
           parsed.avatarUrl = DEFAULT_AVATAR;
         }
         setCurrentUser(parsed);

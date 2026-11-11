@@ -45,16 +45,6 @@ export interface Product {
   reviews?: ReviewItem[];
 }
 
-// Danh mục phân loại hình thức quyển sách cho Nhà Sách BookStore
-export const BOOK_FORMATS = [
-  "Tất cả",
-  "Bìa mềm",
-  "Bìa cứng",
-  "Sách bỏ túi",
-  "Boxset",
-  "Bản đặc biệt"
-];
-
 // 11 Thể loại sách chính thức và mở rộng cho Nhà Sách BookStore
 export const CATEGORIES = [
   "Tất cả",

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { CATEGORIES, BOOK_FORMATS, Product, INITIAL_BOOKS } from "./data/products";
+import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api } from "./services/api";
 
@@ -142,8 +142,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile">("products");
   const [products, setProducts] = useState<Product[]>(INITIAL_BOOKS);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
-  // Bộ lọc theo hình thức / loại quyển sách (Bìa mềm, Bìa cứng, Sách bỏ túi, Boxset, Bản đặc biệt)
-  const [selectedBookFormat, setSelectedBookFormat] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -1051,14 +1049,13 @@ export default function App() {
   // Số lượng bộ lọc nâng cao đang kích hoạt
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (selectedBookFormat !== "Tất cả") count++;
     if (selectedPriceRange !== "all") count++;
     if (selectedAuthor !== "all") count++;
     if (selectedPublisher !== "all") count++;
     if (selectedMinRating > 0) count++;
     if (onlyInStock) count++;
     return count;
-  }, [selectedBookFormat, selectedPriceRange, selectedAuthor, selectedPublisher, selectedMinRating, onlyInStock]);
+  }, [selectedPriceRange, selectedAuthor, selectedPublisher, selectedMinRating, onlyInStock]);
 
   // Hàm thiết lập lại toàn bộ bộ lọc
   const handleResetFilters = () => {
@@ -1068,7 +1065,6 @@ export default function App() {
     setSelectedMinRating(0);
     setOnlyInStock(false);
     setSelectedCategory("Tất cả");
-    setSelectedBookFormat("Tất cả");
     setSearchQuery("");
   };
 
@@ -1095,13 +1091,6 @@ export default function App() {
       // 1. Lọc theo danh mục thể loại
       const matchCat =
         selectedCategory === "Tất cả" || item.category === selectedCategory;
-
-      // 2. Lọc theo hình thức / loại quyển sách (Bìa mềm, Bìa cứng, Boxset, Sách bỏ túi, Bản đặc biệt)
-      const matchFormat =
-        selectedBookFormat === "Tất cả" ||
-        item.bookFormat === selectedBookFormat ||
-        (item.specs?.["Hình thức"] &&
-          item.specs["Hình thức"].toLowerCase().includes(selectedBookFormat.toLowerCase()));
 
       // 3. Lọc theo từ khóa tìm kiếm
       const query = searchQuery.toLowerCase().trim();
@@ -1143,7 +1132,6 @@ export default function App() {
 
       return (
         matchCat &&
-        matchFormat &&
         matchQuery &&
         matchPrice &&
         matchAuthor &&
@@ -1165,7 +1153,6 @@ export default function App() {
   }, [
     products,
     selectedCategory,
-    selectedBookFormat,
     searchQuery,
     sortBy,
     selectedPriceRange,
@@ -1180,7 +1167,6 @@ export default function App() {
     setCurrentPage(1);
   }, [
     selectedCategory,
-    selectedBookFormat,
     searchQuery,
     sortBy,
     itemsPerPage,
@@ -2439,7 +2425,7 @@ export default function App() {
             {/* Filter & Sorting Controls */}
             <section id="product-grid" className="space-y-4">
               <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3.5">
-                {/* Cụm Bộ Lọc: Thể Loại Sách & Loại Quyển Sách */}
+                {/* Cụm Bộ Lọc: Thể Loại Sách */}
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                   {/* Drop List Danh Mục Sách Tinh Gọn */}
                   <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -2470,38 +2456,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Drop List Loại Quyển Sách (Hình Thức Bìa: Bìa mềm, Bìa cứng, Sách bỏ túi, Boxset, Bản đặc biệt) */}
-                  <div className="flex items-center space-x-2 w-full sm:w-auto">
-                    <span className="text-xs font-bold text-slate-600 shrink-0 flex items-center space-x-1">
-                      <span>📖</span>
-                      <span>Loại sách:</span>
-                    </span>
-                    <div className="relative w-full sm:w-44">
-                      <select
-                        value={selectedBookFormat}
-                        onChange={(e) => setSelectedBookFormat(e.target.value)}
-                        className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-2xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs appearance-none transition-all"
-                      >
-                        {BOOK_FORMATS.map((fmt) => {
-                          const count =
-                            fmt === "Tất cả"
-                              ? products.length
-                              : products.filter(
-                                  (p) =>
-                                    p.bookFormat === fmt ||
-                                    (p.specs?.["Hình thức"] &&
-                                      p.specs["Hình thức"].toLowerCase().includes(fmt.toLowerCase()))
-                                ).length;
-                          return (
-                            <option key={fmt} value={fmt}>
-                              {fmt} ({count})
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                  </div>
+                  
                 </div>
 
                 {/* Search & Sort */}
@@ -2581,26 +2536,9 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
-                    {/* 1. Lọc theo Hình thức / Loại quyển sách */}
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700 block">
-                        Loại quyển sách:
-                      </label>
-                      <select
-                        value={selectedBookFormat}
-                        onChange={(e) => setSelectedBookFormat(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {BOOK_FORMATS.map((fmt) => (
-                          <option key={fmt} value={fmt}>
-                            {fmt}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
 
-                    {/* 2. Lọc theo Khoảng giá */}
+                    {/* 1. Lọc theo Khoảng giá */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Khoảng giá (VNĐ):
@@ -2618,7 +2556,7 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* 3. Lọc theo Tác giả */}
+                    {/* 2. Lọc theo Tác giả */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Tác giả tác phẩm:
@@ -2637,7 +2575,7 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* 4. Lọc theo Nhà xuất bản */}
+                    {/* 3. Lọc theo Nhà xuất bản */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Nhà xuất bản (NXB):
@@ -2771,9 +2709,6 @@ export default function App() {
                             <div className="flex items-center space-x-1">
                               <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
                                 {prod.category}
-                              </span>
-                              <span className="font-semibold text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
-                                {prod.bookFormat || "Bìa mềm"}
                               </span>
                             </div>
                             {prod.inStock && prod.stockQuantity !== undefined && prod.stockQuantity <= 5 && (

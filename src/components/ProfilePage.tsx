@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   User,
   Mail,
@@ -19,7 +19,9 @@ import {
   Gift,
   BookOpen,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Image as ImageIcon
 } from "lucide-react";
 import { UserProfile, OrderRecord } from "../App";
 import { OrderTabKey } from "./MyOrdersPage";
@@ -152,7 +154,45 @@ export default function ProfilePage({
   const [phone, setPhone] = useState(currentUser?.phone || "");
   const [address, setAddress] = useState(currentUser?.address || "");
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "");
+  const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
   const [isSavedSuccess, setIsSavedSuccess] = useState(false);
+
+  // Tham chiếu thẻ input file ẩn để tải ảnh đại diện từ máy tính
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Xử lý đọc file ảnh khi độc giả tải ảnh từ thiết bị
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Kiểm tra định dạng ảnh hợp lệ
+    if (!file.type.startsWith("image/")) {
+      setAvatarUploadError("Vui lòng chọn tệp định dạng hình ảnh hợp lệ (PNG, JPG, WEBP).");
+      return;
+    }
+
+    // Giới hạn dung lượng tối đa 5MB
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setAvatarUploadError("Dung lượng hình ảnh vượt quá 5MB. Vui lòng chọn ảnh nhẹ hơn.");
+      return;
+    }
+
+    setAvatarUploadError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setAvatarUrl(reader.result);
+      }
+    };
+    reader.onerror = () => {
+      setAvatarUploadError("Không thể đọc tệp hình ảnh. Vui lòng thử lại.");
+    };
+    reader.readAsDataURL(file);
+
+    // Xóa value để có thể chọn lại file ảnh cùng tên nếu muốn
+    e.target.value = "";
+  };
 
   // Tự động đồng bộ form khi thông tin currentUser được cập nhật
   useEffect(() => {
@@ -532,19 +572,56 @@ export default function ProfilePage({
             )}
 
             <form onSubmit={handleSaveInfo} className="space-y-5 text-xs">
-              {/* Chọn Avatar Mẫu */}
+              {/* Chọn Avatar Mẫu hoặc Tải Ảnh Từ Máy Tính */}
               <div className="space-y-2">
-                <label className="block font-bold text-slate-700">
-                  Chọn ảnh đại diện phong cách độc giả:
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-700">
+                    Ảnh đại diện hồ sơ độc giả:
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    Hỗ trợ tải ảnh từ máy tính (PNG, JPG, WEBP) hoặc chọn mẫu có sẵn
+                  </span>
+                </div>
+
+                {/* Thẻ input ẩn để chọn tệp từ máy tính */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/png, image/jpeg, image/webp, image/gif"
+                  className="hidden"
+                />
+
+                {avatarUploadError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-[11px] flex items-center space-x-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{avatarUploadError}</span>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center gap-3">
+                  {/* Nút tải ảnh đại diện từ thiết bị */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-12 h-12 rounded-2xl border-2 border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/60 hover:bg-blue-100/70 flex flex-col items-center justify-center text-blue-600 transition-all hover:scale-105 group cursor-pointer shadow-2xs shrink-0"
+                    title="Tải ảnh đại diện từ thiết bị của bạn"
+                  >
+                    <Upload className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                    <span className="text-[9px] font-bold mt-0.5">Tải lên</span>
+                  </button>
+
+                  {/* 4 Avatar mẫu chuẩn phong cách tri thức */}
                   {PRESET_AVATARS.map((url, idx) => (
                     <img
                       key={idx}
                       src={url}
                       alt={`Avatar ${idx + 1}`}
-                      onClick={() => setAvatarUrl(url)}
-                      className={`w-12 h-12 rounded-2xl object-cover cursor-pointer border-2 transition-all hover:scale-105 ${
+                      onClick={() => {
+                        setAvatarUploadError(null);
+                        setAvatarUrl(url);
+                      }}
+                      className={`w-12 h-12 rounded-2xl object-cover cursor-pointer border-2 transition-all hover:scale-105 shrink-0 ${
                         avatarUrl === url
                           ? "border-blue-600 ring-2 ring-blue-500/30 scale-105"
                           : "border-slate-200 opacity-70 hover:opacity-100"

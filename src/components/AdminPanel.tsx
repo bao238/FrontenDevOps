@@ -3014,18 +3014,18 @@ export default function AdminPanel({
                                   setReplyingReview(rev);
                                   setAdminReplyText(rev.adminReply || "");
                                 }}
-                                className="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-xs flex items-center space-x-1 transition-colors cursor-pointer shadow-xs"
+                                className="h-7 px-2 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-semibold text-[11px] inline-flex items-center space-x-1 transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
                                 title="Soạn phản hồi gửi khách hàng"
                               >
-                                <CornerDownRight className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Phản hồi</span>
+                                <CornerDownRight className="w-3 h-3 shrink-0" />
+                                <span className="whitespace-nowrap">Phản hồi</span>
                               </button>
 
                               {/* Nút Ẩn / Hiện kiểm duyệt */}
                               <button
                                 type="button"
                                 onClick={() => handleToggleReviewModeration(rev)}
-                                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                                className={`h-7 w-7 flex items-center justify-center rounded-lg border transition-colors cursor-pointer shrink-0 ${
                                   rev.moderationStatus === "hidden"
                                     ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
                                     : "border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -3038,7 +3038,7 @@ export default function AdminPanel({
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditReview(rev)}
-                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer shrink-0"
                                 title="Chỉnh sửa đánh giá"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -3047,7 +3047,7 @@ export default function AdminPanel({
                               <button
                                 type="button"
                                 onClick={() => setDeletingReviewId(rev.id)}
-                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0"
                                 title="Xóa đánh giá khỏi MongoDB"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />

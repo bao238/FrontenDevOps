@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { Product, ReviewItem, INITIAL_BOOKS } from "../data/products";
 import { UserAccount } from "../data/users";
+import { applyRatingBalancing } from "../utils/ratingBalancer";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
 
@@ -194,7 +195,7 @@ export const api = {
             totalPages: json.totalPages || 1,
             currentPage: json.currentPage || (params?.page || 1),
             stats: json.stats,
-            data: json.data
+            data: applyRatingBalancing(json.data)
           };
         }
       }
@@ -213,7 +214,7 @@ export const api = {
         lowStock: 0,
         outOfStock: 0
       },
-      data: INITIAL_BOOKS
+      data: applyRatingBalancing(INITIAL_BOOKS)
     };
   },
 

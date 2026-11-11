@@ -21,7 +21,8 @@ import {
   ChevronRight,
   AlertCircle,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  RotateCcw
 } from "lucide-react";
 import { UserProfile, OrderRecord } from "../App";
 import { OrderTabKey } from "./MyOrdersPage";
@@ -327,15 +328,24 @@ export default function ProfilePage({
 
         <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-5 text-center sm:text-left">
-            {/* Avatar */}
-            <div className="relative group">
+            {/* Avatar lớn kèm click đổi ảnh nhanh */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="relative group cursor-pointer"
+              title="Nhấp để tải ảnh đại diện mới từ thiết bị"
+            >
               <img
-                src={currentUser.avatarUrl || avatarUrl || "/default-avatar.png"}
+                src={avatarUrl || currentUser.avatarUrl || "/default-avatar.png"}
                 alt={currentUser.name}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-white/20 shadow-2xl"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-white/20 shadow-2xl transition-all group-hover:brightness-75"
               />
-              <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-xl shadow-md border border-white/30">
-                <ShieldCheck className="w-4 h-4" />
+              {/* Lớp phủ đổi ảnh khi hover */}
+              <div className="absolute inset-0 rounded-3xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white space-y-1">
+                <Camera className="w-6 h-6 animate-pulse" />
+                <span className="text-[10px] font-bold">Đổi ảnh</span>
+              </div>
+              <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-xl shadow-md border border-white/30 group-hover:scale-110 transition-transform">
+                <Camera className="w-4 h-4" />
               </div>
             </div>
 
@@ -628,6 +638,22 @@ export default function ProfilePage({
                       }`}
                     />
                   ))}
+
+                  {/* Nút đặt lại ảnh đại diện mặc định hệ thống */}
+                  {avatarUrl && avatarUrl !== "/default-avatar.png" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAvatarUploadError(null);
+                        setAvatarUrl("/default-avatar.png");
+                      }}
+                      className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors font-medium cursor-pointer shrink-0 ml-1"
+                      title="Quay về ảnh đại diện hệ thống mặc định"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Mặc định</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

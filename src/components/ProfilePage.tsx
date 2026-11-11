@@ -22,7 +22,8 @@ import {
   AlertCircle,
   Upload,
   Image as ImageIcon,
-  RotateCcw
+  RotateCcw,
+  Link as LinkIcon
 } from "lucide-react";
 import { UserProfile, OrderRecord } from "../App";
 import { OrderTabKey } from "./MyOrdersPage";
@@ -157,11 +158,56 @@ export default function ProfilePage({
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "");
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
   const [isSavedSuccess, setIsSavedSuccess] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [customUrl, setCustomUrl] = useState("");
 
   // Tham chiếu thẻ input file ẩn để tải ảnh đại diện từ máy tính
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Xử lý đọc file ảnh khi độc giả tải ảnh từ thiết bị
+  // Hàm nén ảnh tự động bằng HTML5 Canvas để tối ưu dung lượng và bộ nhớ
+  const compressImage = (file: File, maxWidth = 350, maxHeight = 350, quality = 0.85): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let width = img.width;
+        let height = img.height;
+
+        // Giữ nguyên tỉ lệ khung hình khi resize
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Không thể khởi tạo Canvas 2D context"));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = (err) => {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      };
+      img.src = objectUrl;
+    });
+  };
+
+  // Xử lý đọc và nén file ảnh khi độc giả tải ảnh từ thiết bị
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -180,19 +226,37 @@ export default function ProfilePage({
     }
 
     setAvatarUploadError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setAvatarUrl(reader.result);
-      }
-    };
-    reader.onerror = () => {
-      setAvatarUploadError("Không thể đọc tệp hình ảnh. Vui lòng thử lại.");
-    };
-    reader.readAsDataURL(file);
+
+    // Tự động nén ảnh qua Canvas để dung lượng chỉ còn ~30-50KB
+    compressImage(file)
+      .then((compressedBase64) => {
+        setAvatarUrl(compressedBase64);
+      })
+      .catch(() => {
+        // Dự phòng đọc trực tiếp bằng FileReader nếu Canvas không được hỗ trợ
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            setAvatarUrl(reader.result);
+          }
+        };
+        reader.onerror = () => {
+          setAvatarUploadError("Không thể đọc tệp hình ảnh. Vui lòng thử lại.");
+        };
+        reader.readAsDataURL(file);
+      });
 
     // Xóa value để có thể chọn lại file ảnh cùng tên nếu muốn
     e.target.value = "";
+  };
+
+  // Xử lý áp dụng URL ảnh trực tuyến
+  const handleApplyCustomUrl = () => {
+    if (!customUrl.trim()) return;
+    setAvatarUploadError(null);
+    setAvatarUrl(customUrl.trim());
+    setCustomUrl("");
+    setShowUrlInput(false);
   };
 
   // Tự động đồng bộ form khi thông tin currentUser được cập nhật
@@ -654,7 +718,51 @@ export default function ProfilePage({
                       <span>Mặc định</span>
                     </button>
                   )}
+
+                  {/* Nút bật/tắt dán URL ảnh trực tuyến */}
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlInput(!showUrlInput)}
+                    className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs text-blue-600 hover:text-blue-700 bg-blue-50/70 hover:bg-blue-100 rounded-xl transition-colors font-medium cursor-pointer shrink-0 ml-1"
+                    title="Nhập đường link URL ảnh trực tiếp từ internet"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" />
+                    <span>Dán URL ảnh</span>
+                  </button>
                 </div>
+
+                {/* Khung nhập URL ảnh trực tuyến */}
+                {showUrlInput && (
+                  <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-2xl animate-in fade-in">
+                    <input
+                      type="url"
+                      placeholder="Dán đường dẫn ảnh: https://example.com/avatar.jpg"
+                      value={customUrl}
+                      onChange={(e) => setCustomUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleApplyCustomUrl();
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCustomUrl}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-colors shrink-0 shadow-xs"
+                    >
+                      Áp dụng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowUrlInput(false)}
+                      className="px-3 py-2 text-slate-400 hover:text-slate-600 text-xs font-semibold"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

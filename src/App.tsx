@@ -1385,15 +1385,27 @@ export default function App() {
     }
   };
 
-  // Handle Contact Submit
+  // Handle Contact Submit - Tự động nhận diện thông tin nếu độc giả đã đăng nhập
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactForm.name || !contactForm.phone || !contactForm.message) {
-      showToast("Vui lòng nhập đầy đủ họ tên, số điện thoại và lời nhắn!");
+    const senderName = currentUser?.name || contactForm.name.trim();
+    const senderPhone = currentUser?.phone || contactForm.phone.trim();
+    const senderEmail = currentUser?.email || contactForm.email.trim();
+
+    // Đối với khách chưa đăng nhập, bắt buộc phải nhập họ tên và số điện thoại
+    if (!currentUser && (!contactForm.name.trim() || !contactForm.phone.trim())) {
+      showToast("Vui lòng nhập đầy đủ họ tên và số điện thoại liên hệ!");
       return;
     }
+
+    // Nội dung lời nhắn là bắt buộc đối với tất cả
+    if (!contactForm.message.trim()) {
+      showToast("Vui lòng nhập nội dung lời nhắn hoặc yêu cầu hỗ trợ!");
+      return;
+    }
+
     setContactSubmitted(true);
-    showToast("Cảm ơn bạn! BookStore đã nhận được tin nhắn và sẽ liên hệ lại sớm nhất.");
+    showToast(`Cảm ơn ${senderName || "bạn"}! BookStore đã nhận được lời nhắn và sẽ liên hệ hỗ trợ bạn sớm nhất.`);
     setContactForm({ name: "", email: "", phone: "", message: "" });
   };
 
@@ -3071,48 +3083,90 @@ export default function App() {
                   </p>
 
                   <form onSubmit={handleContactSubmit} className="space-y-4 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Họ và tên của bạn *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nguyễn Văn A"
-                          value={contactForm.name}
-                          onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                    {/* Nếu đã đăng nhập: Tự động dùng thông tin tài khoản, ẩn các ô Họ tên, SĐT, Email */}
+                    {currentUser ? (
+                      <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-slate-50 border border-blue-200/80 rounded-2xl p-4 shadow-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center space-x-3.5">
+                            <img
+                              src={currentUser.avatarUrl || DEFAULT_AVATAR}
+                              alt={currentUser.name}
+                              className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm shrink-0"
+                            />
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-bold text-slate-900 text-sm">{currentUser.name}</span>
+                                <span className="text-[10px] bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full shadow-xs flex items-center">
+                                  <CheckCircle2 className="w-3 h-3 inline mr-1" />
+                                  <span>ĐÃ ĐĂNG NHẬP</span>
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="flex items-center">
+                                  <Mail className="w-3 h-3 text-slate-400 inline mr-1" />
+                                  {currentUser.email}
+                                </span>
+                                {currentUser.phone && (
+                                  <span className="flex items-center">
+                                    <Phone className="w-3 h-3 text-slate-400 inline mr-1" />
+                                    {currentUser.phone}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-blue-700 bg-white/90 px-3 py-1.5 rounded-xl border border-blue-100 font-medium self-start sm:self-auto shadow-2xs">
+                            ✓ Tự động gửi kèm thông tin tài khoản
+                          </div>
+                        </div>
                       </div>
+                    ) : (
+                      /* Nếu chưa đăng nhập: Hiển thị các ô nhập Họ tên, SĐT, Email */
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">
+                              Họ và tên của bạn *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Nguyễn Văn A"
+                              value={contactForm.name}
+                              onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Số điện thoại *
-                        </label>
-                        <input
-                          type="tel"
-                          required
-                          placeholder="0905 123 456"
-                          value={contactForm.phone}
-                          onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">
+                              Số điện thoại *
+                            </label>
+                            <input
+                              type="tel"
+                              required
+                              placeholder="0905 123 456"
+                              value={contactForm.phone}
+                              onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
 
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">
-                        Địa chỉ Email
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="you@example.com"
-                        value={contactForm.email}
-                        onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">
+                            Địa chỉ Email
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="you@example.com"
+                            value={contactForm.email}
+                            onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </>
+                    )}
 
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">

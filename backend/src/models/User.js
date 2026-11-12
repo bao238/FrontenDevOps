@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { hashPassword, isBcryptHash, verifyPassword } = require('../utils/password');
 
 const userSchema = new mongoose.Schema(
   {
@@ -15,5 +16,23 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Tự động băm mật khẩu bằng bcryptjs (Hash + Salt) trước khi lưu document mới hoặc đổi mật khẩu
+userSchema.pre('save', async function hashUserPassword() {
+  if (!this.isModified('password') || !this.password || isBcryptHash(this.password)) {
+    return;
+  }
+  this.password = await hashPassword(this.password);
+});
+
+userSchema.methods.comparePassword = async function comparePassword(plainPassword) {
+  return verifyPassword(plainPassword, this.password);
+};
+
+userSchema.methods.toSafeObject = function toSafeObject() {
+  const obj = this.toObject();
+  delete obj.password;
+  return obj;
+};
 
 module.exports = mongoose.model('User', userSchema);

@@ -58,6 +58,17 @@ function normalizeError(err) {
     return new AppError(`Dữ liệu bị trùng lặp (${fieldText}) trong hệ thống`, 400);
   }
 
+  // Lỗi xác thực JWT (jsonwebtoken)
+  if (err.name === 'JsonWebTokenError') {
+    return new AppError('Token xác thực không hợp lệ', 401);
+  }
+  if (err.name === 'TokenExpiredError') {
+    return new AppError('Phiên đăng nhập (Token) đã hết hạn, vui lòng đăng nhập lại', 401);
+  }
+  if (err.name === 'NotBeforeError') {
+    return new AppError('Token xác thực chưa có hiệu lực', 401);
+  }
+
   return err;
 }
 

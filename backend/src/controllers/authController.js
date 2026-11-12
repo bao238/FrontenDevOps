@@ -1,37 +1,82 @@
 const User = require('../models/User');
+const { hashPassword, verifyPassword } = require('../utils/password');
+const { JWT_EXPIRES_IN, signAccessToken, signRefreshToken } = require('../utils/jwt');
+
+function formatAuthUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    avatarUrl: user.avatarUrl || '/default-avatar.png',
+    address: user.address || '',
+    memberSince:
+      user.createdAtStr ||
+      (user.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '2024')
+  };
+}
 
 // POST /api/auth/login
 exports.login = async (req, res, next) => {
   const { email, password } = req.body;
-  const cleanEmail = (email || '').trim().toLowerCase();
+  const rawInput = (email || '').trim();
+  const cleanEmail = rawInput.toLowerCase();
+
+  if (!rawInput || !password) {
+    return res.status(400).json({ message: 'Vui lòng nhập đầy đủ Email/Số điện thoại và mật khẩu' });
+  }
 
   try {
     const user = await User.findOne({
-      $or: [{ email: cleanEmail }, { name: (email || '').trim() }],
-      password: password
-    }).lean();
+      $or: [
+        { email: cleanEmail },
+        { phone: rawInput },
+        { name: rawInput }
+      ]
+    });
 
-    if (user) {
-      if (user.status === 'locked') {
-        return res.status(403).json({ message: 'Tài khoản của bạn đã bị tạm khóa' });
-      }
-      return res.json({
-        message: 'Đăng nhập thành công',
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          avatarUrl: user.avatarUrl || '/default-avatar.png',
-          memberSince: user.createdAtStr || (user.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '2024')
-        }
-      });
+    if (!user) {
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
     }
-    return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
+
+    const { isMatch, needsRehash } = await verifyPassword(String(password), user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
+    }
+
+    if (user.status === 'locked') {
+      return res.status(403).json({ message: 'Tài khoản của bạn đã bị tạm khóa' });
+    }
+
+    // Tự động băm lại nếu tài khoản cũ trong DB vẫn đang lưu mật khẩu dạng thô
+    if (needsRehash) {
+      user.password = await hashPassword(String(password));
+      await user.save();
+    }
+
+    const token = signAccessToken(user);
+    const refreshToken = signRefreshToken(user);
+
+    return res.json({
+      message: 'Đăng nhập thành công',
+      token,
+      refreshToken,
+      expiresIn: JWT_EXPIRES_IN,
+      user: formatAuthUser(user)
+    });
   } catch (err) {
     return next(err);
   }
+};
+
+// GET /api/auth/me
+exports.getMe = async (req, res) => {
+  return res.json({
+    success: true,
+    user: formatAuthUser(req.user)
+  });
 };
 
 // POST /api/auth/register hoặc POST /api/users
@@ -51,7 +96,14 @@ exports.register = async (req, res, next) => {
     return res.status(400).json({ message: 'Số điện thoại là bắt buộc, vui lòng nhập đủ 10 số' });
   }
   if (!/^0\d{9}$/.test(cleanPhone)) {
-    return res.status(400).json({ message: 'Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0 (Ví dụ: 0905123456)' });
+    return res.status(400).json({
+      message: 'Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0 (Ví dụ: 0905123456)'
+    });
+  }
+
+  const rawPassword = password ? String(password) : '123456';
+  if (rawPassword.length < 6) {
+    return res.status(400).json({ message: 'Mật khẩu phải có tối thiểu 6 ký tự' });
   }
 
   const cleanEmail = email.trim().toLowerCase();
@@ -78,14 +130,24 @@ exports.register = async (req, res, next) => {
       phone: cleanPhone,
       role: role || 'customer',
       status: status || 'active',
-      password: password || '123456',
+      password: rawPassword,
       avatarUrl: finalAvatar,
       address: (address || '').trim(),
       createdAtStr: new Date().toLocaleDateString('vi-VN')
     };
 
     const created = await User.create(newUser);
-    return res.status(201).json({ message: 'Thêm tài khoản thành công trên MongoDB', user: created });
+    const safeUser = created.toSafeObject();
+    const token = signAccessToken(safeUser);
+    const refreshToken = signRefreshToken(safeUser);
+
+    return res.status(201).json({
+      message: 'Thêm tài khoản thành công trên MongoDB',
+      token,
+      refreshToken,
+      expiresIn: JWT_EXPIRES_IN,
+      user: safeUser
+    });
   } catch (err) {
     return next(err);
   }
@@ -169,7 +231,7 @@ exports.getUsers = async (req, res, next) => {
 // PUT /api/users/:id
 exports.updateUser = async (req, res, next) => {
   try {
-    const { name, email, phone, role, status, address, avatarUrl } = req.body;
+    const { name, email, phone, role, status, address, avatarUrl, password } = req.body;
     const updateData = {};
     if (name) updateData.name = String(name).trim();
     if (email) updateData.email = String(email).trim().toLowerCase();
@@ -178,6 +240,13 @@ exports.updateUser = async (req, res, next) => {
     if (status) updateData.status = status;
     if (address !== undefined) updateData.address = String(address).trim();
     if (avatarUrl) updateData.avatarUrl = String(avatarUrl).trim();
+    if (password && String(password).trim()) {
+      const cleanPass = String(password).trim();
+      if (cleanPass.length < 6) {
+        return res.status(400).json({ message: 'Mật khẩu mới phải có tối thiểu 6 ký tự' });
+      }
+      updateData.password = await hashPassword(cleanPass);
+    }
 
     const targetId = req.params.id;
     const queryConditions = [
@@ -198,7 +267,7 @@ exports.updateUser = async (req, res, next) => {
       { $or: queryConditions },
       { $set: updateData },
       { new: true }
-    );
+    ).select('-password');
 
     if (!updated) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản trong cơ sở dữ liệu' });

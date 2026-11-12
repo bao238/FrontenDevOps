@@ -8,6 +8,7 @@ const OrderItem = require('../models/OrderItem');
 const Review = require('../models/Review');
 const Coupon = require('../models/Coupon');
 const Category = require('../models/Category');
+const { hashPassword, isBcryptHash } = require('../utils/password');
 
 // 1. Danh sách 18 Tác phẩm Sách Bestseller theo 6 thể loại chuẩn
 const initialProducts = [
@@ -970,12 +971,25 @@ const initialCoupons = [
   }
 ];
 
+// Nâng cấp tự động mật khẩu plaintext cho các tài khoản mẫu nếu DB cũ chưa được băm
+async function migrateLegacySeedUsers() {
+  const seedIds = initialUsers.map((u) => u.id);
+  const legacyUsers = await User.find({ id: { $in: seedIds } });
+  for (const u of legacyUsers) {
+    if (u.password && !isBcryptHash(u.password)) {
+      u.password = await hashPassword(u.password);
+      await u.save();
+    }
+  }
+}
+
 // Hàm nạp dữ liệu tự động vào MongoDB
 async function seedData() {
   try {
     // Kiem tra so luong sach hien co trong MongoDB. Neu da co sach thi bo qua seed de bao ve du lieu va tiet kiem RAM
     const totalExistingProducts = await Product.countDocuments();
     if (totalExistingProducts > 0) {
+      await migrateLegacySeedUsers();
       console.log(`📦 [MongoDB Seed] Database da co ${totalExistingProducts} cuon sach, bo qua seed de bao ve du lieu.`);
       return;
     }
@@ -1006,11 +1020,19 @@ async function seedData() {
       console.log('📚 [MongoDB Seed] Đã tự động nạp 18 đầu sách Bestseller vào collection products!');
     }
 
-    // 3. Nạp người dùng vào collection users
+    // 3. Nạp người dùng vào collection users (mã hóa mật khẩu bằng bcryptjs)
     const uCount = await User.countDocuments();
     if (uCount === 0) {
-      await User.insertMany(initialUsers);
-      console.log('👥 [MongoDB Seed] Đã tự động nạp 6 tài khoản người dùng BookStore vào collection users!');
+      const hashedInitialUsers = await Promise.all(
+        initialUsers.map(async (u) => ({
+          ...u,
+          password: isBcryptHash(u.password) ? u.password : await hashPassword(u.password)
+        }))
+      );
+      await User.insertMany(hashedInitialUsers);
+      console.log('👥 [MongoDB Seed] Đã tự động nạp 6 tài khoản người dùng BookStore (mật khẩu đã hash bcrypt) vào collection users!');
+    } else {
+      await migrateLegacySeedUsers();
     }
 
     // 4. Nạp đơn hàng vào collection orders

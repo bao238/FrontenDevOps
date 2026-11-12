@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
-import { api } from "./services/api";
+import { api, getAuthToken, clearAuthTokens } from "./services/api";
 import { applyRatingBalancing, calculateAverageRating } from "./utils/ratingBalancer";
 
 // Ánh xạ icon/emoji trực quan cho 11 thể loại sách mở rộng
@@ -262,13 +262,14 @@ export default function App() {
     note: "",
   });
 
-  // Admin Authentication States
+  // Admin Authentication States (chỉ giữ phiên khi còn JWT Token hợp lệ)
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
     try {
-      return (
+      const hasToken = Boolean(getAuthToken());
+      const hasFlag =
         localStorage.getItem("bookstore_admin_session") === "true" ||
-        localStorage.getItem("dinhbao_admin_session") === "true"
-      );
+        localStorage.getItem("dinhbao_admin_session") === "true";
+      return hasToken && hasFlag;
     } catch {
       return false;
     }
@@ -448,14 +449,16 @@ export default function App() {
       oldEmail: oldEmail,
       id: oldId,
     } as any).then(() => {
-      api.getUsers().then((freshList) => {
-        if (freshList && Array.isArray(freshList)) {
-          setUsers(freshList);
-          try {
-            localStorage.setItem("bookstore_users", JSON.stringify(freshList));
-          } catch {}
-        }
-      });
+      if (currentUser.role === "admin" || currentUser.role === "staff") {
+        api.getUsers({ page: 1, limit: 20 }).then((res) => {
+          if (res && res.source === "mongodb" && Array.isArray(res.data)) {
+            setUsers(res.data);
+            try {
+              localStorage.setItem("bookstore_users", JSON.stringify(res.data));
+            } catch {}
+          }
+        });
+      }
     }).catch((err) => {
       console.warn("[App] Lỗi đồng bộ updateUser lên MongoDB:", err);
     });
@@ -504,11 +507,13 @@ export default function App() {
     switchTab("cart");
   };
 
-  // Load saved user from local storage on mount
+  // Load saved user from local storage on mount and verify JWT session
   useEffect(() => {
+    const token = getAuthToken();
+
     try {
       const savedUser = localStorage.getItem("bookstore_user") || localStorage.getItem("dinhbao_user");
-      if (savedUser) {
+      if (savedUser && token) {
         const parsed = JSON.parse(savedUser);
         if (!parsed.avatarUrl) {
           parsed.avatarUrl = DEFAULT_AVATAR;
@@ -530,17 +535,16 @@ export default function App() {
           }
         }
 
-        // Nếu tài khoản không phải là admin thì tắt phiên admin
+        // Nếu tài khoản không phải là admin/staff thì tắt phiên admin
         if (parsed.role !== "admin" && parsed.role !== "staff") {
           setIsAdminLoggedIn(false);
         }
-      }
-
-      const savedUsers = localStorage.getItem("bookstore_users");
-      if (savedUsers) {
-        try {
-          setUsers(JSON.parse(savedUsers));
-        } catch {}
+      } else if (savedUser && !token) {
+        // Phiên cũ trước khi bật JWT: dọn sạch để yêu cầu đăng nhập lấy JWT mới
+        localStorage.removeItem("bookstore_user");
+        localStorage.removeItem("bookstore_admin_session");
+        localStorage.removeItem("bookstore_admin_user");
+        setIsAdminLoggedIn(false);
       }
 
       const savedOrders = localStorage.getItem("bookstore_orders") || localStorage.getItem("dinhbao_orders");
@@ -593,25 +597,57 @@ export default function App() {
       // ignore
     }
 
-    // Tự động đồng bộ 100% từ Backend REST API (MongoDB) có hỗ trợ phân trang Server-Side
+    // Tự động đồng bộ danh sách sách công khai từ Backend REST API (MongoDB)
     api.getProducts({ page: 1, limit: 35 }).then((res) => {
       if (res && res.data) {
         setProducts(res.data);
       }
     });
-    api.getOrders({ page: 1, limit: 20 }).then((res) => {
-      if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setOrders(res.data);
-      }
-    });
-    api.getUsers({ page: 1, limit: 20 }).then((res) => {
-      if (res && res.data && Array.isArray(res.data)) {
-        setUsers(res.data);
-        try {
-          localStorage.setItem("bookstore_users", JSON.stringify(res.data));
-        } catch {}
-      }
-    });
+
+    // Nếu đã có JWT Token, xác thực lại với /api/auth/me và đồng bộ dữ liệu được phép truy cập
+    if (token) {
+      api.getMe().then((meUser) => {
+        if (!meUser) {
+          clearAuthTokens();
+          setCurrentUser(null);
+          setIsAdminLoggedIn(false);
+          localStorage.removeItem("bookstore_user");
+          localStorage.removeItem("bookstore_admin_session");
+          localStorage.removeItem("bookstore_admin_user");
+          return;
+        }
+        const syncedUser: UserProfile = {
+          id: meUser.id,
+          name: meUser.name,
+          email: meUser.email,
+          phone: meUser.phone,
+          address: meUser.address || "",
+          avatarUrl: meUser.avatarUrl || DEFAULT_AVATAR,
+          memberSince: meUser.memberSince || "2024",
+          role: meUser.role
+        };
+        setCurrentUser(syncedUser);
+        localStorage.setItem("bookstore_user", JSON.stringify(syncedUser));
+
+        const isStaffOrAdmin = meUser.role === "admin" || meUser.role === "staff";
+        setIsAdminLoggedIn(isStaffOrAdmin);
+        if (isStaffOrAdmin) {
+          localStorage.setItem("bookstore_admin_session", "true");
+          localStorage.setItem("bookstore_admin_user", JSON.stringify(meUser));
+          api.getUsers({ page: 1, limit: 20 }).then((res) => {
+            if (res && res.source === "mongodb" && Array.isArray(res.data)) {
+              setUsers(res.data);
+            }
+          });
+        }
+
+        api.getOrders({ page: 1, limit: 20 }).then((res) => {
+          if (res && res.source === "mongodb" && Array.isArray(res.data) && res.data.length > 0) {
+            setOrders(res.data);
+          }
+        });
+      });
+    }
   }, []);
 
   // Timer tự động kiểm tra thời gian lấy hàng:
@@ -667,8 +703,105 @@ export default function App() {
     }, 3000);
   };
 
-  // Handle Login
-  const handleLogin = (e: React.FormEvent) => {
+  // Hàm dùng chung đồng bộ phiên người dùng sau khi xác thực JWT thành công từ Backend
+  const applyLoggedInUser = (apiUser: any) => {
+    const loggedUser: UserProfile = {
+      id: apiUser.id,
+      name: apiUser.name,
+      email: apiUser.email,
+      phone: apiUser.phone || "",
+      address: apiUser.address || "",
+      avatarUrl: apiUser.avatarUrl || DEFAULT_AVATAR,
+      memberSince: apiUser.memberSince || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
+      role: apiUser.role || "customer",
+    };
+
+    setCurrentUser(loggedUser);
+    try {
+      localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
+    } catch {}
+
+    setCustomerInfo((prev) => ({
+      ...prev,
+      fullName: loggedUser.name,
+      phone: loggedUser.phone,
+      address: loggedUser.address || prev.address,
+    }));
+
+    // Khôi phục giỏ hàng riêng theo tài khoản
+    const userSavedCart = localStorage.getItem("bookstore_cart_" + loggedUser.id);
+    if (userSavedCart) {
+      try {
+        setCart(JSON.parse(userSavedCart));
+      } catch {
+        setCart([]);
+      }
+    } else {
+      setCart([]);
+    }
+    setSelectedCartIds([]);
+
+    const isStaffOrAdmin = loggedUser.role === "admin" || loggedUser.role === "staff";
+    setIsAdminLoggedIn(isStaffOrAdmin);
+    try {
+      if (isStaffOrAdmin) {
+        localStorage.setItem("bookstore_admin_session", "true");
+        localStorage.setItem("bookstore_admin_user", JSON.stringify(apiUser));
+      } else {
+        localStorage.removeItem("bookstore_admin_session");
+        localStorage.removeItem("bookstore_admin_user");
+      }
+    } catch {}
+
+    // Đồng bộ đơn hàng và danh sách người dùng (nếu là admin/staff) bằng JWT mới nhận
+    api.getOrders({ page: 1, limit: 20 }).then((res) => {
+      if (res && res.source === "mongodb" && Array.isArray(res.data)) {
+        setOrders(res.data);
+      }
+    });
+    if (isStaffOrAdmin) {
+      api.getUsers({ page: 1, limit: 20 }).then((res) => {
+        if (res && res.source === "mongodb" && Array.isArray(res.data)) {
+          setUsers(res.data);
+        }
+      });
+    }
+
+    return loggedUser;
+  };
+
+  // Hàm dọn sạch toàn bộ phiên đăng nhập & JWT khi đăng xuất
+  const clearAuthSessionState = () => {
+    clearAuthTokens();
+    setCurrentUser(null);
+    setIsAdminLoggedIn(false);
+    setUsers([]);
+    setCart([]);
+    setSelectedCartIds([]);
+    setCustomerInfo({
+      fullName: "",
+      phone: "",
+      address: "",
+      paymentMethod: "cod",
+      note: "",
+    });
+    setIsCheckoutOpen(false);
+    try {
+      localStorage.removeItem("bookstore_user");
+      localStorage.removeItem("bookstore_users");
+      localStorage.removeItem("bookstore_admin_session");
+      localStorage.removeItem("bookstore_admin_user");
+      localStorage.removeItem("dinhbao_user");
+      localStorage.removeItem("dinhbao_admin_session");
+      localStorage.removeItem("dinhbao_admin_user");
+      localStorage.removeItem("bookstore_cart_guest");
+    } catch (err) {
+      console.error("Lỗi khi dọn dẹp local storage lúc đăng xuất:", err);
+    }
+  };
+
+  // Handle Login - Xác thực thật qua Backend REST API & JWT
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
 
@@ -679,144 +812,30 @@ export default function App() {
       return;
     }
 
-    const inputVal = loginEmail.trim().toLowerCase();
-    const inputPhone = loginEmail.trim().replace(/\s+/g, "");
-    const inputPass = loginPassword.trim();
-    // CHỈ cho phép đăng nhập bằng Email hoặc Số điện thoại (KHÔNG đăng nhập bằng tên user)
-    const existing = users.find((u) => {
-      const uEmail = u.email ? u.email.trim().toLowerCase() : "";
-      const uPhone = u.phone ? u.phone.trim().replace(/\s+/g, "") : "";
-      if (uEmail && uEmail === inputVal) return true;
-      if (uPhone && (uPhone === inputPhone || uPhone === inputVal)) return true;
-      if (inputVal === "admin" && u.role === "admin") return true;
-      return false;
-    });
-
-    // Fallback nếu tài khoản admin hệ thống (admin / admin123 hoặc admin@bookstore.vn / admin)
-    const isFallbackAdmin =
-      (inputVal === "admin" || inputVal === "admin@bookstore.vn" || inputVal === "manager@bookstore.vn" || inputVal === "bao@gmail.com" || inputVal === "admin@dinhbao.vn") &&
-      (inputPass === "admin123" || inputPass === "admin");
-
-    if (existing) {
-      if (existing.status === "locked") {
-        const err = "Tài khoản của bạn đã bị KHÓA bởi Quản trị viên!";
-        setAuthError(err);
-        showToast(err);
-        return;
-      }
-      if (existing.password && existing.password !== inputPass && !isFallbackAdmin) {
-        const err = "Mật khẩu không chính xác! Vui lòng kiểm tra lại.";
-        setAuthError(err);
-        showToast(err);
-        return;
-      }
-      const loggedUser: UserProfile = {
-        id: existing.id,
-        name: existing.name,
-        email: existing.email,
-        phone: existing.phone,
-        avatarUrl: existing.avatarUrl || "/default-avatar.png",
-        memberSince: existing.createdAt || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
-        role: existing.role || "user",
-      };
-      setCurrentUser(loggedUser);
-      localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
-      setCustomerInfo((prev) => ({
-        ...prev,
-        fullName: loggedUser.name,
-        phone: loggedUser.phone,
-        address: existing.address || prev.address,
-      }));
+    try {
+      const res = await api.login(loginEmail.trim(), loginPassword.trim());
+      const loggedUser = applyLoggedInUser(res.user);
       setIsAuthModalOpen(false);
       setLoginPassword("");
       setAuthError(null);
 
-      // Khôi phục giỏ hàng của tài khoản vừa đăng nhập (giỏ hàng của ai thì của người đó)
-      const userSavedCart = localStorage.getItem("bookstore_cart_" + loggedUser.id);
-      if (userSavedCart) {
-        try {
-          setCart(JSON.parse(userSavedCart));
-        } catch {
-          setCart([]);
-        }
-      } else {
-        setCart([]);
-      }
-      setSelectedCartIds([]);
-
-      // Nếu là tài khoản người dùng bình thường: Tắt quyền và phiên quản trị Admin
-      if (existing.role !== "admin" && existing.role !== "staff") {
-        setIsAdminLoggedIn(false);
-        try {
-          localStorage.removeItem("bookstore_admin_session");
-          localStorage.removeItem("bookstore_admin_user");
-        } catch {
-          // ignore
-        }
-      }
-
-      // NẾU LÀ TÀI KHOẢN ADMIN HOẶC STAFF -> TỰ ĐỘNG CHUYỂN QUA TRANG /admin VÀ KÍCH HOẠT PHIÊN QUẢN TRỊ
-      if (existing.role === "admin" || existing.role === "staff") {
-        setIsAdminLoggedIn(true);
-        try {
-          localStorage.setItem("bookstore_admin_session", "true");
-          localStorage.setItem("bookstore_admin_user", JSON.stringify(existing));
-        } catch (err) {
-          console.error(err);
-        }
+      if (loggedUser.role === "admin" || loggedUser.role === "staff") {
         switchTab("admin");
-        showToast(`Đăng nhập quyền Quản trị (${existing.role === "admin" ? "Admin" : "Nhân viên"}) thành công! Chuyển hướng sang Trang Admin...`);
-        return;
+        showToast(
+          `Đăng nhập quyền Quản trị (${loggedUser.role === "admin" ? "Admin" : "Nhân viên"}) thành công! Chuyển hướng sang Trang Admin...`
+        );
+      } else {
+        showToast(`Chào mừng bạn trở lại, ${loggedUser.name}!`);
       }
-
-      showToast(`Chào mừng bạn trở lại, ${loggedUser.name}!`);
-      return;
+    } catch (err: any) {
+      const msg = err?.message || "Email hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại.";
+      setAuthError(msg);
+      showToast(msg);
     }
-
-    if (isFallbackAdmin) {
-      const adminAcc = users.find((u) => u.role === "admin") || {
-        id: "usr-admin-1",
-        name: "Quản Trị Viên (BookStore Admin)",
-        email: "admin@bookstore.vn",
-        phone: "0905 888 999",
-        role: "admin" as const,
-        status: "active" as const,
-        avatarUrl: "/default-avatar.png",
-        createdAt: "01/01/2024"
-      };
-      const loggedUser: UserProfile = {
-        id: adminAcc.id,
-        name: adminAcc.name,
-        email: adminAcc.email,
-        phone: adminAcc.phone,
-        avatarUrl: adminAcc.avatarUrl || "/default-avatar.png",
-        memberSince: adminAcc.createdAt || "Tháng 01/2024",
-      };
-      setCurrentUser(loggedUser);
-      localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
-      setIsAdminLoggedIn(true);
-      try {
-        localStorage.setItem("bookstore_admin_session", "true");
-        localStorage.setItem("bookstore_admin_user", JSON.stringify(adminAcc));
-      } catch (err) {
-        console.error(err);
-      }
-      setIsAuthModalOpen(false);
-      setLoginPassword("");
-      setAuthError(null);
-      switchTab("admin");
-      showToast("Đăng nhập quyền Quản trị (Admin) thành công! Chuyển hướng sang Trang Admin...");
-      return;
-    }
-
-    // Tài khoản không tồn tại trên hệ thống
-    const err = "Tài khoản hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại.";
-    setAuthError(err);
-    showToast(err);
   };
 
-  // Handle Register
-  const handleRegister = (e: React.FormEvent) => {
+  // Handle Register - Đăng ký tài khoản mới qua Backend API (/api/auth/register)
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
     if (!regName || !regEmail || !regPhone || !regPassword) {
@@ -832,81 +851,29 @@ export default function App() {
       return;
     }
 
-    const email = regEmail.trim().toLowerCase();
-    if (users.some((u) => u.email.toLowerCase() === email)) {
-      const err = "Email này đã được đăng ký! Vui lòng chuyển sang tab Đăng Nhập.";
-      setAuthError(err);
-      showToast(err);
-      return;
+    try {
+      const res = await api.register({
+        name: regName.trim(),
+        email: regEmail.trim(),
+        phone: regPhone.trim(),
+        password: regPassword
+      });
+
+      const newUser = applyLoggedInUser(res.user);
+      setIsAuthModalOpen(false);
+      showToast(`Đăng ký tài khoản thành công! Xin chào ${newUser.name}`);
+      setRegPassword("");
+      setRegConfirmPassword("");
+    } catch (err: any) {
+      const msg = err?.message || "Không thể đăng ký tài khoản. Vui lòng thử lại.";
+      setAuthError(msg);
+      showToast(msg);
     }
-
-    const newAccount: UserAccount = {
-      id: "usr-" + Date.now(),
-      name: regName.trim(),
-      email: regEmail.trim(),
-      phone: regPhone.trim(),
-      role: "customer",
-      status: "active",
-      password: regPassword,
-      avatarUrl: "/default-avatar.png",
-      createdAt: new Date().toLocaleDateString("vi-VN"),
-    };
-
-    api.createUser(newAccount).catch(console.error);
-    const updatedUsers = [newAccount, ...users];
-    setUsers(updatedUsers);
-
-    const newUser: UserProfile = {
-      id: newAccount.id,
-      name: newAccount.name,
-      email: newAccount.email,
-      phone: newAccount.phone,
-      avatarUrl: "/default-avatar.png",
-      memberSince: newAccount.createdAt,
-      role: "user",
-    };
-    setIsAdminLoggedIn(false);
-    setCart([]);
-    setSelectedCartIds([]);
-
-    setCurrentUser(newUser);
-    localStorage.setItem("bookstore_user", JSON.stringify(newUser));
-    setCustomerInfo((prev) => ({
-      ...prev,
-      fullName: newUser.name,
-      phone: newUser.phone,
-    }));
-    setIsAuthModalOpen(false);
-    showToast(`Đăng ký tài khoản thành công! Xin chào ${newUser.name}`);
-    setRegPassword("");
-    setRegConfirmPassword("");
   };
 
-  // Handle Logout - Xóa sạch phiên, giỏ hàng và dữ liệu form đặt hàng
+  // Handle Logout - Xóa sạch phiên, JWT, giỏ hàng và dữ liệu form đặt hàng
   const handleLogout = () => {
-    setCurrentUser(null);
-    setIsAdminLoggedIn(false);
-    setCart([]);
-    setSelectedCartIds([]);
-    setCustomerInfo({
-      fullName: "",
-      phone: "",
-      address: "",
-      paymentMethod: "cod",
-      note: "",
-    });
-    setIsCheckoutOpen(false);
-    try {
-      localStorage.removeItem("bookstore_user");
-      localStorage.removeItem("bookstore_admin_session");
-      localStorage.removeItem("bookstore_admin_user");
-      localStorage.removeItem("dinhbao_user");
-      localStorage.removeItem("dinhbao_admin_session");
-      localStorage.removeItem("dinhbao_admin_user");
-      localStorage.removeItem("bookstore_cart_guest");
-    } catch (err) {
-      console.error("Lỗi khi dọn dẹp local storage lúc đăng xuất:", err);
-    }
+    clearAuthSessionState();
     setIsUserMenuOpen(false);
     showToast("Đã đăng xuất tài khoản thành công. Giỏ hàng và dữ liệu phiên đã được xóa.");
   };
@@ -1661,124 +1628,148 @@ export default function App() {
 
   const handleResetDefaultUsers = () => {
     api.getUsers({ page: 1, limit: 50 }).then((res) => {
-      if (res && res.data) setUsers(res.data);
+      if (res && res.source === "mongodb" && res.data) setUsers(res.data);
     });
     showToast("Đã đồng bộ lại danh sách người dùng từ MongoDB!");
   };
 
-  // Admin Login Handlers
-  const handleAdminLogin = (e: React.FormEvent) => {
+  // Admin Login Handlers - Xác thực qua Backend API & kiểm tra vai trò admin/staff
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdminLoginError(null);
-    const u = adminUsername.trim().toLowerCase();
+    const u = adminUsername.trim();
     const p = adminPassword.trim();
 
-    // Look for account in users list
-    const found = users.find(
-      (acc) =>
-        (acc.email.toLowerCase() === u ||
-          acc.name.toLowerCase() === u ||
-          (u === "admin" && acc.role === "admin")) &&
-        acc.password === p
-    );
+    if (!u || !p) {
+      setAdminLoginError("Vui lòng nhập đầy đủ Email/Tài khoản và Mật khẩu!");
+      return;
+    }
 
-    if (found) {
-      if (found.status === "locked") {
-        setAdminLoginError("Tài khoản này đã bị KHÓA bởi Quản trị viên!");
-        return;
-      }
-      if (found.role !== "admin" && found.role !== "staff") {
+    try {
+      const loginIdentifier = u.toLowerCase() === "admin" ? "admin@bookstore.vn" : u;
+      const res = await api.login(loginIdentifier, p);
+      if (res.user.role !== "admin" && res.user.role !== "staff") {
+        clearAuthTokens();
         setAdminLoginError(
           "Tài khoản này là 'Khách Hàng', không có quyền truy cập Cổng Quản Trị!"
         );
         return;
       }
-      const loggedUser: UserProfile = {
-        id: found.id,
-        name: found.name,
-        email: found.email,
-        phone: found.phone,
-        avatarUrl: found.avatarUrl || "/default-avatar.png",
-        memberSince: found.createdAt || "Tháng " + (new Date().getMonth() + 1) + "/" + new Date().getFullYear(),
-      };
-      setCurrentUser(loggedUser);
-      setIsAdminLoggedIn(true);
-      try {
-        localStorage.setItem("bookstore_admin_session", "true");
-        localStorage.setItem("bookstore_admin_user", JSON.stringify(found));
-        localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
-      } catch (err) {
-        console.error(err);
-      }
-      showToast(`Đăng nhập Quản trị thành công! Xin chào ${found.name}`);
-      setAdminPassword("");
-      return;
-    }
 
-    // Fallback credentials for demo: admin / admin123 or admin@bookstore.vn / admin
-    if (
-      (u === "admin" || u === "admin@bookstore.vn" || u === "manager@bookstore.vn" || u === "bao@gmail.com" || u === "admin@dinhbao.vn") &&
-      (p === "admin123" || p === "admin")
-    ) {
-      const adminAcc = users.find((acc) => acc.role === "admin") || {
-        id: "usr-admin-1",
-        name: "Quản Trị Viên (BookStore Admin)",
-        email: "admin@bookstore.vn",
-        phone: "0905 888 999",
-        role: "admin" as const,
-        status: "active" as const,
-        avatarUrl: "/default-avatar.png",
-        createdAt: "01/01/2024"
-      };
-      const loggedUser: UserProfile = {
-        id: adminAcc.id,
-        name: adminAcc.name,
-        email: adminAcc.email,
-        phone: adminAcc.phone,
-        avatarUrl: adminAcc.avatarUrl || "/default-avatar.png",
-        memberSince: adminAcc.createdAt || "Tháng 01/2024",
-      };
-      setCurrentUser(loggedUser);
-      setIsAdminLoggedIn(true);
-      try {
-        localStorage.setItem("bookstore_admin_session", "true");
-        localStorage.setItem("bookstore_admin_user", JSON.stringify(adminAcc));
-        localStorage.setItem("bookstore_user", JSON.stringify(loggedUser));
-      } catch (err) {
-        console.error(err);
-      }
-      showToast("Đăng nhập quyền Quản trị (Admin) thành công!");
+      applyLoggedInUser(res.user);
       setAdminPassword("");
-    } else {
+      showToast(`Đăng nhập Quản trị thành công! Xin chào ${res.user.name}`);
+    } catch (err: any) {
       setAdminLoginError(
-        "Tài khoản hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại."
+        err?.message || "Tài khoản hoặc mật khẩu không chính xác! Vui lòng kiểm tra lại."
       );
     }
   };
 
   const handleAdminLogout = () => {
-    setIsAdminLoggedIn(false);
-    setCurrentUser(null);
+    clearAuthSessionState();
     setIsUserMenuOpen(false);
-    setCart([]);
-    setSelectedCartIds([]);
-    try {
-      localStorage.removeItem("bookstore_admin_session");
-      localStorage.removeItem("bookstore_admin_user");
-      localStorage.removeItem("bookstore_user");
-      localStorage.removeItem("dinhbao_admin_session");
-      localStorage.removeItem("dinhbao_admin_user");
-      localStorage.removeItem("dinhbao_user");
-    } catch (err) {
-      console.error(err);
-    }
     // Tự động điều hướng ra trang chủ khi đăng xuất khỏi Admin
     switchTab("products");
     showToast("Đã đăng xuất khỏi trang quản trị và quay về trang chủ!");
   };
 
-  // NẾU ĐANG Ở TRANG /admin: HIỂN THỊ GIAO DIỆN ADMIN RIÊNG BIỆT (KHÔNG CÓ HEADER/CART CỦA CỬA HÀNG)
+  // NẾU ĐANG Ở TRANG /admin: HIỂN THỊ GIAO DIỆN ADMIN RIÊNG BIỆT (BẢO VỆ BẰNG JWT ADMIN/STAFF)
   if (activeTab === "admin") {
+    const hasAdminAccess =
+      isAdminLoggedIn &&
+      Boolean(getAuthToken()) &&
+      (currentUser?.role === "admin" || currentUser?.role === "staff");
+
+    if (!hasAdminAccess) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 z-[9999] bg-slate-800 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 border border-slate-700">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <span className="text-sm font-medium">{toastMessage}</span>
+            </div>
+          )}
+
+          <div className="bg-white rounded-3xl max-w-md w-full p-7 sm:p-8 shadow-2xl border border-slate-200 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-500/30">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-black text-slate-900">BookStore Admin Console</h2>
+              <p className="text-xs text-slate-500">
+                Đăng nhập tài khoản Quản trị viên hoặc Nhân viên để xác thực JWT và xem dữ liệu từ MongoDB.
+              </p>
+            </div>
+
+            {adminLoginError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                <span className="font-semibold">{adminLoginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminLogin} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  Email hoặc Tên đăng nhập
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={adminUsername}
+                  onChange={(e) => setAdminUsername(e.target.value)}
+                  placeholder="admin@bookstore.vn hoặc staff@bookstore.vn"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">Mật khẩu</label>
+                <div className="relative">
+                  <input
+                    type={adminShowPassword ? "text" : "password"}
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAdminShowPassword(!adminShowPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {adminShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/25 transition-all flex items-center justify-center space-x-2"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Đăng Nhập Trang Quản Trị</span>
+              </button>
+            </form>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <button
+                type="button"
+                onClick={() => switchTab("products")}
+                className="font-bold text-slate-600 hover:text-blue-600 flex items-center space-x-1"
+              >
+                <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                <span>Về Cửa Hàng</span>
+              </button>
+              <span className="font-mono text-slate-400">JWT Protected &bull; /admin</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between">
         {/* Toast Notification */}

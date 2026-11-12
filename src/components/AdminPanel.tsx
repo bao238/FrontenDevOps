@@ -361,7 +361,7 @@ export default function AdminPanel({
         status: adminOrderFilter,
         search: debouncedOrderSearch
       });
-      if (res && res.data && res.data.length > 0) {
+      if (res && res.source === "mongodb" && res.data) {
         setServerOrders(res.data);
         setServerTotalOrders(res.count ?? res.totalAllCount ?? res.data.length);
         setServerTotalOrderPages(res.totalPages || 1);
@@ -460,7 +460,7 @@ export default function AdminPanel({
         search: debouncedReviewSearchQuery,
         productId: selectedProductReviewFilter
       });
-      if (res && res.data) {
+      if (res && res.source === "mongodb" && res.data) {
         setReviewsList(res.data);
         const count = res.count ?? res.totalAllCount ?? res.data.length;
         const totalPages = res.totalPages || Math.ceil(count / limit) || 1;
@@ -1013,7 +1013,7 @@ export default function AdminPanel({
         status: userStatusFilter,
         search: debouncedUserSearchQuery
       });
-      if (res && res.data && res.data.length > 0) {
+      if (res && res.source === "mongodb" && res.data) {
         setServerUsers(res.data);
         setServerTotalUsers(res.count ?? res.totalAllCount ?? res.data.length);
         setServerTotalUserPages(res.totalPages || 1);
@@ -1464,6 +1464,10 @@ export default function AdminPanel({
           <button
             onClick={() => {
               setAdminTab("users");
+              if (serverUsers.length === 0) {
+                userPageCacheRef.current.clear();
+                fetchServerUsers(adminUserPage, adminUsersPerPage);
+              }
               if (onResetDefaultUsers) onResetDefaultUsers();
             }}
             className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${

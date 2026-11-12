@@ -4,6 +4,70 @@ import { UserAccount } from "../data/users";
 import { applyRatingBalancing } from "../utils/ratingBalancer";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
+const TOKEN_STORAGE_KEY = "bookstore_token";
+const REFRESH_TOKEN_STORAGE_KEY = "bookstore_refresh_token";
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthTokens(token?: string | null, refreshToken?: string | null) {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    }
+    if (refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function clearAuthTokens() {
+  try {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers || {});
+  const token = getAuthToken();
+
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers
+  });
+
+  // Nếu token đã lưu bị hết hạn hoặc không hợp lệ, dọn sạch token cũ
+  if (res.status === 401 && token && !endpoint.startsWith("/auth/login")) {
+    clearAuthTokens();
+  }
+
+  return res;
+}
+
+async function parseJsonSafe(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
 
 export interface OrderPayload {
   customerInfo: {
@@ -162,13 +226,14 @@ export const api = {
   // 1. Kiểm tra Backend Health
   async checkHealth() {
     try {
-      const res = await fetch(`${API_BASE}/health`);
+      const res = await apiFetch("/health");
       if (!res.ok) throw new Error("Healthcheck failed");
       return await res.json();
     } catch {
       return { status: "offline", service: "disconnected" };
     }
   },
+
   // 2. Lay danh sach san pham tu MongoDB ho tro Server-Side Pagination
   async getProducts(params?: ProductQueryParams): Promise<PaginatedResponse<Product>> {
     try {
@@ -184,7 +249,7 @@ export const api = {
       if (params?.sortBy && params.sortBy !== "default") query.append("sortBy", params.sortBy);
 
       const qs = query.toString() ? `?${query.toString()}` : "";
-      const res = await fetch(`${API_BASE}/products${qs}`);
+      const res = await apiFetch(`/products${qs}`);
       if (res.ok) {
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
@@ -218,33 +283,32 @@ export const api = {
     };
   },
 
-  // 3. Thêm sản phẩm mới (Admin)
+  // 3. Thêm sản phẩm mới (Admin/Staff)
   async createProduct(product: Partial<Product>) {
-    const res = await fetch(`${API_BASE}/products`, {
+    const res = await apiFetch("/products", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(product)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
-  // 4. Cập nhật sản phẩm
+  // 4. Cập nhật sản phẩm (Admin/Staff)
   async updateProduct(id: string, product: Partial<Product>) {
-    const res = await fetch(`${API_BASE}/products/${id}`, {
+    const res = await apiFetch(`/products/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(product)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
-  // 5. Xóa sản phẩm
+  // 5. Xóa sản phẩm (Admin)
   async deleteProduct(id: string) {
-    const res = await fetch(`${API_BASE}/products/${id}`, {
+    const res = await apiFetch(`/products/${id}`, {
       method: "DELETE"
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
+
   // 6. Lay danh sach don hang ho tro Server-Side Pagination
   async getOrders(params?: OrderQueryParams): Promise<PaginatedResponse<any>> {
     try {
@@ -255,7 +319,7 @@ export const api = {
       if (params?.search && params.search.trim()) query.append("search", params.search.trim());
 
       const qs = query.toString() ? `?${query.toString()}` : "";
-      const res = await fetch(`${API_BASE}/orders${qs}`);
+      const res = await apiFetch(`/orders${qs}`);
       if (res.ok) {
         const json = await res.json();
         return {
@@ -268,6 +332,9 @@ export const api = {
           data: json.data || []
         };
       }
+      if (res.status === 401 || res.status === 403) {
+        return { source: "unauthorized", count: 0, totalPages: 1, currentPage: 1, data: [] };
+      }
     } catch (err) {
       console.error("❌ [API] Loi lay don hang tu MongoDB:", err);
     }
@@ -276,35 +343,59 @@ export const api = {
 
   // 7. Tạo đơn hàng mới
   async createOrder(order: OrderPayload) {
-    const res = await fetch(`${API_BASE}/orders`, {
+    const res = await apiFetch("/orders", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(order)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 8. Cập nhật trạng thái và dữ liệu liên quan của đơn hàng
   async updateOrderStatus(id: string, status: string, extraData?: Record<string, any>) {
-    const res = await fetch(`${API_BASE}/orders/${id}/status`, {
+    const res = await apiFetch(`/orders/${id}/status`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, ...extraData })
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
-  // 9. Đăng nhập qua MongoDB
+  // 9. Đăng nhập qua MongoDB (lưu JWT Token)
   async login(email: string, password: string) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await apiFetch("/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.message || data.error || "Đăng nhập thất bại");
+    setAuthTokens(data.token, data.refreshToken);
     return data;
   },
+
+  // 9b. Đăng ký tài khoản độc giả mới (lưu JWT Token)
+  async register(payload: { name: string; email: string; phone: string; password: string }) {
+    const res = await apiFetch("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(data.message || data.error || "Đăng ký tài khoản thất bại");
+    setAuthTokens(data.token, data.refreshToken);
+    return data;
+  },
+
+  // 9c. Lấy thông tin tài khoản hiện tại từ JWT Token
+  async getMe() {
+    if (!getAuthToken()) return null;
+    try {
+      const res = await apiFetch("/auth/me");
+      if (!res.ok) return null;
+      const data = await parseJsonSafe(res);
+      return data.user || null;
+    } catch {
+      return null;
+    }
+  },
+
   // 10. Lay danh sach Users tu MongoDB ho tro Server-Side Pagination
   async getUsers(params?: UserQueryParams): Promise<PaginatedResponse<UserAccount>> {
     try {
@@ -316,7 +407,7 @@ export const api = {
       if (params?.search && params.search.trim()) query.append("search", params.search.trim());
 
       const qs = query.toString() ? `?${query.toString()}` : "";
-      const res = await fetch(`${API_BASE}/users${qs}`);
+      const res = await apiFetch(`/users${qs}`);
       if (res.ok) {
         const json = await res.json();
         return {
@@ -329,6 +420,9 @@ export const api = {
           data: json.data || []
         };
       }
+      if (res.status === 401 || res.status === 403) {
+        return { source: "unauthorized", count: 0, totalPages: 1, currentPage: 1, data: [] };
+      }
     } catch (err) {
       console.error("❌ [API] Loi lay danh sach user tu MongoDB:", err);
     }
@@ -337,54 +431,51 @@ export const api = {
 
   // 11. Xóa đơn hàng (Admin)
   async deleteOrder(id: string) {
-    const res = await fetch(`${API_BASE}/orders/${id}`, { method: "DELETE" });
-    return await res.json();
+    const res = await apiFetch(`/orders/${id}`, { method: "DELETE" });
+    return await parseJsonSafe(res);
   },
 
   // 12. Thêm người dùng (Admin)
   async createUser(user: Partial<UserAccount>) {
-    const res = await fetch(`${API_BASE}/users`, {
+    const res = await apiFetch("/users", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user)
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) {
       return { error: data.message || data.error || "Lỗi khi thêm người dùng", ...data };
     }
     return data;
   },
 
-  // 13. Cập nhật người dùng (Admin)
+  // 13. Cập nhật người dùng (Chính chủ hoặc Admin)
   async updateUser(id: string, user: Partial<UserAccount>) {
-    const res = await fetch(`${API_BASE}/users/${id}`, {
+    const res = await apiFetch(`/users/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 14. Khóa / Mở khóa người dùng (Admin)
   async toggleUserStatus(id: string, status: "active" | "locked") {
-    const res = await fetch(`${API_BASE}/users/${id}/status`, {
+    const res = await apiFetch(`/users/${id}/status`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status })
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 15. Xóa người dùng (Admin)
   async deleteUser(id: string) {
-    const res = await fetch(`${API_BASE}/users/${id}`, { method: "DELETE" });
-    return await res.json();
+    const res = await apiFetch(`/users/${id}`, { method: "DELETE" });
+    return await parseJsonSafe(res);
   },
 
   // 16. Lấy đánh giá của sản phẩm từ MongoDB
   async getProductReviews(productId: string): Promise<ReviewItem[]> {
     try {
-      const res = await fetch(`${API_BASE}/products/${productId}/reviews`);
+      const res = await apiFetch(`/products/${productId}/reviews`);
       if (res.ok) {
         const json = await res.json();
         return json.data || [];
@@ -397,13 +488,13 @@ export const api = {
 
   // 17. Thêm đánh giá cho sản phẩm lưu trực tiếp vào MongoDB
   async addProductReview(productId: string, review: { author: string; rating: number; content: string; imageUrl?: string; userId?: string }) {
-    const res = await fetch(`${API_BASE}/products/${productId}/reviews`, {
+    const res = await apiFetch(`/products/${productId}/reviews`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(review)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
+
   // 18. Lay toan bo danh gia trong he thong ho tro Server-Side Pagination
   async getAllReviews(params?: ReviewQueryParams): Promise<PaginatedResponse<ReviewItem>> {
     try {
@@ -416,7 +507,7 @@ export const api = {
       if (params?.moderationStatus && params.moderationStatus !== "all") query.append("moderationStatus", params.moderationStatus);
 
       const qs = query.toString() ? `?${query.toString()}` : "";
-      const res = await fetch(`${API_BASE}/reviews${qs}`);
+      const res = await apiFetch(`/reviews${qs}`);
       if (res.ok) {
         const json = await res.json();
         return {
@@ -429,6 +520,9 @@ export const api = {
           data: json.data || []
         };
       }
+      if (res.status === 401 || res.status === 403) {
+        return { source: "unauthorized", count: 0, totalPages: 1, currentPage: 1, data: [] };
+      }
     } catch (err) {
       console.error("❌ [API] Loi lay tat ca danh gia:", err);
     }
@@ -437,25 +531,24 @@ export const api = {
 
   // 19. Xóa đánh giá (Admin)
   async deleteReview(id: string) {
-    const res = await fetch(`${API_BASE}/reviews/${id}`, { method: "DELETE" });
-    return await res.json();
+    const res = await apiFetch(`/reviews/${id}`, { method: "DELETE" });
+    return await parseJsonSafe(res);
   },
 
-  // 20. Chỉnh sửa đánh giá (Admin)
+  // 20. Chỉnh sửa đánh giá (Admin/Staff)
   async updateReview(id: string, review: { author?: string; rating?: number; content?: string }) {
-    const res = await fetch(`${API_BASE}/reviews/${id}`, {
+    const res = await apiFetch(`/reviews/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(review)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // --- MODULE QUẢN LÝ MÃ GIẢM GIÁ (COUPONS) ---
   // 21. Lấy danh sách tất cả mã giảm giá
   async getCoupons(): Promise<CouponItem[]> {
     try {
-      const res = await fetch(`${API_BASE}/coupons`);
+      const res = await apiFetch("/coupons");
       if (res.ok) {
         const json = await res.json();
         return json.data || [];
@@ -468,47 +561,44 @@ export const api = {
 
   // 22. Tạo mã giảm giá mới
   async createCoupon(coupon: Partial<CouponItem>) {
-    const res = await fetch(`${API_BASE}/coupons`, {
+    const res = await apiFetch("/coupons", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(coupon)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 23. Cập nhật mã giảm giá
   async updateCoupon(id: string, coupon: Partial<CouponItem>) {
-    const res = await fetch(`${API_BASE}/coupons/${id}`, {
+    const res = await apiFetch(`/coupons/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(coupon)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 24. Xóa mã giảm giá
   async deleteCoupon(id: string) {
-    const res = await fetch(`${API_BASE}/coupons/${id}`, {
+    const res = await apiFetch(`/coupons/${id}`, {
       method: "DELETE"
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 25. Kiểm tra và áp dụng mã giảm giá khi thanh toán
   async applyCoupon(code: string, orderTotal: number) {
-    const res = await fetch(`${API_BASE}/coupons/apply`, {
+    const res = await apiFetch("/coupons/apply", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, orderTotal })
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // --- MODULE QUẢN LÝ THỂ LOẠI SÁCH (CATEGORIES) ---
   // 26. Lấy danh sách thể loại sách kèm số lượng đầu sách
   async getCategories(): Promise<CategoryItem[]> {
     try {
-      const res = await fetch(`${API_BASE}/categories`);
+      const res = await apiFetch("/categories");
       if (res.ok) {
         const json = await res.json();
         return json.data || [];
@@ -521,37 +611,35 @@ export const api = {
 
   // 27. Tạo thể loại sách mới
   async createCategory(category: Partial<CategoryItem>) {
-    const res = await fetch(`${API_BASE}/categories`, {
+    const res = await apiFetch("/categories", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(category)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 28. Cập nhật thể loại sách
   async updateCategory(id: string, category: Partial<CategoryItem>) {
-    const res = await fetch(`${API_BASE}/categories/${id}`, {
+    const res = await apiFetch(`/categories/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(category)
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // 29. Xóa thể loại sách
   async deleteCategory(id: string) {
-    const res = await fetch(`${API_BASE}/categories/${id}`, {
+    const res = await apiFetch(`/categories/${id}`, {
       method: "DELETE"
     });
-    return await res.json();
+    return await parseJsonSafe(res);
   },
 
   // --- MODULE BÁO CÁO & THỐNG KÊ DOANH THU (ANALYTICS) ---
   // 30. Lấy báo cáo thống kê doanh thu và phân tích chuyên sâu
   async getAnalyticsSummary(): Promise<AnalyticsSummary | null> {
     try {
-      const res = await fetch(`${API_BASE}/analytics/summary`);
+      const res = await apiFetch("/analytics/summary");
       if (res.ok) {
         const json = await res.json();
         return json.data || null;
@@ -561,12 +649,12 @@ export const api = {
     }
     return null;
   },
-  // 19. Admin phan hoi danh gia doc gia
+
+  // 31. Admin phan hoi danh gia doc gia
   async replyToReview(reviewId: string, reply: string): Promise<{ message: string; data: ReviewItem } | null> {
     try {
-      const res = await fetch(`${API_BASE}/reviews/${reviewId}/reply`, {
+      const res = await apiFetch(`/reviews/${reviewId}/reply`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reply })
       });
       if (res.ok) {
@@ -578,12 +666,11 @@ export const api = {
     return null;
   },
 
-  // 20. Admin kiem duyet danh gia (approved, hidden, flagged)
+  // 32. Admin kiem duyet danh gia (approved, hidden, flagged)
   async updateReviewModeration(reviewId: string, status: "approved" | "hidden" | "flagged"): Promise<{ message: string; data: ReviewItem } | null> {
     try {
-      const res = await fetch(`${API_BASE}/reviews/${reviewId}/moderation`, {
+      const res = await apiFetch(`/reviews/${reviewId}/moderation`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status })
       });
       if (res.ok) {
@@ -593,5 +680,5 @@ export const api = {
       console.error("❌ [API] Loi cap nhat kiem duyet danh gia:", err);
     }
     return null;
-  },
+  }
 };

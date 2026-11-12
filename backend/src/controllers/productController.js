@@ -1,14 +1,9 @@
 const Product = require('../models/Product');
 const Review = require('../models/Review');
-const { isDbConnected } = require('../config/db');
 
 // GET /api/products
 // Lay danh sach sach tu MongoDB voi phan trang phia may chu (Server-Side Pagination), tranh tai toan bo 10.000+ san pham gay tran RAM
-exports.getProducts = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Co so du lieu MongoDB chua ket noi' });
-  }
-
+exports.getProducts = async (req, res, next) => {
   try {
     // 1. Tham so phan trang: trang hien tai va so luong moi trang (mac dinh 10 cuon, toi da 100)
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -125,18 +120,13 @@ exports.getProducts = async (req, res) => {
       data: products
     });
   } catch (err) {
-    console.error('[ProductController] Loi truy van MongoDB:', err.message);
-    return res.status(500).json({ error: 'Loi truy van san pham MongoDB', message: err.message });
+    return next(err);
   }
 };
 
 // GET /api/products/:id
 // Lấy thông tin chi tiết một cuốn sách theo mã định danh id
-exports.getProductById = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getProductById = async (req, res, next) => {
   try {
     const product = await Product.findOne({ id: req.params.id }).lean();
     if (!product) {
@@ -144,18 +134,13 @@ exports.getProductById = async (req, res) => {
     }
     return res.json({ source: 'mongodb', data: product });
   } catch (err) {
-    console.error('[ProductController] Lỗi truy vấn MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi truy vấn sản phẩm', message: err.message });
+    return next(err);
   }
 };
 
 // POST /api/products
 // Tạo mới một cuốn sách và lưu trữ vào MongoDB
-exports.createProduct = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.createProduct = async (req, res, next) => {
   try {
     const newProduct = {
       id: req.body.id || `prod-book-${Date.now()}`,
@@ -181,18 +166,13 @@ exports.createProduct = async (req, res) => {
     const created = await Product.create(newProduct);
     return res.status(201).json({ message: 'Tạo sản phẩm thành công trên MongoDB', data: created });
   } catch (err) {
-    console.error('[ProductController] Lỗi tạo sản phẩm:', err.message);
-    return res.status(500).json({ error: 'Lỗi thêm sản phẩm vào MongoDB', message: err.message });
+    return next(err);
   }
 };
 
 // PUT /api/products/:id
 // Cập nhật thông tin cuốn sách trong MongoDB
-exports.updateProduct = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.updateProduct = async (req, res, next) => {
   try {
     const updated = await Product.findOneAndUpdate(
       { id: req.params.id },
@@ -205,18 +185,13 @@ exports.updateProduct = async (req, res) => {
     }
     return res.json({ message: 'Cập nhật sản phẩm thành công trên MongoDB', data: updated });
   } catch (err) {
-    console.error('[ProductController] Lỗi cập nhật sản phẩm:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật sản phẩm', message: err.message });
+    return next(err);
   }
 };
 
 // DELETE /api/products/:id
 // Xóa một cuốn sách khỏi MongoDB
-exports.deleteProduct = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.deleteProduct = async (req, res, next) => {
   try {
     const deleted = await Product.findOneAndDelete({ id: req.params.id });
     if (!deleted) {
@@ -224,18 +199,13 @@ exports.deleteProduct = async (req, res) => {
     }
     return res.json({ message: 'Xóa sản phẩm thành công trên MongoDB' });
   } catch (err) {
-    console.error('[ProductController] Lỗi xóa sản phẩm:', err.message);
-    return res.status(500).json({ error: 'Lỗi xóa sản phẩm', message: err.message });
+    return next(err);
   }
 };
 
 // GET /api/reviews
 // Lay danh sach danh gia voi phan trang Server-Side, tranh tran RAM khi co hang chuc nghin danh gia
-exports.getAllReviews = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Co so du lieu MongoDB chua ket noi' });
-  }
-
+exports.getAllReviews = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
@@ -285,34 +255,24 @@ exports.getAllReviews = async (req, res) => {
       data: reviews
     });
   } catch (err) {
-    console.error('[ProductController] Loi lay tat ca danh gia:', err.message);
-    return res.status(500).json({ error: 'Loi lay tat ca danh gia', message: err.message });
+    return next(err);
   }
 };
 
 // GET /api/products/:id/reviews
 // Lấy danh sách đánh giá của một cuốn sách cụ thể
-exports.getProductReviews = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getProductReviews = async (req, res, next) => {
   try {
     const reviews = await Review.find({ productId: req.params.id }).sort({ createdAt: -1 }).lean();
     return res.json({ source: 'mongodb', count: reviews.length, data: reviews });
   } catch (err) {
-    console.error('[ProductController] Lỗi lấy đánh giá MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi lấy đánh giá sản phẩm', message: err.message });
+    return next(err);
   }
 };
 
 // POST /api/products/:id/reviews
 // Thêm đánh giá mới cho một cuốn sách và cập nhật lại điểm đánh giá trung bình
-exports.addProductReview = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.addProductReview = async (req, res, next) => {
   try {
     const { author, rating, content, userId, imageUrl } = req.body;
     if (!author || !content) {
@@ -351,18 +311,13 @@ exports.addProductReview = async (req, res) => {
       newReview
     });
   } catch (err) {
-    console.error('[ProductController] Lỗi thêm đánh giá MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi thêm đánh giá sản phẩm', message: err.message });
+    return next(err);
   }
 };
 
 // DELETE /api/reviews/:id
 // Admin xóa một đánh giá và tính lại điểm trung bình cho cuốn sách
-exports.deleteReview = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.deleteReview = async (req, res, next) => {
   try {
     const deleted = await Review.findOneAndDelete({ id: req.params.id });
     if (!deleted) {
@@ -385,18 +340,13 @@ exports.deleteReview = async (req, res) => {
 
     return res.json({ message: 'Xóa đánh giá thành công trên MongoDB', data: deleted });
   } catch (err) {
-    console.error('[ProductController] Lỗi xóa đánh giá:', err.message);
-    return res.status(500).json({ error: 'Lỗi xóa đánh giá', message: err.message });
+    return next(err);
   }
 };
 
 // PUT /api/reviews/:id
 // Admin chỉnh sửa nội dung hoặc điểm số đánh giá
-exports.updateReview = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.updateReview = async (req, res, next) => {
   try {
     const { author, rating, content, imageUrl } = req.body;
     const review = await Review.findOne({ id: req.params.id });
@@ -426,18 +376,13 @@ exports.updateReview = async (req, res) => {
 
     return res.json({ message: 'Cập nhật đánh giá thành công trên MongoDB', data: review });
   } catch (err) {
-    console.error('[ProductController] Lỗi cập nhật đánh giá:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật đánh giá', message: err.message });
+    return next(err);
   }
 };
 
 // PUT /api/reviews/:id/reply
 // Admin phản hồi nhận xét đánh giá của khách hàng
-exports.replyToReview = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.replyToReview = async (req, res, next) => {
   try {
     const { reply } = req.body;
     const review = await Review.findOne({ id: req.params.id });
@@ -451,18 +396,13 @@ exports.replyToReview = async (req, res) => {
 
     return res.json({ message: 'Phản hồi đánh giá thành công trên MongoDB', data: review });
   } catch (err) {
-    console.error('[ProductController] Lỗi phản hồi đánh giá:', err.message);
-    return res.status(500).json({ error: 'Lỗi phản hồi đánh giá', message: err.message });
+    return next(err);
   }
 };
 
 // PUT /api/reviews/:id/moderation
 // Admin thay đổi trạng thái kiểm duyệt đánh giá (approved, hidden, flagged)
-exports.updateReviewModeration = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.updateReviewModeration = async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!['approved', 'hidden', 'flagged'].includes(status)) {
@@ -479,7 +419,6 @@ exports.updateReviewModeration = async (req, res) => {
 
     return res.json({ message: 'Cập nhật trạng thái kiểm duyệt thành công', data: review });
   } catch (err) {
-    console.error('[ProductController] Lỗi cập nhật kiểm duyệt đánh giá:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật kiểm duyệt đánh giá', message: err.message });
+    return next(err);
   }
 };

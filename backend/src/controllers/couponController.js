@@ -1,12 +1,7 @@
 const Coupon = require('../models/Coupon');
-const { isDbConnected } = require('../config/db');
 
 // Lấy danh sách toàn bộ mã giảm giá trong hệ thống (Dành cho Quản trị viên)
-exports.getCoupons = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getCoupons = async (req, res, next) => {
   try {
     const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
     return res.json({
@@ -15,17 +10,12 @@ exports.getCoupons = async (req, res) => {
       data: coupons
     });
   } catch (err) {
-    console.error('❌ [CouponController] Lỗi lấy danh sách coupon:', err.message);
-    return res.status(500).json({ error: 'Lỗi truy xuất danh sách mã giảm giá', message: err.message });
+    return next(err);
   }
 };
 
 // Tạo mã giảm giá mới
-exports.createCoupon = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.createCoupon = async (req, res, next) => {
   try {
     const {
       code,
@@ -72,17 +62,12 @@ exports.createCoupon = async (req, res) => {
       data: newCoupon
     });
   } catch (err) {
-    console.error('❌ [CouponController] Lỗi tạo coupon:', err.message);
-    return res.status(500).json({ error: 'Lỗi tạo mã giảm giá', message: err.message });
+    return next(err);
   }
 };
 
 // Cập nhật thông tin mã giảm giá
-exports.updateCoupon = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.updateCoupon = async (req, res, next) => {
   const { id } = req.params;
 
   try {
@@ -102,17 +87,12 @@ exports.updateCoupon = async (req, res) => {
       data: updatedCoupon
     });
   } catch (err) {
-    console.error('❌ [CouponController] Lỗi cập nhật coupon:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật mã giảm giá', message: err.message });
+    return next(err);
   }
 };
 
 // Xóa mã giảm giá
-exports.deleteCoupon = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.deleteCoupon = async (req, res, next) => {
   const { id } = req.params;
 
   try {
@@ -126,17 +106,12 @@ exports.deleteCoupon = async (req, res) => {
       message: `Đã xóa mã giảm giá "${deleted.code}" thành công`
     });
   } catch (err) {
-    console.error('❌ [CouponController] Lỗi xóa coupon:', err.message);
-    return res.status(500).json({ error: 'Lỗi xóa mã giảm giá', message: err.message });
+    return next(err);
   }
 };
 
 // Kiểm tra và áp dụng mã giảm giá khi khách đặt hàng
-exports.applyCoupon = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.applyCoupon = async (req, res, next) => {
   const { code, orderTotal } = req.body;
 
   if (!code) {
@@ -201,7 +176,6 @@ exports.applyCoupon = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ [CouponController] Lỗi kiểm tra coupon:', err.message);
-    return res.status(500).json({ error: 'Lỗi xử lý áp dụng mã giảm giá', message: err.message });
+    return next(err);
   }
 };

@@ -1,14 +1,9 @@
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Product = require('../models/Product');
-const { isDbConnected } = require('../config/db');
 
 // GET /api/orders (Lay danh sach don hang, ho tro phan trang Server-Side khi du lieu lon)
-exports.getOrders = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Co so du lieu MongoDB chua ket noi' });
-  }
-
+exports.getOrders = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
@@ -66,47 +61,32 @@ exports.getOrders = async (req, res) => {
       data: orders
     });
   } catch (err) {
-    console.error('[OrderController] Loi truy van MongoDB:', err.message);
-    return res.status(500).json({ error: 'Loi truy van don hang MongoDB', message: err.message });
+    return next(err);
   }
 };
 
 // GET /api/orders/:id/items (Lấy danh sách OrderItems theo orderId)
-exports.getOrderItems = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getOrderItems = async (req, res, next) => {
   try {
     const items = await OrderItem.find({ orderId: req.params.id }).lean();
     return res.json({ source: 'mongodb', count: items.length, data: items });
   } catch (err) {
-    console.error('[OrderController] Lỗi lấy chi tiết đơn hàng:', err.message);
-    return res.status(500).json({ error: 'Lỗi lấy chi tiết đơn hàng', message: err.message });
+    return next(err);
   }
 };
 
 // GET /api/order-items (Lấy tất cả chi tiết đơn hàng trong bảng order_items)
-exports.getAllOrderItems = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getAllOrderItems = async (req, res, next) => {
   try {
     const items = await OrderItem.find().sort({ createdAt: -1 }).lean();
     return res.json({ source: 'mongodb', count: items.length, data: items });
   } catch (err) {
-    console.error('[OrderController] Lỗi lấy toàn bộ order_items:', err.message);
-    return res.status(500).json({ error: 'Lỗi lấy order items', message: err.message });
+    return next(err);
   }
 };
 
 // POST /api/orders (Tạo đơn hàng mới)
-exports.createOrder = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.createOrder = async (req, res, next) => {
   const { customerInfo, items, totalAmount, paymentMethod, userId, status, pickupTime, shippingCarrier } = req.body;
   const orderId = `ORD-${Date.now().toString().slice(-6)}`;
 
@@ -168,17 +148,12 @@ exports.createOrder = async (req, res) => {
 
     return res.status(201).json({ message: 'Tạo đơn hàng thành công trên MongoDB', data: created });
   } catch (err) {
-    console.error('[OrderController] Lỗi tạo đơn hàng MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi lưu đơn hàng vào MongoDB', message: err.message });
+    return next(err);
   }
 };
 
 // PUT /api/orders/:id/status (Cập nhật trạng thái và thông tin vận chuyển/đánh giá đơn hàng)
-exports.updateOrderStatus = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.updateOrderStatus = async (req, res, next) => {
   try {
     const updateData = {};
     if (req.body.status !== undefined) updateData.status = req.body.status;
@@ -203,17 +178,12 @@ exports.updateOrderStatus = async (req, res) => {
     }
     return res.json({ message: 'Cập nhật trạng thái đơn thành công trên MongoDB', data: updated });
   } catch (err) {
-    console.error('[OrderController] Lỗi cập nhật trạng thái:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật trạng thái đơn hàng', message: err.message });
+    return next(err);
   }
 };
 
 // DELETE /api/orders/:id (Xóa đơn hàng)
-exports.deleteOrder = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.deleteOrder = async (req, res, next) => {
   try {
     const deleted = await Order.findOneAndDelete({ id: req.params.id });
     if (!deleted) {
@@ -225,7 +195,6 @@ exports.deleteOrder = async (req, res) => {
 
     return res.json({ message: 'Xóa đơn hàng và chi tiết đơn hàng thành công trên MongoDB' });
   } catch (err) {
-    console.error('[OrderController] Lỗi xóa đơn hàng MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi xóa đơn hàng', message: err.message });
+    return next(err);
   }
 };

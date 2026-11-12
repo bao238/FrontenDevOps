@@ -1,6 +1,5 @@
 const Category = require('../models/Category');
 const Product = require('../models/Product');
-const { isDbConnected } = require('../config/db');
 
 // Hàm hỗ trợ tạo slug chuẩn từ chuỗi tiếng Việt có dấu
 function generateSlug(text) {
@@ -16,11 +15,7 @@ function generateSlug(text) {
 }
 
 // Lấy danh sách tất cả thể loại sách kèm số lượng đầu sách tương ứng
-exports.getCategories = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getCategories = async (req, res, next) => {
   try {
     const categories = await Category.find().sort({ displayOrder: 1, createdAt: 1 }).lean();
 
@@ -41,17 +36,12 @@ exports.getCategories = async (req, res) => {
       data: categoriesWithCount
     });
   } catch (err) {
-    console.error('❌ [CategoryController] Lỗi lấy danh sách thể loại:', err.message);
-    return res.status(500).json({ error: 'Lỗi truy xuất danh mục thể loại', message: err.message });
+    return next(err);
   }
 };
 
 // Tạo thể loại sách mới
-exports.createCategory = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.createCategory = async (req, res, next) => {
   try {
     const { name, description, icon, displayOrder, isActive } = req.body;
 
@@ -91,17 +81,12 @@ exports.createCategory = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ [CategoryController] Lỗi tạo thể loại:', err.message);
-    return res.status(500).json({ error: 'Lỗi tạo thể loại sách mới', message: err.message });
+    return next(err);
   }
 };
 
 // Cập nhật thông tin thể loại sách
-exports.updateCategory = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.updateCategory = async (req, res, next) => {
   const { id } = req.params;
 
   try {
@@ -142,17 +127,12 @@ exports.updateCategory = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ [CategoryController] Lỗi cập nhật thể loại:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật thể loại sách', message: err.message });
+    return next(err);
   }
 };
 
 // Xóa thể loại sách
-exports.deleteCategory = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.deleteCategory = async (req, res, next) => {
   const { id } = req.params;
 
   try {
@@ -176,7 +156,6 @@ exports.deleteCategory = async (req, res) => {
       message: `Đã xóa thể loại "${category.name}" thành công`
     });
   } catch (err) {
-    console.error('❌ [CategoryController] Lỗi xóa thể loại:', err.message);
-    return res.status(500).json({ error: 'Lỗi xóa thể loại sách', message: err.message });
+    return next(err);
   }
 };

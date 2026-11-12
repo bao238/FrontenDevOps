@@ -2,14 +2,9 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const Review = require('../models/Review');
-const { isDbConnected } = require('../config/db');
 
 // Lấy toàn bộ số liệu phân tích và báo cáo doanh thu hệ thống BookStore tối ưu hóa bằng MongoDB Aggregation
-exports.getAnalyticsSummary = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getAnalyticsSummary = async (req, res, next) => {
   try {
     // 1. Tổng hợp song song các chỉ số tổng quan với hiệu năng cao O(1)
     const [
@@ -133,7 +128,6 @@ exports.getAnalyticsSummary = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ [AnalyticsController] Lỗi phân tích số liệu:', err.message);
-    return res.status(500).json({ error: 'Lỗi tổng hợp báo cáo phân tích doanh thu', message: err.message });
+    return next(err);
   }
 };

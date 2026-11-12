@@ -1,12 +1,7 @@
 const User = require('../models/User');
-const { isDbConnected } = require('../config/db');
 
 // POST /api/auth/login
-exports.login = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.login = async (req, res, next) => {
   const { email, password } = req.body;
   const cleanEmail = (email || '').trim().toLowerCase();
 
@@ -35,17 +30,12 @@ exports.login = async (req, res) => {
     }
     return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
   } catch (err) {
-    console.error('[AuthController] Lỗi đăng nhập MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi đăng nhập MongoDB', message: err.message });
+    return next(err);
   }
 };
 
 // POST /api/auth/register hoặc POST /api/users
-exports.register = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.register = async (req, res, next) => {
   const { name, email, phone, password, role, status, address, avatarUrl } = req.body;
 
   if (!name || !name.trim()) {
@@ -97,20 +87,12 @@ exports.register = async (req, res) => {
     const created = await User.create(newUser);
     return res.status(201).json({ message: 'Thêm tài khoản thành công trên MongoDB', user: created });
   } catch (err) {
-    console.error('[AuthController] Lỗi tạo tài khoản MongoDB:', err.message);
-    if (err.code === 11000) {
-      return res.status(400).json({ message: 'Email hoặc ID đã tồn tại trong hệ thống' });
-    }
-    return res.status(500).json({ error: `Lỗi cơ sở dữ liệu MongoDB: ${err.message}` });
+    return next(err);
   }
 };
 
 // GET /api/users (Hỗ trợ phân trang khi dữ liệu lớn)
-exports.getUsers = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.getUsers = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
@@ -180,17 +162,12 @@ exports.getUsers = async (req, res) => {
       data: formatted
     });
   } catch (err) {
-    console.error('[AuthController] Lỗi lấy danh sách user MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi lấy danh sách người dùng', message: err.message });
+    return next(err);
   }
 };
 
 // PUT /api/users/:id
-exports.updateUser = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.updateUser = async (req, res, next) => {
   try {
     const { name, email, phone, role, status, address, avatarUrl } = req.body;
     const updateData = {};
@@ -228,17 +205,12 @@ exports.updateUser = async (req, res) => {
     }
     return res.json({ message: 'Cập nhật tài khoản thành công trên MongoDB', user: updated });
   } catch (err) {
-    console.error('[AuthController] Lỗi cập nhật user MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật tài khoản', message: err.message });
+    return next(err);
   }
 };
 
 // PUT /api/users/:id/status
-exports.toggleUserStatus = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.toggleUserStatus = async (req, res, next) => {
   try {
     const updated = await User.findOneAndUpdate(
       { id: req.params.id },
@@ -251,17 +223,12 @@ exports.toggleUserStatus = async (req, res) => {
     }
     return res.json({ message: `Đã đổi trạng thái tài khoản thành ${req.body.status} trên MongoDB` });
   } catch (err) {
-    console.error('[AuthController] Lỗi toggleUserStatus MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi cập nhật trạng thái tài khoản', message: err.message });
+    return next(err);
   }
 };
 
 // DELETE /api/users/:id
-exports.deleteUser = async (req, res) => {
-  if (!isDbConnected()) {
-    return res.status(503).json({ error: 'Cơ sở dữ liệu MongoDB chưa kết nối' });
-  }
-
+exports.deleteUser = async (req, res, next) => {
   try {
     const deleted = await User.findOneAndDelete({ id: req.params.id });
     if (!deleted) {
@@ -269,7 +236,6 @@ exports.deleteUser = async (req, res) => {
     }
     return res.json({ message: 'Xóa tài khoản thành công trên MongoDB' });
   } catch (err) {
-    console.error('[AuthController] Lỗi xóa user MongoDB:', err.message);
-    return res.status(500).json({ error: 'Lỗi xóa tài khoản', message: err.message });
+    return next(err);
   }
 };

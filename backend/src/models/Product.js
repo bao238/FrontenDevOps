@@ -45,4 +45,10 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Chỉ mục B-Tree tối ưu hóa sắp xếp và phân trang Server-Side tốc độ cao
+productSchema.index({ createdAt: -1 });
+productSchema.index({ category: 1, createdAt: -1 });
+productSchema.index({ price: 1 });
+productSchema.index({ rating: -1 });
+
 module.exports = mongoose.model('Product', productSchema);

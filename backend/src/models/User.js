@@ -17,6 +17,10 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Chỉ mục B-Tree tối ưu hóa sắp xếp và phân trang Server-Side tốc độ cao
+userSchema.index({ createdAt: -1 });
+userSchema.index({ role: 1, status: 1, createdAt: -1 });
+
 // Tự động băm mật khẩu bằng bcryptjs (Hash + Salt) trước khi lưu document mới hoặc đổi mật khẩu
 userSchema.pre('save', async function hashUserPassword() {
   if (!this.isModified('password') || !this.password || isBcryptHash(this.password)) {

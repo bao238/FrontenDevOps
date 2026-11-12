@@ -45,4 +45,9 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Chỉ mục B-Tree tối ưu hóa sắp xếp và phân trang Server-Side tốc độ cao
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Order', orderSchema);

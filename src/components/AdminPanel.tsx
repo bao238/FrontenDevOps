@@ -343,6 +343,29 @@ export default function AdminPanel({
   // Bộ nhớ đệm phân trang Đơn Hàng (In-Memory Page Cache) - Chuyển trang tức thì 0ms
   const orderPageCacheRef = useRef<Map<string, { data: OrderRecord[]; count: number; totalPages: number; stats?: any }>>(new Map());
 
+  // Tải trước trang đơn hàng ngầm (Smart Background & Hover Prefetching)
+  const prefetchOrdersPage = async (page: number) => {
+    if (page < 1 || page > serverTotalOrderPages) return;
+    const cacheKey = `${page}-${adminOrdersPerPage}-${adminOrderFilter}-${debouncedOrderSearch}`;
+    if (orderPageCacheRef.current.has(cacheKey)) return;
+    try {
+      const res = await api.getOrders({
+        page,
+        limit: adminOrdersPerPage,
+        status: adminOrderFilter,
+        search: debouncedOrderSearch
+      });
+      if (res && res.source === "mongodb" && res.data) {
+        orderPageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count: res.count ?? res.totalAllCount ?? res.data.length,
+          totalPages: res.totalPages || 1,
+          stats: res.stats
+        });
+      }
+    } catch {}
+  };
+
   const fetchServerOrders = async (page = adminOrderPage, limit = adminOrdersPerPage) => {
     const cacheKey = `${page}-${limit}-${adminOrderFilter}-${debouncedOrderSearch}`;
     if (orderPageCacheRef.current.has(cacheKey)) {
@@ -351,6 +374,10 @@ export default function AdminPanel({
       setServerTotalOrders(cached.count);
       setServerTotalOrderPages(cached.totalPages);
       if (cached.stats) setServerOrderStats(cached.stats);
+      // Tự động tải trước trang tiếp theo ngầm
+      if (page < cached.totalPages) {
+        prefetchOrdersPage(page + 1);
+      }
       return;
     }
 
@@ -374,6 +401,10 @@ export default function AdminPanel({
           totalPages: res.totalPages || 1,
           stats: res.stats
         });
+        // Tự động tải trước trang tiếp theo ngầm
+        if (page < (res.totalPages || 1)) {
+          prefetchOrdersPage(page + 1);
+        }
       }
     } catch (err) {
       console.error("Lỗi khi tải đơn hàng từ MongoDB:", err);
@@ -439,6 +470,32 @@ export default function AdminPanel({
   // Bộ nhớ đệm phân trang Đánh Giá (In-Memory Page Cache) - Phản hồi 0ms khi chuyển qua lại giữa các trang
   const reviewPageCacheRef = useRef<Map<string, { data: ReviewItem[]; count: number; totalPages: number; stats?: any }>>(new Map());
 
+  // Tải trước trang đánh giá ngầm (Smart Background & Hover Prefetching)
+  const prefetchReviewsPage = async (page: number) => {
+    if (page < 1 || page > totalAdminReviewPages) return;
+    const cacheKey = `${page}-${adminReviewsPerPage}-${reviewRatingFilter}-${selectedProductReviewFilter}-${debouncedReviewSearchQuery}`;
+    if (reviewPageCacheRef.current.has(cacheKey)) return;
+    try {
+      const res = await api.getAllReviews({
+        page,
+        limit: adminReviewsPerPage,
+        rating: reviewRatingFilter,
+        search: debouncedReviewSearchQuery,
+        productId: selectedProductReviewFilter
+      });
+      if (res && res.source === "mongodb" && res.data) {
+        const count = res.count ?? res.totalAllCount ?? res.data.length;
+        const totalPages = res.totalPages || Math.ceil(count / adminReviewsPerPage) || 1;
+        reviewPageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count,
+          totalPages,
+          stats: res.stats
+        });
+      }
+    } catch {}
+  };
+
   // Tải danh sách đánh giá từ MongoDB hỗ trợ Server-Side Pagination & In-Memory Caching
   const fetchReviews = async (page = adminReviewPage, limit = adminReviewsPerPage) => {
     const cacheKey = `${page}-${limit}-${reviewRatingFilter}-${selectedProductReviewFilter}-${debouncedReviewSearchQuery}`;
@@ -448,6 +505,10 @@ export default function AdminPanel({
       setTotalAdminReviews(cached.count);
       setTotalAdminReviewPages(cached.totalPages);
       if (cached.stats) setServerReviewStats(cached.stats);
+      // Tự động tải trước trang tiếp theo ngầm
+      if (page < cached.totalPages) {
+        prefetchReviewsPage(page + 1);
+      }
       return;
     }
 
@@ -475,6 +536,10 @@ export default function AdminPanel({
           totalPages,
           stats: res.stats
         });
+        // Tự động tải trước trang tiếp theo ngầm
+        if (page < totalPages) {
+          prefetchReviewsPage(page + 1);
+        }
       }
     } catch (err) {
       console.error("Lỗi khi tải đánh giá từ MongoDB:", err);
@@ -859,6 +924,30 @@ export default function AdminPanel({
   }>({ total: 0, inStock: 0, lowStock: 0, outOfStock: 0 });
   const [isLoadingServerProducts, setIsLoadingServerProducts] = useState<boolean>(false);
 
+  // Tải trước trang sản phẩm ngầm (Smart Background & Hover Prefetching)
+  const prefetchProductsPage = async (page: number) => {
+    if (page < 1 || page > serverTotalProdPages) return;
+    const cacheKey = `${page}-${adminProdPerPage}-${selectedCategory}-${debouncedSearchQuery}-${selectedStockFilter}`;
+    if (productPageCacheRef.current.has(cacheKey)) return;
+    try {
+      const res = await api.getProducts({
+        page,
+        limit: adminProdPerPage,
+        category: selectedCategory,
+        search: debouncedSearchQuery,
+        stock: selectedStockFilter
+      });
+      if (res && res.data) {
+        productPageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count: res.count ?? res.totalAllCount ?? res.data.length,
+          totalPages: res.totalPages || 1,
+          stats: res.stats
+        });
+      }
+    } catch {}
+  };
+
   // Tải danh sách sản phẩm phân trang từ MongoDB
   const fetchServerProducts = async (page = adminProdPage, limit = adminProdPerPage) => {
     const cacheKey = `${page}-${limit}-${selectedCategory}-${debouncedSearchQuery}-${selectedStockFilter}`;
@@ -868,6 +957,10 @@ export default function AdminPanel({
       setServerTotalProducts(cached.count);
       setServerTotalProdPages(cached.totalPages);
       if (cached.stats) setServerProdStats(cached.stats);
+      // Tự động tải trước trang tiếp theo ngầm
+      if (page < cached.totalPages) {
+        prefetchProductsPage(page + 1);
+      }
       return; // Phản hồi tức thì 0ms!
     }
 
@@ -893,6 +986,10 @@ export default function AdminPanel({
           totalPages: res.totalPages || 1,
           stats: res.stats
         });
+        // Tự động tải trước trang tiếp theo ngầm
+        if (page < (res.totalPages || 1)) {
+          prefetchProductsPage(page + 1);
+        }
       }
     } catch (err) {
       console.error("Lỗi khi tải dữ liệu sản phẩm từ MongoDB:", err);
@@ -994,6 +1091,30 @@ export default function AdminPanel({
   const [serverTotalUserPages, setServerTotalUserPages] = useState<number>(1);
   const [serverUserStats, setServerUserStats] = useState<any>(null);
 
+  // Tải trước trang người dùng ngầm (Smart Background & Hover Prefetching)
+  const prefetchUsersPage = async (page: number) => {
+    if (page < 1 || page > serverTotalUserPages) return;
+    const cacheKey = `${page}-${adminUsersPerPage}-${userRoleFilter}-${userStatusFilter}-${debouncedUserSearchQuery}`;
+    if (userPageCacheRef.current.has(cacheKey)) return;
+    try {
+      const res = await api.getUsers({
+        page,
+        limit: adminUsersPerPage,
+        role: userRoleFilter,
+        status: userStatusFilter,
+        search: debouncedUserSearchQuery
+      });
+      if (res && res.source === "mongodb" && res.data) {
+        userPageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count: res.count ?? res.totalAllCount ?? res.data.length,
+          totalPages: res.totalPages || 1,
+          stats: res.stats
+        });
+      }
+    } catch {}
+  };
+
   const fetchServerUsers = async (page = adminUserPage, limit = adminUsersPerPage) => {
     const cacheKey = `${page}-${limit}-${userRoleFilter}-${userStatusFilter}-${debouncedUserSearchQuery}`;
     if (userPageCacheRef.current.has(cacheKey)) {
@@ -1002,6 +1123,10 @@ export default function AdminPanel({
       setServerTotalUsers(cached.count);
       setServerTotalUserPages(cached.totalPages);
       if (cached.stats) setServerUserStats(cached.stats);
+      // Tự động tải trước trang tiếp theo ngầm
+      if (page < cached.totalPages) {
+        prefetchUsersPage(page + 1);
+      }
       return;
     }
 
@@ -1026,6 +1151,10 @@ export default function AdminPanel({
           totalPages: res.totalPages || 1,
           stats: res.stats
         });
+        // Tự động tải trước trang tiếp theo ngầm
+        if (page < (res.totalPages || 1)) {
+          prefetchUsersPage(page + 1);
+        }
       }
     } catch (err) {
       console.error("Lỗi khi tải người dùng từ MongoDB:", err);
@@ -1749,6 +1878,7 @@ export default function AdminPanel({
             itemsPerPage={adminProdPerPage}
             itemLabel="sản phẩm"
             onPageChange={setAdminProdPage}
+            onPageHover={prefetchProductsPage}
             onPerPageChange={(per) => {
               setAdminProdPerPage(per);
               setAdminProdPage(1);
@@ -2408,6 +2538,7 @@ export default function AdminPanel({
               itemsPerPage={adminOrdersPerPage}
               itemLabel="đơn hàng"
               onPageChange={setAdminOrderPage}
+              onPageHover={prefetchOrdersPage}
               onPerPageChange={(per) => {
                 setAdminOrdersPerPage(per);
                 setAdminOrderPage(1);
@@ -2743,6 +2874,7 @@ export default function AdminPanel({
                 itemsPerPage={adminUsersPerPage}
                 itemLabel="người dùng"
                 onPageChange={setAdminUserPage}
+                onPageHover={prefetchUsersPage}
                 onPerPageChange={(per) => {
                   setAdminUsersPerPage(per);
                   setAdminUserPage(1);
@@ -2907,8 +3039,8 @@ export default function AdminPanel({
               );
             })()}
 
-            {/* Reviews List */}
-            {isLoadingReviews ? (
+            {/* Reviews List - Giữ nguyên bảng cũ khi chuyển trang để chống chớp giật (Keep Previous Data) */}
+            {isLoadingReviews && displayAdminReviews.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">
                 Đang tải đánh giá từ MongoDB...
               </div>
@@ -3074,6 +3206,7 @@ export default function AdminPanel({
                 itemsPerPage={adminReviewsPerPage}
                 itemLabel="đánh giá"
                 onPageChange={setAdminReviewPage}
+                onPageHover={prefetchReviewsPage}
                 onPerPageChange={(per) => {
                   setAdminReviewsPerPage(per);
                   setAdminReviewPage(1);

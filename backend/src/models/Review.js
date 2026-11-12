@@ -27,4 +27,10 @@ const reviewSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Chỉ mục B-Tree tối ưu hóa sắp xếp và phân trang Server-Side tốc độ cao
+reviewSchema.index({ createdAt: -1 });
+reviewSchema.index({ rating: 1, createdAt: -1 });
+reviewSchema.index({ moderationStatus: 1, createdAt: -1 });
+reviewSchema.index({ productId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Review', reviewSchema);

@@ -2,6 +2,7 @@
 import { Product, ReviewItem, INITIAL_BOOKS } from "../data/products";
 import { UserAccount } from "../data/users";
 import { applyRatingBalancing } from "../utils/ratingBalancer";
+import { NotificationItem, NotificationApiResponse } from "../types/notification";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
 const TOKEN_STORAGE_KEY = "bookstore_token";
@@ -678,6 +679,185 @@ export const api = {
       }
     } catch (err) {
       console.error("❌ [API] Loi cap nhat kiem duyet danh gia:", err);
+    }
+    return null;
+  },
+
+  // 33. Lay danh sach thong bao cua nguoi dung (kem phan trang, loc trang thai va du phong LocalStorage)
+  async getNotifications(params?: {
+    page?: number;
+    limit?: number;
+    unreadOnly?: boolean;
+    type?: string;
+  }): Promise<NotificationApiResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) query.append("page", String(params.page));
+    if (params?.limit) query.append("limit", String(params.limit));
+    if (params?.unreadOnly) query.append("unreadOnly", "true");
+    if (params?.type && params.type !== "all") query.append("type", params.type);
+
+    try {
+      const qs = query.toString() ? `?${query.toString()}` : "";
+      const res = await apiFetch(`/notifications${qs}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          // Luu vao LocalStorage lam ban sao luu du phong ngoai tuyen
+          try {
+            localStorage.setItem("bookstore_cached_notifications", JSON.stringify(json.data));
+          } catch {}
+          return json;
+        }
+      }
+    } catch (err) {
+      console.warn("⚠️ [API] Khong the ket noi API thong bao, su dung ban sao luu du phong:", err);
+    }
+
+    // Du phong khi mat ket noi mang hoac server khong kha dung
+    let fallbackData: NotificationItem[] = [];
+    try {
+      const cached = localStorage.getItem("bookstore_cached_notifications");
+      if (cached) {
+        fallbackData = JSON.parse(cached);
+      }
+    } catch {}
+
+    if (fallbackData.length === 0) {
+      fallbackData = [
+        {
+          id: "notif-local-welcome",
+          title: "Chào mừng bạn đến với BookStore!",
+          message: "Khám phá hàng ngàn tựa sách bán chạy cùng những chương trình khuyến mãi đặc sắc mỗi ngày.",
+          type: "system",
+          link: "/products",
+          isRead: false,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: "notif-local-coupon",
+          title: "Mã giảm giá 15% cho bạn mới",
+          message: "Sử dụng mã BANMOI15 khi thanh toán để nhận ngay ưu đãi 15% cho đơn sách đầu tiên.",
+          type: "coupon",
+          link: "/products",
+          isRead: false,
+          createdAt: new Date().toISOString()
+        }
+      ];
+    }
+
+    // Loc theo yeu cau tren du lieu fallback
+    let filtered = [...fallbackData];
+    if (params?.unreadOnly) {
+      filtered = filtered.filter((n) => !n.isRead);
+    }
+    if (params?.type && params.type !== "all") {
+      filtered = filtered.filter((n) => n.type === params.type);
+    }
+
+    return {
+      success: true,
+      data: filtered,
+      unreadCount: fallbackData.filter((n) => !n.isRead).length,
+      pagination: {
+        page: params?.page || 1,
+        limit: params?.limit || 10,
+        total: filtered.length,
+        totalPages: Math.ceil(filtered.length / (params?.limit || 10)) || 1
+      }
+    };
+  },
+
+  // 34. Danh dau mot thong bao la da doc
+  async markNotificationAsRead(notificationId: string): Promise<boolean> {
+    try {
+      const res = await apiFetch(`/notifications/${notificationId}/read`, {
+        method: "PATCH"
+      });
+      if (res.ok) return true;
+    } catch (err) {
+      console.warn("⚠️ [API] Loi khi danh dau thong bao da doc:", err);
+    }
+
+    // Cap nhat LocalStorage du phong
+    try {
+      const cached = localStorage.getItem("bookstore_cached_notifications");
+      if (cached) {
+        const list: NotificationItem[] = JSON.parse(cached);
+        const item = list.find((n) => n.id === notificationId);
+        if (item) {
+          item.isRead = true;
+          localStorage.setItem("bookstore_cached_notifications", JSON.stringify(list));
+        }
+      }
+    } catch {}
+    return true;
+  },
+
+  // 35. Danh dau toan bo thong bao la da doc
+  async markAllNotificationsAsRead(): Promise<boolean> {
+    try {
+      const res = await apiFetch("/notifications/read-all", {
+        method: "PATCH"
+      });
+      if (res.ok) return true;
+    } catch (err) {
+      console.warn("⚠️ [API] Loi khi danh dau tat ca thong bao da doc:", err);
+    }
+
+    // Cap nhat LocalStorage du phong
+    try {
+      const cached = localStorage.getItem("bookstore_cached_notifications");
+      if (cached) {
+        const list: NotificationItem[] = JSON.parse(cached);
+        list.forEach((n) => (n.isRead = true));
+        localStorage.setItem("bookstore_cached_notifications", JSON.stringify(list));
+      }
+    } catch {}
+    return true;
+  },
+
+  // 36. Xoa mot thong bao
+  async deleteNotification(notificationId: string): Promise<boolean> {
+    try {
+      const res = await apiFetch(`/notifications/${notificationId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) return true;
+    } catch (err) {
+      console.warn("⚠️ [API] Loi khi xoa thong bao:", err);
+    }
+
+    // Cap nhat LocalStorage du phong
+    try {
+      const cached = localStorage.getItem("bookstore_cached_notifications");
+      if (cached) {
+        let list: NotificationItem[] = JSON.parse(cached);
+        list = list.filter((n) => n.id !== notificationId);
+        localStorage.setItem("bookstore_cached_notifications", JSON.stringify(list));
+      }
+    } catch {}
+    return true;
+  },
+
+  // 37. Tao thong bao moi (Admin hoac su kien he thong)
+  async createNotification(payload: {
+    title: string;
+    message: string;
+    type?: string;
+    link?: string;
+    userId?: string;
+  }): Promise<NotificationItem | null> {
+    try {
+      const res = await apiFetch("/notifications", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || null;
+      }
+    } catch (err) {
+      console.warn("⚠️ [API] Loi khi tao thong bao:", err);
     }
     return null;
   }

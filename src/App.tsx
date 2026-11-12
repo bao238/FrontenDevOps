@@ -22,6 +22,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 import {
   Search,
   ShoppingCart,
+  Bell,
   Trash2,
   Plus,
   Minus,
@@ -81,6 +82,9 @@ import MyOrdersPage, { OrderTabKey } from "./components/MyOrdersPage";
 import ProfilePage from "./components/ProfilePage";
 import InvoiceModal from "./components/InvoiceModal";
 import BlogPage from "./components/BlogPage";
+import { NotificationDropdown } from "./components/NotificationDropdown";
+import { NotificationsPage } from "./components/NotificationsPage";
+import { NotificationItem } from "./types/notification";
 
 interface CartItem {
   product: Product;
@@ -140,7 +144,7 @@ export interface OrderRecord {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile" | "notifications">("products");
   const [products, setProducts] = useState<Product[]>(() => applyRatingBalancing(INITIAL_BOOKS));
 
   // Điểm sao trung bình toàn hệ thống được cân bằng chuẩn xác 4.9/5
@@ -230,6 +234,10 @@ export default function App() {
   // Trạng thái Modal In Hóa Đơn Bán Lẻ
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<OrderRecord | null>(null);
 
+  // Trạng thái Quản lý Thông báo (Notifications)
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
+
   // Form states
   const [loginEmail, setLoginEmail] = useState<string>("");
   const [loginPassword, setLoginPassword] = useState<string>("");
@@ -298,6 +306,9 @@ export default function App() {
       } else if (path === "/profile" || path.startsWith("/profile")) {
         setActiveTab("profile");
         setSelectedProduct(null);
+      } else if (path === "/notifications" || path.startsWith("/notifications")) {
+        setActiveTab("notifications");
+        setSelectedProduct(null);
       } else if (path === "/blog" || path.startsWith("/blog")) {
         // Góc đọc sách đã được loại bỏ, tự động điều hướng về trang sản phẩm
         setActiveTab("products");
@@ -318,11 +329,12 @@ export default function App() {
     return () => window.removeEventListener("popstate", handleUrlSync);
   }, [products]);
 
-  const switchTab = (tab: "products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile") => {
+  const switchTab = (tab: "products" | "about" | "contact" | "admin" | "cart" | "orders" | "profile" | "notifications") => {
     setActiveTab(tab);
     setSelectedProduct(null);
     setIsUserMenuOpen(false);
     setIsMobileNavOpen(false);
+    setIsNotificationOpen(false);
     if (tab === "admin") {
       if (window.location.pathname !== "/admin") {
         window.history.pushState({}, "", "/admin");
@@ -338,6 +350,10 @@ export default function App() {
     } else if (tab === "profile") {
       if (window.location.pathname !== "/profile") {
         window.history.pushState({}, "", "/profile");
+      }
+    } else if (tab === "notifications") {
+      if (window.location.pathname !== "/notifications") {
+        window.history.pushState({}, "", "/notifications");
       }
     } else {
       if (window.location.pathname !== "/" || window.location.search) {
@@ -701,6 +717,50 @@ export default function App() {
     setTimeout(() => {
       setToastMessage(null);
     }, 3000);
+  };
+
+  // Tính toán số lượng thông báo chưa đọc
+  const unreadNotificationsCount = useMemo(() => {
+    return notifications.filter((n) => !n.isRead).length;
+  }, [notifications]);
+
+  // Nạp danh sách thông báo từ API Backend (có cơ chế dự phòng LocalStorage)
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.getNotifications({ limit: 40 });
+      if (res && res.success && Array.isArray(res.data)) {
+        setNotifications(res.data);
+      }
+    } catch (err) {
+      console.warn("⚠️ Không thể tải danh sách thông báo:", err);
+    }
+  };
+
+  // Tự động tải thông báo khi khởi động ứng dụng hoặc khi người dùng đăng nhập/đăng xuất
+  useEffect(() => {
+    fetchNotifications();
+  }, [currentUser]);
+
+  // Thao tác đánh dấu 1 thông báo cụ thể là đã đọc
+  const handleMarkNotificationAsRead = async (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+    await api.markNotificationAsRead(id);
+  };
+
+  // Thao tác đánh dấu toàn bộ thông báo là đã đọc
+  const handleMarkAllNotificationsAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    await api.markAllNotificationsAsRead();
+    showToast("Đã đánh dấu tất cả thông báo là đã đọc!");
+  };
+
+  // Thao tác xóa thông báo
+  const handleDeleteNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    await api.deleteNotification(id);
+    showToast("Đã xóa thông báo thành công!");
   };
 
   // Hàm dùng chung đồng bộ phiên người dùng sau khi xác thực JWT thành công từ Backend
@@ -1329,7 +1389,9 @@ export default function App() {
       items: [...selectedCartItems],
       totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod
-    }).catch(console.error);
+    })
+      .then(() => fetchNotifications())
+      .catch(console.error);
 
     // Xóa khỏi giỏ hàng CHỈ các sản phẩm đã được tick mua, GIỮ LẠI các sản phẩm chưa tick mua
     setCart((prev) => {
@@ -2030,6 +2092,50 @@ export default function App() {
                   </span>
                 </button>
 
+                {/* Nút Chuông Thông Báo */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                    className={`relative p-2 sm:px-2.5 sm:py-2 rounded-xl font-bold text-xs transition-all flex items-center space-x-1 shrink-0 hover:scale-[1.02] border ${
+                      isNotificationOpen || activeTab === "notifications"
+                        ? "bg-blue-50 text-blue-700 border-blue-300 shadow-sm"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                    }`}
+                    title="Thông báo"
+                  >
+                    <Bell className="w-4 h-4 shrink-0" />
+                    {unreadNotificationsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                        {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Menu Xem Nhanh Thông Báo (Dropdown) */}
+                  <NotificationDropdown
+                    isOpen={isNotificationOpen}
+                    onClose={() => setIsNotificationOpen(false)}
+                    notifications={notifications}
+                    unreadCount={unreadNotificationsCount}
+                    onMarkAsRead={handleMarkNotificationAsRead}
+                    onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+                    onSelectNotification={(item) => {
+                      setIsNotificationOpen(false);
+                      if (item.type === "order") {
+                        switchTab("orders");
+                      } else if (item.type === "coupon") {
+                        switchTab("products");
+                      } else {
+                        switchTab("notifications");
+                      }
+                    }}
+                    onViewAll={() => {
+                      setIsNotificationOpen(false);
+                      switchTab("notifications");
+                    }}
+                  />
+                </div>
+
                 {/* Khối Tài Khoản User */}
                 {currentUser ? (
                   <div className="relative">
@@ -2099,6 +2205,29 @@ export default function App() {
                           >
                             <Package className="w-4 h-4 text-indigo-600" />
                             <span>Đơn hàng của tôi ({userScopedOrders.length})</span>
+                          </button>
+
+                          {/* Nút Thông Báo Của Tôi */}
+                          <button
+                            onClick={() => {
+                              setIsUserMenuOpen(false);
+                              switchTab("notifications");
+                            }}
+                            className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between font-medium transition-colors ${
+                              activeTab === "notifications"
+                                ? "bg-blue-50 text-blue-700 font-bold"
+                                : "text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Bell className="w-4 h-4 text-blue-600" />
+                              <span>Thông báo</span>
+                            </div>
+                            {unreadNotificationsCount > 0 && (
+                              <span className="text-[10px] bg-rose-500 text-white font-black px-1.5 py-0.2 rounded-full">
+                                {unreadNotificationsCount}
+                              </span>
+                            )}
                           </button>
 
                           {/* Nút Vào Trang Quản Trị Hệ Thống (CHỈ hiển thị cho tài khoản Quản trị, KHÔNG hiện cho user thường) */}
@@ -2217,6 +2346,25 @@ export default function App() {
                   {currentUser && userScopedOrders.length > 0 && (
                     <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full">
                       {userScopedOrders.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => switchTab("notifications")}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold text-left flex items-center justify-between transition-all ${
+                    activeTab === "notifications"
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span>🔔</span>
+                    <span>Thông Báo Của Tôi</span>
+                  </div>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                      {unreadNotificationsCount}
                     </span>
                   )}
                 </button>
@@ -3262,6 +3410,20 @@ export default function App() {
             }}
             onLogout={handleLogout}
             onContinueShopping={() => switchTab("products")}
+          />
+        )}
+
+        {/* TAB 7: TRUNG TÂM THÔNG BÁO (NOTIFICATIONS PAGE RIÊNG BIỆT) */}
+        {activeTab === "notifications" && (
+          <NotificationsPage
+            notifications={notifications}
+            unreadCount={unreadNotificationsCount}
+            onMarkAsRead={handleMarkNotificationAsRead}
+            onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+            onDeleteNotification={handleDeleteNotification}
+            onNavigateToOrders={() => switchTab("orders")}
+            onNavigateToProducts={() => switchTab("products")}
+            onRefresh={fetchNotifications}
           />
         )}
 

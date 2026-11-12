@@ -13,6 +13,7 @@ const userRoutes = require('./userRoutes');
 const couponRoutes = require('./couponRoutes');
 const categoryRoutes = require('./categoryRoutes');
 const analyticsRoutes = require('./analyticsRoutes');
+const notificationRoutes = require('./notificationRoutes');
 
 const router = express.Router();
 
@@ -51,5 +52,8 @@ router.use('/categories', categoryRoutes);
 
 // 7. Analytics & Financial Dashboard Route
 router.use('/analytics', analyticsRoutes);
+
+// 8. Notification Routes (Hệ thống thông báo)
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;

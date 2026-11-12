@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Product = require('../models/Product');
+const { createInternalNotification } = require('./notificationController');
 
 function buildCustomerOrderScope(user) {
   const scope = [{ userId: user.id }];
@@ -178,6 +179,20 @@ exports.createOrder = async (req, res, next) => {
       }
     }
 
+    // Tự động gửi thông báo hệ thống đến người dùng về đơn hàng vừa tạo
+    try {
+      createInternalNotification({
+        userId: created.userId || (req.user ? req.user.id : null),
+        title: `Đặt hàng thành công #${created.id}`,
+        message: `Đơn hàng #${created.id} trị giá ${Number(created.totalAmount || 0).toLocaleString('vi-VN')}đ đã được tiếp nhận và đang chờ xử lý.`,
+        type: 'order',
+        link: '/orders',
+        metadata: { orderId: created.id, totalAmount: created.totalAmount }
+      });
+    } catch (e) {
+      // Bỏ qua lỗi thông báo để không gián đoạn kết quả trả về của đơn hàng
+    }
+
     return res.status(201).json({ message: 'Tạo đơn hàng thành công trên MongoDB', data: created });
   } catch (err) {
     return next(err);
@@ -219,6 +234,22 @@ exports.updateOrderStatus = async (req, res, next) => {
       { $set: updateData },
       { new: true }
     );
+
+    // Tự động gửi thông báo cập nhật tiến độ đơn hàng cho khách hàng
+    if (req.body.status && req.body.status !== existingOrder.status) {
+      try {
+        createInternalNotification({
+          userId: existingOrder.userId || null,
+          title: `Cập nhật tiến độ đơn hàng #${existingOrder.id}`,
+          message: `Đơn hàng #${existingOrder.id} của bạn đã được chuyển sang trạng thái: "${req.body.status}".`,
+          type: 'order',
+          link: '/orders',
+          metadata: { orderId: existingOrder.id, newStatus: req.body.status, oldStatus: existingOrder.status }
+        });
+      } catch (e) {
+        // Bỏ qua lỗi thông báo để đảm bảo API phản hồi ổn định
+      }
+    }
 
     return res.json({ message: 'Cập nhật trạng thái đơn thành công trên MongoDB', data: updated });
   } catch (err) {

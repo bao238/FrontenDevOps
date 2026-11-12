@@ -15,9 +15,28 @@ function extractBearerToken(req) {
 }
 
 /**
- * Middleware xác thực JWT bắt buộc: kiểm tra token hợp lệ và gắn req.user.
+ * Nạp thông tin người dùng hợp lệ từ decoded JWT payload.
  */
-const authenticateJWT = async (req, res, next) => {
+async function loadAuthenticatedUser(decoded) {
+  const user = await User.findOne({ id: decoded.id || decoded.sub })
+    .select('-password')
+    .lean();
+
+  if (!user) {
+    throw new AppError('Tài khoản gắn với token không còn tồn tại', 401);
+  }
+
+  if (user.status === 'locked') {
+    throw new AppError('Tài khoản của bạn đã bị tạm khóa', 403);
+  }
+
+  return user;
+}
+
+/**
+ * Middleware xác thực JWT bắt buộc: kiểm tra Bearer Token và gắn req.user.
+ */
+const authMiddleware = async (req, res, next) => {
   try {
     const token = extractBearerToken(req);
     if (!token) {
@@ -25,19 +44,7 @@ const authenticateJWT = async (req, res, next) => {
     }
 
     const decoded = verifyAccessToken(token);
-    const user = await User.findOne({ id: decoded.id || decoded.sub })
-      .select('-password')
-      .lean();
-
-    if (!user) {
-      return next(new AppError('Tài khoản gắn với token không còn tồn tại', 401));
-    }
-
-    if (user.status === 'locked') {
-      return next(new AppError('Tài khoản của bạn đã bị tạm khóa', 403));
-    }
-
-    req.user = user;
+    req.user = await loadAuthenticatedUser(decoded);
     req.tokenPayload = decoded;
     return next();
   } catch (err) {
@@ -46,7 +53,27 @@ const authenticateJWT = async (req, res, next) => {
 };
 
 /**
- * Middleware phân quyền theo vai trò (admin, staff, customer).
+ * Middleware xác thực tùy chọn: nếu có Bearer Token thì xác thực và gắn req.user,
+ * nếu không có token vẫn cho đi tiếp như khách vãng lai.
+ */
+const optionalAuth = async (req, res, next) => {
+  try {
+    const token = extractBearerToken(req);
+    if (!token) {
+      return next();
+    }
+
+    const decoded = verifyAccessToken(token);
+    req.user = await loadAuthenticatedUser(decoded);
+    req.tokenPayload = decoded;
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * Middleware phân quyền theo danh sách vai trò cho phép.
  */
 const requireRoles = (...allowedRoles) => (req, res, next) => {
   if (!req.user) {
@@ -58,8 +85,44 @@ const requireRoles = (...allowedRoles) => (req, res, next) => {
   return next();
 };
 
+/**
+ * Chỉ cho phép Quản trị viên (admin).
+ */
+const requireAdmin = requireRoles('admin');
+
+/**
+ * Cho phép Nhân viên (staff) hoặc Quản trị viên (admin) truy cập các route quản trị nội bộ.
+ */
+const requireStaff = requireRoles('admin', 'staff');
+
+/**
+ * Cho phép chính chủ tài khoản thao tác trên hồ sơ của mình hoặc Quản trị viên (admin).
+ */
+const requireSelfOrAdmin = (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError('Chưa xác thực người dùng', 401));
+  }
+
+  const target = (req.params.id || '').trim().toLowerCase();
+  const isOwner =
+    req.user.id.toLowerCase() === target ||
+    (req.user.email && req.user.email.toLowerCase() === target) ||
+    (req.body?.id && req.body.id === req.user.id);
+
+  if (req.user.role === 'admin' || isOwner) {
+    return next();
+  }
+
+  return next(new AppError('Bạn không có quyền chỉnh sửa tài khoản của người khác', 403));
+};
+
 module.exports = {
   extractBearerToken,
-  authenticateJWT,
-  requireRoles
+  authMiddleware,
+  authenticateJWT: authMiddleware,
+  optionalAuth,
+  requireRoles,
+  requireAdmin,
+  requireStaff,
+  requireSelfOrAdmin
 };

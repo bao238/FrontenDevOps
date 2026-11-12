@@ -123,13 +123,14 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ message: `Tên người dùng "${cleanName}" đã tồn tại trong hệ thống!` });
     }
 
+    const isAdminRequest = req.user?.role === 'admin';
     const newUser = {
       id: req.body.id || `usr-cust-${Date.now()}`,
       name: cleanName,
       email: cleanEmail,
       phone: cleanPhone,
-      role: role || 'customer',
-      status: status || 'active',
+      role: isAdminRequest ? (role || 'customer') : 'customer',
+      status: isAdminRequest ? (status || 'active') : 'active',
       password: rawPassword,
       avatarUrl: finalAvatar,
       address: (address || '').trim(),
@@ -231,13 +232,14 @@ exports.getUsers = async (req, res, next) => {
 // PUT /api/users/:id
 exports.updateUser = async (req, res, next) => {
   try {
+    const isAdminRequest = req.user?.role === 'admin';
     const { name, email, phone, role, status, address, avatarUrl, password } = req.body;
     const updateData = {};
     if (name) updateData.name = String(name).trim();
     if (email) updateData.email = String(email).trim().toLowerCase();
     if (phone !== undefined) updateData.phone = String(phone).trim();
-    if (role) updateData.role = role;
-    if (status) updateData.status = status;
+    if (isAdminRequest && role) updateData.role = role;
+    if (isAdminRequest && status) updateData.status = status;
     if (address !== undefined) updateData.address = String(address).trim();
     if (avatarUrl) updateData.avatarUrl = String(avatarUrl).trim();
     if (password && String(password).trim()) {
@@ -281,16 +283,24 @@ exports.updateUser = async (req, res, next) => {
 // PUT /api/users/:id/status
 exports.toggleUserStatus = async (req, res, next) => {
   try {
+    const nextStatus = req.body.status;
+    if (!['active', 'locked'].includes(nextStatus)) {
+      return res.status(400).json({ message: 'Trạng thái tài khoản không hợp lệ (chỉ nhận active hoặc locked)' });
+    }
+    if (req.user && req.user.id === req.params.id && nextStatus === 'locked') {
+      return res.status(400).json({ message: 'Không thể tự khóa tài khoản Quản trị viên đang đăng nhập' });
+    }
+
     const updated = await User.findOneAndUpdate(
       { id: req.params.id },
-      { $set: { status: req.body.status } },
+      { $set: { status: nextStatus } },
       { new: true }
     );
 
     if (!updated) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản trong cơ sở dữ liệu' });
     }
-    return res.json({ message: `Đã đổi trạng thái tài khoản thành ${req.body.status} trên MongoDB` });
+    return res.json({ message: `Đã đổi trạng thái tài khoản thành ${nextStatus} trên MongoDB` });
   } catch (err) {
     return next(err);
   }

@@ -1,6 +1,7 @@
 const express = require('express');
 const { isDbConnected } = require('../config/db');
 const { requireDbConnection } = require('../middlewares/dbMiddleware');
+const { authMiddleware, requireStaff } = require('../middlewares/authMiddleware');
 const { asyncHandler } = require('../middlewares/errorMiddleware');
 const orderController = require('../controllers/orderController');
 
@@ -36,7 +37,7 @@ router.use('/reviews', reviewRoutes);
 
 // 3. Order & OrderItem Routes
 router.use('/orders', orderRoutes);
-router.get('/order-items', asyncHandler(orderController.getAllOrderItems));
+router.get('/order-items', authMiddleware, requireStaff, asyncHandler(orderController.getAllOrderItems));
 
 // 4. Auth & User Routes
 router.use('/auth', authRoutes);

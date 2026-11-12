@@ -2,6 +2,21 @@ const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Product = require('../models/Product');
 
+function buildCustomerOrderScope(user) {
+  const scope = [{ userId: user.id }];
+  if (user.phone) {
+    scope.push({ userId: null, 'customerInfo.phone': user.phone });
+  }
+  return { $or: scope };
+}
+
+function isOrderOwner(order, user) {
+  if (!order || !user) return false;
+  if (order.userId && order.userId === user.id) return true;
+  if (!order.userId && user.phone && order.customerInfo?.phone === user.phone) return true;
+  return false;
+}
+
 // GET /api/orders (Lay danh sach don hang, ho tro phan trang Server-Side khi du lieu lon)
 exports.getOrders = async (req, res, next) => {
   try {
@@ -9,18 +24,25 @@ exports.getOrders = async (req, res, next) => {
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
     const skip = (page - 1) * limit;
 
-    const query = {};
+    const conditions = [];
+    if (req.user && req.user.role === 'customer') {
+      conditions.push(buildCustomerOrderScope(req.user));
+    }
     if (req.query.status && req.query.status !== 'all') {
-      query.status = req.query.status;
+      conditions.push({ status: req.query.status });
     }
     if (req.query.search && req.query.search.trim()) {
       const q = req.query.search.trim();
-      query.$or = [
-        { id: { $regex: q, $options: 'i' } },
-        { 'customerInfo.fullName': { $regex: q, $options: 'i' } },
-        { 'customerInfo.phone': { $regex: q, $options: 'i' } }
-      ];
+      conditions.push({
+        $or: [
+          { id: { $regex: q, $options: 'i' } },
+          { 'customerInfo.fullName': { $regex: q, $options: 'i' } },
+          { 'customerInfo.phone': { $regex: q, $options: 'i' } }
+        ]
+      });
     }
+
+    const query = conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : { $and: conditions }) : {};
 
     const totalCount = await Order.countDocuments(query);
     const totalAllCount = await Order.countDocuments();
@@ -68,6 +90,16 @@ exports.getOrders = async (req, res, next) => {
 // GET /api/orders/:id/items (Lấy danh sách OrderItems theo orderId)
 exports.getOrderItems = async (req, res, next) => {
   try {
+    if (req.user && req.user.role === 'customer') {
+      const order = await Order.findOne({ id: req.params.id }).lean();
+      if (!order) {
+        return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+      }
+      if (!isOrderOwner(order, req.user)) {
+        return res.status(403).json({ message: 'Bạn không có quyền xem chi tiết đơn hàng của người khác' });
+      }
+    }
+
     const items = await OrderItem.find({ orderId: req.params.id }).lean();
     return res.json({ source: 'mongodb', count: items.length, data: items });
   } catch (err) {
@@ -92,7 +124,7 @@ exports.createOrder = async (req, res, next) => {
 
   const newOrder = {
     id: orderId, // Khóa chính (PK)
-    userId: userId || null, // Khóa ngoại (FK -> User.id)
+    userId: req.user?.id || userId || null, // Khóa ngoại (FK -> User.id)
     date: new Date().toISOString().split('T')[0],
     customerInfo: {
       fullName: customerInfo?.fullName || 'Khách vãng lai',
@@ -155,10 +187,25 @@ exports.createOrder = async (req, res, next) => {
 // PUT /api/orders/:id/status (Cập nhật trạng thái và thông tin vận chuyển/đánh giá đơn hàng)
 exports.updateOrderStatus = async (req, res, next) => {
   try {
+    const existingOrder = await Order.findOne({ id: req.params.id }).lean();
+    if (!existingOrder) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+
+    const isAdminOrStaff = req.user && (req.user.role === 'admin' || req.user.role === 'staff');
+    if (req.user && !isAdminOrStaff) {
+      if (!isOrderOwner(existingOrder, req.user)) {
+        return res.status(403).json({ message: 'Bạn không có quyền cập nhật đơn hàng của người khác' });
+      }
+      if (req.body.status !== undefined && req.body.status !== 'Hoàn tất') {
+        return res.status(403).json({ message: 'Khách hàng chỉ được phép xác nhận đã nhận hàng hoặc đánh giá đơn' });
+      }
+    }
+
     const updateData = {};
     if (req.body.status !== undefined) updateData.status = req.body.status;
-    if (req.body.pickupTime !== undefined) updateData.pickupTime = req.body.pickupTime;
-    if (req.body.shippingCarrier !== undefined) updateData.shippingCarrier = req.body.shippingCarrier;
+    if (isAdminOrStaff && req.body.pickupTime !== undefined) updateData.pickupTime = req.body.pickupTime;
+    if (isAdminOrStaff && req.body.shippingCarrier !== undefined) updateData.shippingCarrier = req.body.shippingCarrier;
     if (req.body.isReviewed !== undefined) updateData.isReviewed = req.body.isReviewed;
     if (req.body.reviewRating !== undefined) updateData.reviewRating = req.body.reviewRating;
     if (req.body.reviewComment !== undefined) updateData.reviewComment = req.body.reviewComment;
@@ -173,9 +220,6 @@ exports.updateOrderStatus = async (req, res, next) => {
       { new: true }
     );
 
-    if (!updated) {
-      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
-    }
     return res.json({ message: 'Cập nhật trạng thái đơn thành công trên MongoDB', data: updated });
   } catch (err) {
     return next(err);

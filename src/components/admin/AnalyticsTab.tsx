@@ -382,7 +382,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
       {/* Row 1: Biểu đồ Doanh Thu Cột SVG & Biểu đồ Vành Khuyên Donut SVG */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Biểu đồ Cột SVG Tương Tác (Interactive Bar Chart) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm">
+        <div className="lg:col-span-2 bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm min-w-0 flex flex-col justify-between relative">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm sm:text-base font-black text-slate-900 flex items-center space-x-2">
@@ -399,38 +399,50 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
           </div>
 
           {/* SVG Bar Chart Responsive */}
-          <div className="h-64 flex items-end justify-between gap-1.5 sm:gap-3 pt-6 pb-2 border-b border-slate-100 relative">
+          <div className={`h-64 w-full flex items-end justify-between pt-6 pb-2 border-b border-slate-100 relative ${
+            timeRange === "30days" ? "gap-1 sm:gap-1.5" : "gap-2 sm:gap-4"
+          }`}>
             {trendData.map((item, index) => {
               const heightPercent = Math.max(10, Math.round((item.revenue / maxDayRevenue) * 100));
               const isHovered = hoveredBarIndex === index;
               const label = item.date.length > 5 ? item.date.slice(5) : item.date;
+              const is30Days = timeRange === "30days";
+              const showLabel = !is30Days || index === 0 || index === trendData.length - 1 || index % 5 === 0;
 
               return (
                 <div
                   key={item.date || index}
-                  className="flex-1 flex flex-col items-center group relative h-full justify-end"
+                  className="flex-1 min-w-0 flex flex-col items-center group relative h-full justify-end"
                   onMouseEnter={() => setHoveredBarIndex(index)}
                   onMouseLeave={() => setHoveredBarIndex(null)}
                 >
-                  {/* Tooltip khi rê chuột */}
+                  {/* Tooltip khi rê chuột căn giữa cột */}
                   {isHovered && (
-                    <div className="absolute -top-12 opacity-100 transition-all bg-slate-900 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl whitespace-nowrap pointer-events-none shadow-xl z-20 animate-in fade-in zoom-in-95">
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-100 transition-all bg-slate-900 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl whitespace-nowrap pointer-events-none shadow-xl z-30 animate-in fade-in zoom-in-95">
                       <div className="text-amber-300 font-mono">{item.date}</div>
                       <div>{formatVND(item.revenue)}</div>
                     </div>
                   )}
 
                   <div
-                    className={`w-full max-w-[38px] rounded-t-xl transition-all cursor-pointer shadow-sm ${
+                    className={`w-full ${
+                      is30Days ? "max-w-[16px] sm:max-w-[22px] md:max-w-[28px]" : "max-w-[32px] sm:max-w-[40px]"
+                    } rounded-t-lg sm:rounded-t-xl transition-all cursor-pointer shadow-sm ${
                       isHovered
                         ? "bg-gradient-to-t from-purple-700 to-indigo-600 transform scale-y-105"
                         : "bg-gradient-to-t from-purple-600/90 to-indigo-500/90 hover:from-purple-700 hover:to-indigo-600"
                     }`}
                     style={{ height: `${heightPercent}%` }}
                   />
-                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 mt-2 truncate max-w-full">
-                    {label}
-                  </span>
+                  
+                  {/* Nhãn ngày thông minh: hiển thị cách quãng, các ngày giữa dùng dấu chấm nhỏ để triệt tiêu việc tràn layout */}
+                  {showLabel ? (
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 mt-2 truncate max-w-full text-center select-none">
+                      {label}
+                    </span>
+                  ) : (
+                    <span className="w-1 h-1 rounded-full bg-slate-300 mt-3.5 mb-1 shrink-0 select-none pointer-events-none" title={label} />
+                  )}
                 </div>
               );
             })}
@@ -446,7 +458,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
         </div>
 
         {/* Biểu đồ Vành Khuyên Donut SVG (Cơ Cấu Trạng Thái Đơn Hàng) */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between min-w-0">
           <div>
             <div className="flex items-center space-x-2 mb-1">
               <PieChart className="w-4 h-4 text-purple-600" />

@@ -397,6 +397,39 @@ export const api = {
     }
   },
 
+  // 9d. Quên mật khẩu - Yêu cầu cấp mã OTP xác thực
+  async forgotPassword(emailOrPhone: string) {
+    const res = await apiFetch("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ emailOrPhone })
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(data.message || data.error || "Yêu cầu cấp mã OTP thất bại");
+    return data;
+  },
+
+  // 9e. Đặt lại mật khẩu bằng mã xác thực OTP
+  async resetPassword(payload: { emailOrPhone: string; otp: string; newPassword: string }) {
+    const res = await apiFetch("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(data.message || data.error || "Đặt lại mật khẩu thất bại");
+    return data;
+  },
+
+  // 9f. Đổi mật khẩu an toàn khi người dùng đã đăng nhập JWT
+  async changePassword(payload: { oldPassword: string; newPassword: string }) {
+    const res = await apiFetch("/auth/change-password", {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(data.message || data.error || "Đổi mật khẩu thất bại");
+    return data;
+  },
+
   // 10. Lay danh sach Users tu MongoDB ho tro Server-Side Pagination
   async getUsers(params?: UserQueryParams): Promise<PaginatedResponse<UserAccount>> {
     try {

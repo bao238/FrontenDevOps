@@ -155,6 +155,32 @@ export default function AdminPanel({
   >("products");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
+  // Thể loại sách động tải trực tiếp từ MongoDB API (/api/categories)
+  const [adminCategories, setAdminCategories] = useState<string[]>(CATEGORIES);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAdminCategories = async () => {
+      try {
+        const cats = await api.getCategories();
+        if (isMounted && Array.isArray(cats) && cats.length > 0) {
+          const activeNames = cats
+            .filter((c) => c.isActive !== false)
+            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+            .map((c) => c.name);
+          if (activeNames.length > 0) {
+            setAdminCategories(["Tất cả", ...activeNames]);
+          }
+        }
+      } catch (err) {
+        console.warn("⚠️ Không thể tải danh mục thể loại sách trong Admin:", err);
+      }
+    };
+    fetchAdminCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   // Quản lý Bộ lọc Kho sách (Stock Filter: Tất cả, Còn hàng, Sắp hết <=5, Hết hàng)
   const [selectedStockFilter, setSelectedStockFilter] = useState<
     "all" | "in_stock" | "low_stock" | "out_of_stock"
@@ -1680,7 +1706,7 @@ export default function AdminPanel({
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {CATEGORIES.map((cat) => (
+                  {adminCategories.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
                     </option>
@@ -3426,7 +3452,7 @@ export default function AdminPanel({
                           onChange={(e) => setFormCategory(e.target.value)}
                           className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px]"
                         >
-                          {CATEGORIES.filter((c) => c !== "Tất cả").map((c) => (
+                          {adminCategories.filter((c) => c !== "Tất cả").map((c) => (
                             <option key={c} value={c}>
                               {c}
                             </option>

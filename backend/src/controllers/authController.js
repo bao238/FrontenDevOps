@@ -318,3 +318,140 @@ exports.deleteUser = async (req, res, next) => {
     return next(err);
   }
 };
+
+// POST /api/auth/forgot-password - Yêu cầu cấp mã xác thực OTP khôi phục mật khẩu
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { emailOrPhone } = req.body;
+    const cleanInput = (emailOrPhone || '').trim();
+    const cleanEmail = cleanInput.toLowerCase();
+
+    if (!cleanInput) {
+      return res.status(400).json({ message: 'Vui lòng nhập Email hoặc Số điện thoại đã đăng ký' });
+    }
+
+    // Tìm kiếm tài khoản độc giả qua Email hoặc Số điện thoại
+    const user = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        { phone: cleanInput }
+      ]
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản nào khớp với thông tin cung cấp' });
+    }
+
+    if (user.status === 'locked') {
+      return res.status(403).json({ message: 'Tài khoản này hiện đang bị tạm khóa, vui lòng liên hệ quản trị viên' });
+    }
+
+    // Tạo mã xác thực ngẫu nhiên 6 chữ số có hiệu lực trong vòng 10 phút
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    user.resetPasswordOtp = otp;
+    user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 phút
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: `Mã xác thực OTP của bạn là: ${otp} (Hiệu lực trong 10 phút). Vui lòng nhập mã này cùng mật khẩu mới.`,
+      otp,
+      email: user.email,
+      phone: user.phone
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// POST /api/auth/reset-password - Đặt lại mật khẩu mới với mã xác thực OTP
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { emailOrPhone, otp, newPassword } = req.body;
+    const cleanInput = (emailOrPhone || '').trim();
+    const cleanEmail = cleanInput.toLowerCase();
+    const cleanOtp = (otp || '').trim();
+    const cleanPass = String(newPassword || '').trim();
+
+    if (!cleanInput || !cleanOtp || !cleanPass) {
+      return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin tài khoản, mã OTP và mật khẩu mới' });
+    }
+
+    if (cleanPass.length < 6) {
+      return res.status(400).json({ message: 'Mật khẩu mới phải có tối thiểu 6 ký tự' });
+    }
+
+    // Tìm kiếm tài khoản
+    const user = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        { phone: cleanInput }
+      ]
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản trong hệ thống' });
+    }
+
+    // Kiểm tra tính hợp lệ và thời hạn của mã OTP
+    if (!user.resetPasswordOtp || user.resetPasswordOtp !== cleanOtp) {
+      return res.status(400).json({ message: 'Mã xác thực OTP không chính xác, vui lòng thử lại' });
+    }
+
+    if (!user.resetPasswordExpires || new Date() > user.resetPasswordExpires) {
+      return res.status(400).json({ message: 'Mã xác thực OTP đã hết hạn hiệu lực (10 phút), vui lòng yêu cầu mã mới' });
+    }
+
+    // Băm mật khẩu mới và lưu vào MongoDB, xóa mã OTP đã sử dụng
+    user.password = await hashPassword(cleanPass);
+    user.resetPasswordOtp = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới.'
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// PUT /api/auth/change-password - Đổi mật khẩu an toàn khi người dùng đã đăng nhập
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const cleanNewPass = String(newPassword || '').trim();
+
+    if (!oldPassword || !cleanNewPass) {
+      return res.status(400).json({ message: 'Vui lòng nhập đầy đủ mật khẩu cũ và mật khẩu mới' });
+    }
+
+    if (cleanNewPass.length < 6) {
+      return res.status(400).json({ message: 'Mật khẩu mới phải có tối thiểu 6 ký tự' });
+    }
+
+    // Lấy thông tin tài khoản từ payload xác thực JWT
+    const user = await User.findOne({ id: req.user.id });
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản người dùng' });
+    }
+
+    // Kiểm tra mật khẩu hiện tại
+    const { isMatch } = await verifyPassword(String(oldPassword), user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Mật khẩu cũ không chính xác' });
+    }
+
+    // Cập nhật mật khẩu mới đã băm
+    user.password = await hashPassword(cleanNewPass);
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Đổi mật khẩu thành công!'
+    });
+  } catch (err) {
+    return next(err);
+  }
+};

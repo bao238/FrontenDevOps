@@ -69,7 +69,8 @@ import {
   DollarSign,
   Wallet,
   Printer,
-  Newspaper
+  Newspaper,
+  Key
 } from "lucide-react";
 
 import AdminPanel from "./components/AdminPanel";
@@ -150,6 +151,8 @@ export default function App() {
   // Điểm sao trung bình toàn hệ thống được cân bằng chuẩn xác 4.9/5
   const siteAverageRating = useMemo(() => calculateAverageRating(products), [products]);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
+  // Danh mục thể loại sách động tải trực tiếp từ MongoDB API (/api/categories)
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>(CATEGORIES);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -197,9 +200,18 @@ export default function App() {
   // Authentication States
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [authTab, setAuthTab] = useState<"login" | "register">("login");
+  const [authTab, setAuthTab] = useState<"login" | "register" | "forgot">("login");
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  // Các state phục vụ luồng Quên mật khẩu & Đặt lại mật khẩu với OTP
+  const [forgotEmailOrPhone, setForgotEmailOrPhone] = useState<string>("");
+  const [forgotOtp, setForgotOtp] = useState<string>("");
+  const [forgotNewPassword, setForgotNewPassword] = useState<string>("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState<string>("");
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotLoading, setForgotLoading] = useState<boolean>(false);
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState<boolean>(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState<boolean>(false);
@@ -741,6 +753,31 @@ export default function App() {
     fetchNotifications();
   }, [currentUser]);
 
+  // Tự động nạp danh mục thể loại sách động từ MongoDB API (/api/categories)
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCategories = async () => {
+      try {
+        const cats = await api.getCategories();
+        if (isMounted && Array.isArray(cats) && cats.length > 0) {
+          const activeNames = cats
+            .filter((c) => c.isActive !== false)
+            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+            .map((c) => c.name);
+          if (activeNames.length > 0) {
+            setDynamicCategories(["Tất cả", ...activeNames]);
+          }
+        }
+      } catch (err) {
+        console.warn("⚠️ Không thể nạp danh mục thể loại sách động:", err);
+      }
+    };
+    fetchCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Thao tác đánh dấu 1 thông báo cụ thể là đã đọc
   const handleMarkNotificationAsRead = async (id: string) => {
     setNotifications((prev) =>
@@ -928,6 +965,74 @@ export default function App() {
       const msg = err?.message || "Không thể đăng ký tài khoản. Vui lòng thử lại.";
       setAuthError(msg);
       showToast(msg);
+    }
+  };
+
+  // Xử lý bước 1: Gửi yêu cầu cấp mã xác thực OTP khôi phục mật khẩu
+  const handleRequestForgotOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmailOrPhone.trim()) {
+      setAuthError("Vui lòng nhập Email hoặc Số điện thoại đã đăng ký!");
+      return;
+    }
+    setForgotLoading(true);
+    setAuthError(null);
+    try {
+      const res = await api.forgotPassword(forgotEmailOrPhone.trim());
+      setForgotStep(2);
+      setForgotMessage(res.message || "Mã OTP đã được tạo thành công!");
+      if (res.otp) {
+        setForgotOtp(res.otp);
+      }
+    } catch (err: any) {
+      setAuthError(err?.message || "Không tìm thấy tài khoản hợp lệ.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // Xử lý bước 2: Xác nhận OTP và đặt lại mật khẩu mới
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotOtp.trim()) {
+      setAuthError("Vui lòng nhập mã xác thực OTP 6 số!");
+      return;
+    }
+    if (!forgotNewPassword) {
+      setAuthError("Vui lòng nhập mật khẩu mới!");
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      setAuthError("Mật khẩu mới phải có tối thiểu 6 ký tự!");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setAuthError("Mật khẩu xác nhận không trùng khớp!");
+      return;
+    }
+
+    setForgotLoading(true);
+    setAuthError(null);
+    try {
+      const res = await api.resetPassword({
+        emailOrPhone: forgotEmailOrPhone.trim(),
+        otp: forgotOtp.trim(),
+        newPassword: forgotNewPassword
+      });
+      showToast(res.message || "Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.");
+      // Tự động chuyển về tab đăng nhập và điền sẵn email/số điện thoại
+      setLoginEmail(forgotEmailOrPhone.trim());
+      setLoginPassword("");
+      setAuthTab("login");
+      setForgotStep(1);
+      setForgotOtp("");
+      setForgotNewPassword("");
+      setForgotConfirmPassword("");
+      setForgotMessage(null);
+    } catch (err: any) {
+      setAuthError(err?.message || "Đặt lại mật khẩu thất bại, vui lòng thử lại.");
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -2595,7 +2700,7 @@ export default function App() {
                         onChange={(e) => setSelectedCategory(e.target.value)}
                         className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-slate-800 text-xs sm:text-sm font-bold rounded-2xl pl-3 pr-8 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs appearance-none transition-all"
                       >
-                        {CATEGORIES.map((cat) => {
+                        {dynamicCategories.map((cat) => {
                           const icon = CATEGORY_ICONS[cat] || "📚";
                           const count =
                             cat === "Tất cả"
@@ -3459,6 +3564,13 @@ export default function App() {
                   >
                     Đăng Ký
                   </button>
+                  {authTab === "forgot" && (
+                    <button
+                      className="pb-3 px-4 text-xs font-bold transition-all border-b-2 border-blue-600 text-blue-600"
+                    >
+                      Quên Mật Khẩu
+                    </button>
+                  )}
                 </div>
 
                 <button
@@ -3513,9 +3625,24 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Mật khẩu
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-semibold text-slate-700">
+                            Mật khẩu
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthError(null);
+                              setForgotStep(1);
+                              setForgotMessage(null);
+                              setForgotEmailOrPhone(loginEmail);
+                              setAuthTab("forgot");
+                            }}
+                            className="text-[11px] text-blue-600 font-semibold hover:underline"
+                          >
+                            Quên mật khẩu?
+                          </button>
+                        </div>
                         <div className="relative">
                           <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                           <input
@@ -3568,7 +3695,7 @@ export default function App() {
                       </p>
                     </div>
                   </form>
-                ) : (
+                ) : authTab === "register" ? (
                   <form onSubmit={handleRegister} className="space-y-3 text-xs">
                     <div className="text-center mb-2">
                       <h3 className="text-lg font-bold text-slate-900">
@@ -3678,6 +3805,186 @@ export default function App() {
                       </button>
                     </p>
                   </form>
+                ) : (
+                  /* Form Quên mật khẩu & Đặt lại mật khẩu */
+                  <div className="space-y-4 text-xs">
+                    <div className="text-center mb-2">
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-inner">
+                        <Key className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900">
+                        {forgotStep === 1 ? "Khôi Phục Mật Khẩu" : "Đặt Lại Mật Khẩu Mới"}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {forgotStep === 1
+                          ? "Nhập Email hoặc SĐT đã đăng ký để nhận mã OTP xác thực"
+                          : "Nhập mã OTP đã được tạo và thiết lập mật khẩu mới"}
+                      </p>
+                    </div>
+
+                    {authError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start space-x-2.5 animate-in fade-in">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                        <span className="font-semibold leading-relaxed">{authError}</span>
+                      </div>
+                    )}
+
+                    {forgotMessage && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 space-y-1 animate-in fade-in">
+                        <div className="flex items-center space-x-2 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Thông báo từ hệ thống:</span>
+                        </div>
+                        <p className="leading-relaxed pl-6">{forgotMessage}</p>
+                      </div>
+                    )}
+
+                    {forgotStep === 1 ? (
+                      <form onSubmit={handleRequestForgotOtp} className="space-y-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">
+                            Email hoặc Số điện thoại *
+                          </label>
+                          <div className="relative">
+                            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              required
+                              placeholder="nguyenvana@gmail.com hoặc 0905123456"
+                              value={forgotEmailOrPhone}
+                              onChange={(e) => {
+                                setForgotEmailOrPhone(e.target.value);
+                                if (authError) setAuthError(null);
+                              }}
+                              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={forgotLoading}
+                          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center justify-center space-x-2"
+                        >
+                          <Key className="w-4 h-4" />
+                          <span>{forgotLoading ? "Đang gửi yêu cầu..." : "Gửi Mã Xác Thực OTP"}</span>
+                        </button>
+
+                        <div className="pt-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthError(null);
+                              setAuthTab("login");
+                            }}
+                            className="text-slate-500 hover:text-blue-600 font-semibold"
+                          >
+                            &larr; Quay lại đăng nhập
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <form onSubmit={handleResetPasswordSubmit} className="space-y-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">
+                            Mã xác thực OTP (6 chữ số) *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={6}
+                            placeholder="Nhập 6 số OTP (Ví dụ: 123456)"
+                            value={forgotOtp}
+                            onChange={(e) => {
+                              setForgotOtp(e.target.value);
+                              if (authError) setAuthError(null);
+                            }}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono tracking-widest text-center text-sm font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">
+                            Mật khẩu mới (tối thiểu 6 ký tự) *
+                          </label>
+                          <div className="relative">
+                            <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type={showForgotNewPassword ? "text" : "password"}
+                              required
+                              placeholder="••••••••"
+                              value={forgotNewPassword}
+                              onChange={(e) => {
+                                setForgotNewPassword(e.target.value);
+                                if (authError) setAuthError(null);
+                              }}
+                              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                              {showForgotNewPassword ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">
+                            Xác nhận mật khẩu mới *
+                          </label>
+                          <input
+                            type="password"
+                            required
+                            placeholder="Nhập lại mật khẩu mới"
+                            value={forgotConfirmPassword}
+                            onChange={(e) => {
+                              setForgotConfirmPassword(e.target.value);
+                              if (authError) setAuthError(null);
+                            }}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={forgotLoading}
+                          className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center space-x-2"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{forgotLoading ? "Đang xử lý..." : "Xác Nhận Đổi Mật Khẩu"}</span>
+                        </button>
+
+                        <div className="flex items-center justify-between pt-2 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForgotStep(1);
+                              setAuthError(null);
+                            }}
+                            className="text-blue-600 hover:underline font-semibold"
+                          >
+                            Gửi lại mã OTP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthError(null);
+                              setAuthTab("login");
+                            }}
+                            className="text-slate-500 hover:text-slate-800"
+                          >
+                            Quay lại đăng nhập
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -4277,7 +4584,7 @@ export default function App() {
                 <span>Danh Mục Sách Hay</span>
               </h4>
               <ul className="space-y-2 text-slate-400 text-[11px]">
-                {CATEGORIES.filter((c) => c !== "Tất cả").slice(0, 5).map((cat) => (
+                {dynamicCategories.filter((c) => c !== "Tất cả").slice(0, 7).map((cat) => (
                   <li key={cat}>
                     <button
                       onClick={() => {

@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     avatarUrl: { type: String, default: '/default-avatar.png' },
     address: { type: String, default: '' },
+    resetPasswordOtp: { type: String, default: null },
+    resetPasswordExpires: { type: Date, default: null },
     createdAtStr: { type: String, default: () => new Date().toLocaleDateString('vi-VN') }
   },
   { timestamps: true }
@@ -36,6 +38,8 @@ userSchema.methods.comparePassword = async function comparePassword(plainPasswor
 userSchema.methods.toSafeObject = function toSafeObject() {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.resetPasswordOtp;
+  delete obj.resetPasswordExpires;
   return obj;
 };
 

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { UserProfile, OrderRecord } from "../App";
 import { OrderTabKey } from "./MyOrdersPage";
+import { api } from "../services/api";
 
 // 4 Icon chuẩn nét vẽ vector tương đồng 100% với Hình 2 (Shopee)
 const ConfirmIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
@@ -294,8 +295,8 @@ export default function ProfilePage({
     setTimeout(() => setIsSavedSuccess(false), 3000);
   };
 
-  // Đổi mật khẩu
-  const handleChangePassword = (e: React.FormEvent) => {
+  // Đổi mật khẩu thực tế vào MongoDB thông qua API
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!oldPassword || !newPassword) {
       setPasswordMessage("Vui lòng điền đầy đủ mật khẩu cũ và mới.");
@@ -310,13 +311,17 @@ export default function ProfilePage({
       return;
     }
 
-    // Giả lập cập nhật mật khẩu thành công
-    setPasswordMessage(null);
-    setPasswordSuccess(true);
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setTimeout(() => setPasswordSuccess(false), 4000);
+    try {
+      await api.changePassword({ oldPassword, newPassword });
+      setPasswordMessage(null);
+      setPasswordSuccess(true);
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch (err: any) {
+      setPasswordMessage(err?.message || "Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu cũ.");
+    }
   };
 
   // TRƯỜNG HỢP CHƯA ĐĂNG NHẬP

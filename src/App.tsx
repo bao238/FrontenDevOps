@@ -2674,8 +2674,12 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Chỉ số uy tín (Social Proof) */}
-                  <div className="pt-4 flex flex-wrap items-center gap-6 text-xs text-slate-300 border-t border-white/10">
+                  {/* Chỉ số uy tín (Social Proof) - Tích hợp điểm đánh giá 4.8/5 hài hòa cùng các tiêu chí uy tín */}
+                  <div className="pt-4 flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-slate-300 border-t border-white/10">
+                    <div className="flex items-center space-x-1.5 bg-amber-400/15 border border-amber-400/30 px-2.5 py-1 rounded-xl text-amber-300 font-bold shadow-xs">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>{siteAverageRating.toFixed(1)}/5 Đánh Giá</span>
+                    </div>
                     <div className="flex items-center space-x-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
                       <span className="font-bold text-white">18+</span> <span>Tựa Bestseller</span>
@@ -2726,12 +2730,6 @@ export default function App() {
                       <span className="block text-[11px] font-black uppercase tracking-wider text-amber-300">Nhà Giả Kim</span>
                       <span className="block text-[9px] text-slate-300">Paulo Coelho</span>
                     </div>
-                  </div>
-
-                  {/* Floating Star Rating Badge */}
-                  <div className="absolute top-2 right-4 z-20 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl border border-white/60 text-slate-900 text-xs font-black flex items-center space-x-1.5 animate-pulse">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <span>{siteAverageRating.toFixed(1)}/5 Đánh Giá</span>
                   </div>
                 </div>
               </div>

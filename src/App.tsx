@@ -850,10 +850,15 @@ export default function App() {
     return notifications.filter((n) => !n.isRead).length;
   }, [notifications]);
 
-  // Nạp danh sách thông báo từ API Backend (có cơ chế dự phòng LocalStorage)
+  // Nạp danh sách thông báo từ API Backend (chỉ tải thông báo cá nhân khi người dùng đã đăng nhập)
   const fetchNotifications = async () => {
+    // Nếu chưa đăng nhập (khách vãng lai), đặt danh sách thông báo rỗng (0 thông báo)
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
     try {
-      const res = await api.getNotifications({ limit: 40 });
+      const res = await api.getNotifications({ limit: 100 });
       if (res && res.success && Array.isArray(res.data)) {
         setNotifications(res.data);
       }

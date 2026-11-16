@@ -62,30 +62,36 @@ async function seedDefaultNotificationsForUser(userId) {
 exports.getNotifications = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
 
     const unreadOnly = req.query.unreadOnly === 'true';
     const typeFilter = req.query.type;
 
     // Xây dựng điều kiện lọc bảo mật theo danh tính người dùng (User Scoping)
-    const query = {};
+    // Loại trừ toàn bộ các thông báo giả lập kiểm thử (notif-bulk-)
+    const query = {
+      id: { $not: /^notif-bulk-/ }
+    };
 
     if (req.user && req.user.id) {
-      // Người dùng đã đăng nhập: Lấy thông báo cá nhân của chính mình HOẶC thông báo hệ thống/khuyến mãi chung
+      // Người dùng đã đăng nhập: Lấy thông báo cá nhân của chính mình HOẶC thông báo hệ thống/khuyến mãi chung thực tế
       query.$or = [
         { userId: req.user.id },
         { userId: null, type: { $in: ['system', 'coupon'] } }
       ];
 
       // Kiểm tra nếu người dùng chưa có thông báo nào thì tự động tạo thông báo chào mừng
-      const countForUser = await Notification.countDocuments({ userId: req.user.id });
+      const countForUser = await Notification.countDocuments({
+        userId: req.user.id,
+        id: { $not: /^notif-bulk-/ }
+      });
       if (countForUser === 0) {
         await seedDefaultNotificationsForUser(req.user.id);
       }
     } else {
       // Khách vãng lai (Chưa đăng nhập): Tuyệt đối KHÔNG hiển thị thông báo đơn hàng hoặc đánh giá cá nhân!
-      // Chỉ cho phép xem thông báo khuyến mãi và hệ thống chung
+      // Chỉ cho phép xem thông báo khuyến mãi và hệ thống chung thực tế (nếu có)
       query.userId = null;
       query.type = { $in: ['system', 'coupon'] };
     }
@@ -107,20 +113,11 @@ exports.getNotifications = async (req, res, next) => {
       query.type = typeFilter;
     }
 
-    // Truy vấn dữ liệu với chỉ mục B-Tree đã đánh
-    const unreadScopeQuery = req.user && req.user.id
-      ? {
-          $or: [
-            { userId: req.user.id },
-            { userId: null, type: { $in: ['system', 'coupon'] } }
-          ],
-          isRead: false
-        }
-      : {
-          userId: null,
-          type: { $in: ['system', 'coupon'] },
-          isRead: false
-        };
+    // Truy vấn dữ liệu chưa đọc đồng bộ chính xác với bộ lọc phạm vi
+    const unreadScopeQuery = {
+      ...query,
+      isRead: false
+    };
 
     const [total, unreadCount, notifications] = await Promise.all([
       Notification.countDocuments(query),
@@ -198,6 +195,7 @@ exports.markAllAsRead = async (req, res, next) => {
     const result = await Notification.updateMany(
       {
         $or: [{ userId: req.user.id }, { userId: null }],
+        id: { $not: /^notif-bulk-/ },
         isRead: false
       },
       {

@@ -239,10 +239,10 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
             </div>
             <div>
               <h4 className="text-xs sm:text-sm font-bold text-amber-900">
-                Bạn đang xem thông báo chung của hệ thống
+                Bạn chưa đăng nhập vào hệ thống
               </h4>
               <p className="text-xs text-amber-700">
-                Đăng nhập tài khoản để nhận thông báo cập nhật đơn hàng riêng và ưu đãi cá nhân.
+                Đăng nhập tài khoản để nhận thông báo cập nhật tiến độ đơn hàng và ưu đãi dành riêng cho bạn.
               </p>
             </div>
           </div>
@@ -467,16 +467,16 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
               <Inbox className="w-8 h-8" />
             </div>
             <h3 className="text-base font-bold text-slate-800">
-              Không tìm thấy thông báo nào
+              {!currentUser ? "Vui lòng đăng nhập" : "Không tìm thấy thông báo nào"}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
-              {activeFilter === "order" && !currentUser
-                ? "Vui lòng đăng nhập để xem thông báo cập nhật các đơn hàng của bạn."
+              {!currentUser
+                ? "Vui lòng đăng nhập tài khoản để xem thông báo cập nhật tiến độ đơn hàng và các ưu đãi dành riêng cho bạn."
                 : searchQuery
                 ? "Thử thay đổi từ khóa tìm kiếm hoặc chọn bộ lọc phân loại khác."
                 : "Hộp thư thông báo hiện đang trống."}
             </p>
-            {activeFilter === "order" && !currentUser && onOpenAuthModal && (
+            {!currentUser && onOpenAuthModal && (
               <button
                 onClick={onOpenAuthModal}
                 className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all inline-flex items-center space-x-1.5 cursor-pointer"

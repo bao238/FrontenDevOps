@@ -26,9 +26,31 @@ exports.getOrders = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const conditions = [];
-    if (req.user && req.user.role === 'customer') {
+
+    // 1. Kiểm soát quyền xem đơn hàng (Account Privacy & Data Scope):
+    // - Khách vãng lai (chưa đăng nhập): Tuyệt đối KHÔNG trả về danh sách đơn hàng của người khác
+    if (!req.user) {
+      if (req.query.search && req.query.search.trim()) {
+        const q = req.query.search.trim();
+        // Cho phép tra cứu chính xác mã đơn hàng cụ thể nếu khách cung cấp mã
+        conditions.push({ id: q });
+      } else {
+        return res.json({
+          source: 'mongodb',
+          count: 0,
+          totalAllCount: 0,
+          totalPages: 1,
+          currentPage: page,
+          stats: { pending: 0, pickup: 0, shipping: 0, completed: 0, canceled: 0 },
+          data: []
+        });
+      }
+    } else if (req.user.role === 'customer') {
+      // Độc giả chỉ xem được đơn hàng của chính tài khoản mình
       conditions.push(buildCustomerOrderScope(req.user));
     }
+    // Tài khoản Admin/Staff được quyền xem toàn bộ đơn hàng để xử lý vận đơn
+
     if (req.query.status && req.query.status !== 'all') {
       conditions.push({ status: req.query.status });
     }
@@ -46,15 +68,16 @@ exports.getOrders = async (req, res, next) => {
     const query = conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : { $and: conditions }) : {};
 
     const totalCount = await Order.countDocuments(query);
-    const totalAllCount = await Order.countDocuments();
+    const baseScopeQuery = req.user && req.user.role === 'customer' ? buildCustomerOrderScope(req.user) : {};
+    const totalAllCount = await Order.countDocuments(baseScopeQuery);
 
-    // Thong ke so luong don hang theo tung trang thai chuan xac tu MongoDB
+    // Thong ke so luong don hang theo tung trang thai chuẩn xác theo phạm vi người dùng
     const [pendingCount, pickupCount, shippingCount, completedCount, canceledCount] = await Promise.all([
-      Order.countDocuments({ status: 'Chờ xác nhận' }),
-      Order.countDocuments({ status: 'Chờ lấy hàng' }),
-      Order.countDocuments({ status: 'Chờ giao hàng' }),
-      Order.countDocuments({ status: 'Hoàn tất' }),
-      Order.countDocuments({ status: 'Đã hủy' })
+      Order.countDocuments({ ...baseScopeQuery, status: 'Chờ xác nhận' }),
+      Order.countDocuments({ ...baseScopeQuery, status: 'Chờ lấy hàng' }),
+      Order.countDocuments({ ...baseScopeQuery, status: 'Chờ giao hàng' }),
+      Order.countDocuments({ ...baseScopeQuery, status: 'Hoàn tất' }),
+      Order.countDocuments({ ...baseScopeQuery, status: 'Đã hủy' })
     ]);
 
     const stats = {

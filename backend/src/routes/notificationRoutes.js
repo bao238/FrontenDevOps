@@ -18,6 +18,9 @@ router.patch('/read-all', authMiddleware, asyncHandler(notificationController.ma
 // Đánh dấu một thông báo cụ thể là đã đọc
 router.patch('/:id/read', authMiddleware, asyncHandler(notificationController.markAsRead));
 
+// Xóa toàn bộ thông báo (Hỗ trợ người dùng đã đăng nhập hoặc khách vãng lai)
+router.delete('/clear-all', optionalAuth, asyncHandler(notificationController.deleteAllNotifications));
+
 // Xóa một thông báo cụ thể
 router.delete('/:id', authMiddleware, asyncHandler(notificationController.deleteNotification));
 

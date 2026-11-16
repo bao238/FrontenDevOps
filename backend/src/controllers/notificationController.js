@@ -68,12 +68,15 @@ exports.getNotifications = async (req, res, next) => {
     const unreadOnly = req.query.unreadOnly === 'true';
     const typeFilter = req.query.type;
 
-    // Xây dựng điều kiện lọc theo người dùng
+    // Xây dựng điều kiện lọc bảo mật theo danh tính người dùng (User Scoping)
     const query = {};
 
     if (req.user && req.user.id) {
-      // Người dùng đã đăng nhập: lấy thông báo riêng hoặc thông báo toàn hệ thống
-      query.$or = [{ userId: req.user.id }, { userId: null }];
+      // Người dùng đã đăng nhập: Lấy thông báo cá nhân của chính mình HOẶC thông báo hệ thống/khuyến mãi chung
+      query.$or = [
+        { userId: req.user.id },
+        { userId: null, type: { $in: ['system', 'coupon'] } }
+      ];
 
       // Kiểm tra nếu người dùng chưa có thông báo nào thì tự động tạo thông báo chào mừng
       const countForUser = await Notification.countDocuments({ userId: req.user.id });
@@ -81,8 +84,10 @@ exports.getNotifications = async (req, res, next) => {
         await seedDefaultNotificationsForUser(req.user.id);
       }
     } else {
-      // Khách vãng lai: chỉ lấy thông báo công khai toàn hệ thống
+      // Khách vãng lai (Chưa đăng nhập): Tuyệt đối KHÔNG hiển thị thông báo đơn hàng hoặc đánh giá cá nhân!
+      // Chỉ cho phép xem thông báo khuyến mãi và hệ thống chung
       query.userId = null;
+      query.type = { $in: ['system', 'coupon'] };
     }
 
     if (unreadOnly) {
@@ -90,18 +95,36 @@ exports.getNotifications = async (req, res, next) => {
     }
 
     if (typeFilter && ['order', 'coupon', 'review', 'system'].includes(typeFilter)) {
+      if (!req.user && (typeFilter === 'order' || typeFilter === 'review')) {
+        // Khách chưa đăng nhập yêu cầu xem thông báo đơn hàng/đánh giá -> Trả về danh sách rỗng 0 kết quả
+        return res.json({
+          success: true,
+          data: [],
+          unreadCount: 0,
+          pagination: { page, limit, total: 0, totalPages: 1 }
+        });
+      }
       query.type = typeFilter;
     }
 
     // Truy vấn dữ liệu với chỉ mục B-Tree đã đánh
+    const unreadScopeQuery = req.user && req.user.id
+      ? {
+          $or: [
+            { userId: req.user.id },
+            { userId: null, type: { $in: ['system', 'coupon'] } }
+          ],
+          isRead: false
+        }
+      : {
+          userId: null,
+          type: { $in: ['system', 'coupon'] },
+          isRead: false
+        };
+
     const [total, unreadCount, notifications] = await Promise.all([
       Notification.countDocuments(query),
-      Notification.countDocuments({
-        ...(req.user && req.user.id
-          ? { $or: [{ userId: req.user.id }, { userId: null }] }
-          : { userId: null }),
-        isRead: false
-      }),
+      Notification.countDocuments(unreadScopeQuery),
       Notification.find(query)
         .select('-metadata.payloadContent')
         .sort({ createdAt: -1 })
@@ -220,6 +243,37 @@ exports.deleteNotification = async (req, res, next) => {
     return res.json({
       success: true,
       message: 'Xóa thông báo thành công'
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * Xóa toàn bộ thông báo thuộc phạm vi của người dùng hoặc phiên hiện tại.
+ * DELETE /api/notifications/clear-all
+ */
+exports.deleteAllNotifications = async (req, res, next) => {
+  try {
+    const query = {};
+    if (req.user && req.user.id) {
+      if (req.user.role === 'admin') {
+        // Admin xóa thông báo cá nhân hoặc thông báo chung
+        query.$or = [{ userId: req.user.id }, { userId: null }];
+      } else {
+        query.userId = req.user.id;
+      }
+    } else {
+      // Khách vãng lai: Xóa các thông báo hiển thị cho phiên khách
+      query.userId = null;
+    }
+
+    const result = await Notification.deleteMany(query);
+
+    return res.json({
+      success: true,
+      message: 'Đã xóa toàn bộ thông báo thành công',
+      deletedCount: result.deletedCount
     });
   } catch (err) {
     return next(err);

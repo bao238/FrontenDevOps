@@ -801,6 +801,13 @@ export default function App() {
     showToast("Đã xóa thông báo thành công!");
   };
 
+  // Thao tác xóa toàn bộ thông báo
+  const handleDeleteAllNotifications = async () => {
+    setNotifications([]);
+    await api.deleteAllNotifications();
+    showToast("Đã xóa toàn bộ thông báo thành công!");
+  };
+
   // Hàm dùng chung đồng bộ phiên người dùng sau khi xác thực JWT thành công từ Backend
   const applyLoggedInUser = (apiUser: any) => {
     const loggedUser: UserProfile = {
@@ -3535,9 +3542,16 @@ export default function App() {
           <NotificationsPage
             notifications={notifications}
             unreadCount={unreadNotificationsCount}
+            currentUser={currentUser}
+            onOpenAuthModal={() => {
+              setAuthError(null);
+              setAuthTab("login");
+              setIsAuthModalOpen(true);
+            }}
             onMarkAsRead={handleMarkNotificationAsRead}
             onMarkAllAsRead={handleMarkAllNotificationsAsRead}
             onDeleteNotification={handleDeleteNotification}
+            onDeleteAllNotifications={handleDeleteAllNotifications}
             onNavigateToOrders={() => switchTab("orders")}
             onNavigateToProducts={() => switchTab("products")}
             onRefresh={fetchNotifications}

@@ -11,7 +11,9 @@ import {
   RefreshCw,
   Search,
   CheckCircle,
-  Inbox
+  Inbox,
+  LogIn,
+  ShieldAlert
 } from "lucide-react";
 import {
   NotificationItem,
@@ -24,12 +26,18 @@ interface NotificationsPageProps {
   notifications: NotificationItem[];
   // Số lượng thông báo chưa đọc
   unreadCount: number;
+  // Người dùng hiện tại (nếu có)
+  currentUser?: any;
+  // Mở modal đăng nhập
+  onOpenAuthModal?: () => void;
   // Đánh dấu 1 thông báo là đã đọc
   onMarkAsRead: (id: string) => void;
   // Đánh dấu tất cả là đã đọc
   onMarkAllAsRead: () => void;
   // Xóa thông báo khỏi danh sách
   onDeleteNotification: (id: string) => void;
+  // Xóa toàn bộ thông báo
+  onDeleteAllNotifications?: () => void;
   // Điều hướng người dùng tới trang Đơn hàng
   onNavigateToOrders?: (orderId?: string) => void;
   // Điều hướng người dùng tới trang Cửa hàng / Sản phẩm
@@ -75,7 +83,7 @@ function getTypeConfig(type: NotificationType) {
         icon: <Tag className="w-5 h-5 text-amber-600" />,
         bgColor: "bg-amber-50 text-amber-700 border-amber-200",
         badgeBg: "bg-amber-100 text-amber-700",
-        actionText: "Dùng ưu đãi ngay"
+        actionText: "Dùng ưu đãi"
       };
     case "review":
       return {
@@ -100,9 +108,12 @@ function getTypeConfig(type: NotificationType) {
 export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   notifications,
   unreadCount,
+  currentUser,
+  onOpenAuthModal,
   onMarkAsRead,
   onMarkAllAsRead,
   onDeleteNotification,
+  onDeleteAllNotifications,
   onNavigateToOrders,
   onNavigateToProducts,
   onRefresh
@@ -113,6 +124,8 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>("");
   // Trạng thái đang tải lại dữ liệu
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  // Trạng thái modal xác nhận xóa tất cả thông báo
+  const [isConfirmDeleteAllOpen, setIsConfirmDeleteAllOpen] = useState<boolean>(false);
 
   // Thống kê nhanh số lượng theo danh mục
   const stats = useMemo(() => {
@@ -182,13 +195,15 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         <div className="relative z-10 space-y-2">
           <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold text-blue-100 border border-white/20">
             <Bell className="w-3.5 h-3.5" />
-            <span>Hộp thư thông báo cá nhân</span>
+            <span>Hộp thư thông báo BookStore</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
             Trung Tâm Thông Báo
           </h1>
           <p className="text-xs sm:text-sm text-blue-100 max-w-xl leading-relaxed">
-            Cập nhật tình trạng đơn hàng thời gian thực, nhận voucher độc quyền và theo dõi các tin tức mới nhất từ BookStore.
+            {currentUser
+              ? `Xin chào ${currentUser.name}! Cập nhật tình trạng đơn hàng thời gian thực, nhận voucher độc quyền và các tin tức mới nhất.`
+              : "Theo dõi các tin tức ưu đãi, khuyến mãi sách hấp dẫn và thông báo mới nhất từ BookStore."}
           </p>
         </div>
 
@@ -197,10 +212,21 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           {unreadCount > 0 && (
             <button
               onClick={onMarkAllAsRead}
-              className="px-4 py-2.5 bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center space-x-2 active:scale-95"
+              className="px-4 py-2.5 bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center space-x-2 active:scale-95 cursor-pointer"
             >
               <CheckCheck className="w-4 h-4" />
               <span>Đã đọc tất cả</span>
+            </button>
+          )}
+
+          {notifications.length > 0 && onDeleteAllNotifications && (
+            <button
+              onClick={() => setIsConfirmDeleteAllOpen(true)}
+              className="px-4 py-2.5 bg-rose-500/90 hover:bg-rose-600 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center space-x-2 active:scale-95 cursor-pointer border border-rose-400/30"
+              title="Xóa tất cả thông báo"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Xóa tất cả</span>
             </button>
           )}
 
@@ -208,7 +234,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
             <button
               onClick={handleRefreshClick}
               disabled={isRefreshing}
-              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm rounded-2xl border border-white/20 transition-all flex items-center space-x-2 active:scale-95 disabled:opacity-50"
+              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm rounded-2xl border border-white/20 transition-all flex items-center space-x-2 active:scale-95 disabled:opacity-50 cursor-pointer"
               title="Làm mới thông báo"
             >
               <RefreshCw
@@ -220,10 +246,78 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
       </div>
 
+      {/* Modal xác nhận xóa tất cả thông báo an toàn */}
+      {isConfirmDeleteAllOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-100 space-y-5 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-base sm:text-lg font-black text-slate-900">
+                Xác nhận xóa tất cả?
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Toàn bộ <strong className="text-slate-800">{notifications.length}</strong> thông báo trong danh sách sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác.
+              </p>
+            </div>
+            <div className="flex items-center space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmDeleteAllOpen(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsConfirmDeleteAllOpen(false);
+                  if (onDeleteAllNotifications) {
+                    onDeleteAllNotifications();
+                  }
+                }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-rose-500/25 cursor-pointer active:scale-95"
+              >
+                Đồng ý xóa hết
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Banner nhắc đăng nhập nếu là khách vãng lai */}
+      {!currentUser && (
+        <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-bold text-amber-900">
+                Bạn đang xem thông báo chung của hệ thống
+              </h4>
+              <p className="text-xs text-amber-700">
+                Đăng nhập tài khoản để nhận thông báo cập nhật đơn hàng riêng và ưu đãi dành riêng cho bạn.
+              </p>
+            </div>
+          </div>
+          {onOpenAuthModal && (
+            <button
+              onClick={onOpenAuthModal}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer active:scale-95"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Đăng Nhập Ngay</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 2. Thẻ Thống Kê Tổng Quan (KPI Badges) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold flex-shrink-0">
             <Bell className="w-5 h-5 text-slate-600" />
           </div>
           <div>
@@ -235,7 +329,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold flex-shrink-0">
             <CheckCircle className="w-5 h-5 text-blue-600" />
           </div>
           <div>
@@ -247,7 +341,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold flex-shrink-0">
             <Package className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
@@ -259,7 +353,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold flex-shrink-0">
             <Tag className="w-5 h-5 text-amber-600" />
           </div>
           <div>
@@ -287,7 +381,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveFilter(tab.id as NotificationFilter)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 cursor-pointer ${
                   isActive
                     ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -323,7 +417,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
       </div>
 
-      {/* 4. Danh Sách Thẻ Thông Báo */}
+      {/* 4. Danh Sách Thẻ Thông Báo - Thiết Kế Lưới Gióng Hàng Chuẩn Tuyệt Đối */}
       <div className="space-y-3">
         {filteredNotifications.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80 shadow-sm space-y-3">
@@ -334,10 +428,21 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
               Không tìm thấy thông báo nào
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
-              {searchQuery
+              {activeFilter === "order" && !currentUser
+                ? "Vui lòng đăng nhập để xem thông báo cập nhật các đơn hàng của bạn."
+                : searchQuery
                 ? "Thử thay đổi từ khóa tìm kiếm hoặc chọn bộ lọc phân loại khác."
-                : "Hộp thư thông báo của bạn hiện đang trống."}
+                : "Hộp thư thông báo hiện đang trống."}
             </p>
+            {activeFilter === "order" && !currentUser && onOpenAuthModal && (
+              <button
+                onClick={onOpenAuthModal}
+                className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-all inline-flex items-center space-x-1.5 cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Đăng Nhập Ngay</span>
+              </button>
+            )}
           </div>
         ) : (
           filteredNotifications.map((item) => {
@@ -345,14 +450,19 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
             return (
               <div
                 key={item.id}
-                className={`bg-white rounded-2xl p-4 sm:p-5 border transition-all duration-200 shadow-sm hover:shadow-md flex flex-col sm:flex-row items-start justify-between gap-4 relative group ${
+                className={`bg-white rounded-2xl p-4 sm:p-5 border transition-all duration-200 shadow-sm hover:shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden group ${
                   !item.isRead
-                    ? "border-blue-200 bg-blue-50/20 ring-1 ring-blue-500/10"
+                    ? "border-blue-200/90 bg-gradient-to-r from-blue-50/30 via-white to-white ring-1 ring-blue-500/10"
                     : "border-slate-200/80"
                 }`}
               >
+                {/* Dải màu nhấn tinh tế bên trái cho thông báo chưa đọc */}
+                {!item.isRead && (
+                  <div className="absolute left-0 top-3 bottom-3 w-1.5 bg-blue-600 rounded-r-full" />
+                )}
+
                 {/* Phần thân thông báo */}
-                <div className="flex items-start space-x-3.5 flex-1 min-w-0">
+                <div className="flex items-start space-x-3.5 flex-1 min-w-0 pl-1">
                   {/* Icon phân loại */}
                   <div
                     className={`w-11 h-11 rounded-2xl border flex-shrink-0 flex items-center justify-center ${config.bgColor}`}
@@ -363,7 +473,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${config.badgeBg}`}
+                        className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${config.badgeBg}`}
                       >
                         {config.label}
                       </span>
@@ -378,7 +488,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                     </div>
 
                     <h4
-                      className={`text-sm sm:text-base ${
+                      className={`text-sm sm:text-base leading-snug ${
                         !item.isRead
                           ? "font-extrabold text-slate-900"
                           : "font-bold text-slate-800"
@@ -393,32 +503,41 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                   </div>
                 </div>
 
-                {/* Các nút tương tác bên phải */}
-                <div className="flex items-center space-x-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex-shrink-0">
-                  {/* Nút hành động chính */}
+                {/* Cột các nút hành động bên phải - CỐ ĐỊNH KÍCH THƯỚC GIÓNG HÀNG THẲNG TẮP (KHÔNG THỤT THÒ) */}
+                <div className="flex items-center justify-end space-x-2 w-full sm:w-[240px] flex-shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                  {/* 1. Nút hành động chính: Chiều rộng cố định chuẩn 135px */}
                   <button
                     onClick={() => handleItemAction(item)}
-                    className="px-3 py-1.5 bg-slate-900 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-colors flex items-center space-x-1.5 shadow-sm"
+                    className="w-[135px] min-w-[135px] px-3 py-2 bg-slate-900 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 cursor-pointer group-hover:bg-blue-600"
                   >
-                    <span>{config.actionText}</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span className="truncate">{config.actionText}</span>
+                    <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                   </button>
 
-                  {/* Nút đánh dấu đã đọc (nếu chưa đọc) */}
-                  {!item.isRead && (
-                    <button
-                      onClick={() => onMarkAsRead(item.id)}
-                      className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-xl transition-colors border border-blue-200"
-                      title="Đánh dấu đã đọc"
-                    >
-                      <CheckCheck className="w-4 h-4" />
-                    </button>
-                  )}
+                  {/* 2. Ô cố định kích thước cho nút Đánh dấu đã đọc / Trạng thái đã đọc (36x36px) */}
+                  <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
+                    {!item.isRead ? (
+                      <button
+                        onClick={() => onMarkAsRead(item.id)}
+                        className="w-9 h-9 flex items-center justify-center text-blue-600 hover:text-white hover:bg-blue-600 rounded-xl transition-all border border-blue-200 hover:border-blue-600 shadow-sm cursor-pointer active:scale-95"
+                        title="Đánh dấu đã đọc"
+                      >
+                        <CheckCheck className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <span
+                        className="w-9 h-9 flex items-center justify-center text-emerald-600 bg-emerald-50 rounded-xl border border-emerald-100/80"
+                        title="Đã đọc"
+                      >
+                        <CheckCircle className="w-4 h-4 text-emerald-500 opacity-80" />
+                      </span>
+                    )}
+                  </div>
 
-                  {/* Nút xóa thông báo */}
+                  {/* 3. Ô cố định kích thước cho nút Xóa thông báo (36x36px) */}
                   <button
                     onClick={() => onDeleteNotification(item.id)}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors border border-transparent hover:border-rose-100"
+                    className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors border border-transparent hover:border-rose-100 flex-shrink-0 cursor-pointer active:scale-95"
                     title="Xóa thông báo"
                   >
                     <Trash2 className="w-4 h-4" />

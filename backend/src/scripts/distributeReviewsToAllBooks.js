@@ -147,7 +147,8 @@ async function runDistributeReviews() {
 
         for (let r = 0; r < reviewsToAdd; r++) {
           const userObj = availableUsers[(globalReviewIndex + r) % availableUsers.length];
-          const authorName = VIETNAMESE_NAMES[(globalReviewIndex + r * 3) % VIETNAMESE_NAMES.length] || userObj.name;
+          // Ưu tiên sử dụng chính xác tên của người dùng trong MongoDB để đảm bảo tìm kiếm khớp 100%
+          const authorName = userObj.name || VIETNAMESE_NAMES[(globalReviewIndex + r * 3) % VIETNAMESE_NAMES.length];
           const templateContent = REVIEW_TEMPLATES[(globalReviewIndex + r * 2) % REVIEW_TEMPLATES.length];
           const dateStr = REVIEW_DATES[(globalReviewIndex + r) % REVIEW_DATES.length];
           const ratingScore = ((globalReviewIndex + r) % 5 === 0) ? 4 : 5; // 80% là 5 sao, 20% là 4 sao (TB 4.8★)
@@ -157,8 +158,8 @@ async function runDistributeReviews() {
           newReviewsBatch.push({
             id: `rev-gen-${pId}-${r + 1}-${Date.now().toString().slice(-4)}`,
             productId: pId, // Khóa ngoại tham chiếu chính xác 100% đến id của sách
-            userId: userObj.id,
-            author: authorName,
+            userId: userObj.id, // Khóa ngoại tham chiếu chính xác 100% đến id của user
+            author: authorName, // Khớp 100% với tên tài khoản trong collection users
             rating: ratingScore,
             date: dateStr,
             content: templateContent,

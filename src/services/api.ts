@@ -932,7 +932,25 @@ export const api = {
     return true;
   },
 
-  // 37. Tao thong bao moi (Admin hoac su kien he thong)
+  // 37. Xóa toàn bộ thông báo khỏi cơ sở dữ liệu
+  async deleteAllNotifications(): Promise<boolean> {
+    try {
+      const res = await apiFetch("/notifications/clear-all", {
+        method: "DELETE"
+      });
+      if (res.ok) return true;
+    } catch (err) {
+      console.warn("⚠️ [API] Lỗi khi xóa toàn bộ thông báo:", err);
+    }
+
+    // Cập nhật LocalStorage dự phòng
+    try {
+      localStorage.removeItem("bookstore_cached_notifications");
+    } catch {}
+    return true;
+  },
+
+  // 38. Tao thong bao moi (Admin hoac su kien he thong)
   async createNotification(payload: {
     title: string;
     message: string;

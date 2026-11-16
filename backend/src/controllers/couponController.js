@@ -172,6 +172,8 @@ exports.applyCoupon = async (req, res, next) => {
         title: coupon.title,
         discountType: coupon.discountType,
         discountValue: coupon.discountValue,
+        minOrderValue: coupon.minOrderValue || 0,
+        maxDiscount: coupon.maxDiscount || null,
         discountAmount: Math.round(discountAmount)
       }
     });

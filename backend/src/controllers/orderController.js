@@ -194,6 +194,33 @@ exports.createOrder = async (req, res, next) => {
       }
     }
 
+    // 0.1 Kiểm tra tính hợp lệ của mã giảm giá và giá trị đơn hàng tối thiểu
+    if (newOrder.couponCode) {
+      const cleanCouponCode = String(newOrder.couponCode).trim().toUpperCase();
+      const coupon = await Coupon.findOne({ code: cleanCouponCode });
+      if (!coupon) {
+        return res.status(400).json({ message: `Mã giảm giá "${cleanCouponCode}" không tồn tại trên hệ thống.` });
+      }
+      if (!coupon.isActive) {
+        return res.status(400).json({ message: `Mã giảm giá "${cleanCouponCode}" hiện đang tạm khóa hoặc đã kết thúc.` });
+      }
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        return res.status(400).json({ message: `Mã giảm giá "${cleanCouponCode}" đã hết hạn sử dụng.` });
+      }
+      if (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) {
+        return res.status(400).json({ message: `Mã giảm giá "${cleanCouponCode}" đã đạt giới hạn lượt sử dụng.` });
+      }
+      const orderSubtotal = (items || []).reduce(
+        (sum, it) => sum + (Number(it.product?.price) || 0) * (Number(it.quantity) || 1),
+        0
+      );
+      if (coupon.minOrderValue > 0 && orderSubtotal < coupon.minOrderValue) {
+        return res.status(400).json({
+          message: `Đơn hàng tối thiểu phải từ ${coupon.minOrderValue.toLocaleString('vi-VN')}đ để áp dụng mã "${cleanCouponCode}".`
+        });
+      }
+    }
+
     // 1. Lưu bản ghi vào bảng Orders
     const created = await Order.create(newOrder);
 

@@ -180,6 +180,10 @@ export default function App() {
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [appliedDiscountAmount, setAppliedDiscountAmount] = useState<number>(0);
+  const [appliedCouponMinOrder, setAppliedCouponMinOrder] = useState<number>(0);
+  const [appliedCouponType, setAppliedCouponType] = useState<"percent" | "fixed">("percent");
+  const [appliedCouponValue, setAppliedCouponValue] = useState<number>(0);
+  const [appliedCouponMaxDiscount, setAppliedCouponMaxDiscount] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Xử lý bật/tắt tick chọn 1 sản phẩm trong giỏ hàng
@@ -1285,6 +1289,11 @@ export default function App() {
       const res = await api.applyCoupon(cleanCode, subtotal);
       if (res && res.success && res.coupon) {
         setAppliedCouponCode(cleanCode);
+        setAppliedCouponMinOrder(res.coupon.minOrderValue || 0);
+        setAppliedCouponType(res.coupon.discountType || "percent");
+        setAppliedCouponValue(res.coupon.discountValue || 0);
+        setAppliedCouponMaxDiscount(res.coupon.maxDiscount || null);
+
         if (res.coupon.discountType === "percent") {
           setAppliedDiscount(res.coupon.discountValue / 100);
           setAppliedDiscountAmount(res.coupon.discountAmount || Math.round((subtotal * res.coupon.discountValue) / 100));
@@ -1296,30 +1305,62 @@ export default function App() {
         }
         showToast(res.message || `Áp dụng mã "${cleanCode}" thành công!`);
         return;
-      } else if (res && res.error) {
+      } else if (res && (res.error || res.message)) {
         setAppliedCouponCode(null);
         setAppliedDiscount(0);
         setAppliedDiscountAmount(0);
-        showToast(res.error);
+        setAppliedCouponMinOrder(0);
+        setAppliedCouponMaxDiscount(null);
+        showToast(res.error || res.message);
         return;
       }
     } catch {
       // Fallback kiểm tra cục bộ khi chưa kết nối backend
     }
 
-    if (
-      cleanCode === "BOOKWORM10" ||
-      cleanCode === "DEVOPS10" ||
-      cleanCode === "DINHBAO10"
-    ) {
+    const fallbackRules: Record<string, { min: number; value: number; type: "percent" | "fixed"; max?: number }> = {
+      "BOOKWORM10": { min: 100000, value: 10, type: "percent", max: 50000 },
+      "DEVOPS10": { min: 50000, value: 10, type: "percent", max: 30000 },
+      "DINHBAO10": { min: 50000, value: 10, type: "percent", max: 30000 },
+      "TRIAN50K": { min: 300000, value: 50000, type: "fixed" },
+      "FREESHIP": { min: 150000, value: 30000, type: "fixed" },
+    };
+
+    const matchedRule = fallbackRules[cleanCode];
+    if (matchedRule) {
+      if (subtotal < matchedRule.min) {
+        setAppliedCouponCode(null);
+        setAppliedDiscount(0);
+        setAppliedDiscountAmount(0);
+        setAppliedCouponMinOrder(0);
+        setAppliedCouponMaxDiscount(null);
+        showToast(`Đơn hàng tối thiểu phải từ ${matchedRule.min.toLocaleString('vi-VN')}đ để áp dụng mã "${cleanCode}"`);
+        return;
+      }
       setAppliedCouponCode(cleanCode);
-      setAppliedDiscount(0.1);
-      setAppliedDiscountAmount(Math.round(subtotal * 0.1));
-      showToast("Áp dụng mã giảm 10% thành công!");
+      setAppliedCouponMinOrder(matchedRule.min);
+      setAppliedCouponType(matchedRule.type);
+      setAppliedCouponValue(matchedRule.value);
+      setAppliedCouponMaxDiscount(matchedRule.max || null);
+      if (matchedRule.type === "percent") {
+        let discount = (subtotal * matchedRule.value) / 100;
+        if (matchedRule.max && discount > matchedRule.max) discount = matchedRule.max;
+        setAppliedDiscount(matchedRule.value / 100);
+        setAppliedDiscountAmount(Math.round(discount));
+        showToast(`Áp dụng mã giảm ${matchedRule.value}% thành công!`);
+      } else {
+        const discount = Math.min(subtotal, matchedRule.value);
+        const ratio = subtotal > 0 ? Math.min(1, discount / subtotal) : 0;
+        setAppliedDiscount(ratio);
+        setAppliedDiscountAmount(Math.round(discount));
+        showToast(`Áp dụng mã giảm ${matchedRule.value.toLocaleString('vi-VN')}đ thành công!`);
+      }
     } else {
       setAppliedCouponCode(null);
       setAppliedDiscount(0);
       setAppliedDiscountAmount(0);
+      setAppliedCouponMinOrder(0);
+      setAppliedCouponMaxDiscount(null);
       showToast("Mã giảm giá không hợp lệ hoặc đã hết hạn!");
     }
   };
@@ -1676,6 +1717,41 @@ export default function App() {
   const shippingFee = subtotal >= 250000 || subtotal === 0 ? 0 : 30000;
   const finalTotal = Math.max(0, subtotal - discountAmount + shippingFee);
 
+  // Tự động kiểm tra và thu hồi mã giảm giá nếu số lượng/mặt hàng giảm khiến subtotal < minOrderValue
+  useEffect(() => {
+    if (!appliedCouponCode) return;
+
+    // Nếu giỏ hàng rỗng hoặc tạm tính dưới mức tối thiểu yêu cầu của voucher
+    if (subtotal === 0 || subtotal < appliedCouponMinOrder) {
+      const revokedCode = appliedCouponCode;
+      const minRequired = appliedCouponMinOrder;
+      setAppliedCouponCode(null);
+      setAppliedDiscount(0);
+      setAppliedDiscountAmount(0);
+      setAppliedCouponMinOrder(0);
+      setAppliedCouponMaxDiscount(null);
+      showToast(
+        `Đơn hàng (${subtotal.toLocaleString("vi-VN")}đ) chưa đạt tối thiểu ${minRequired.toLocaleString("vi-VN")}đ. Đã hủy mã "${revokedCode}"!`
+      );
+      return;
+    }
+
+    // Nếu vẫn đủ điều kiện, tự động tính toán lại số tiền giảm theo subtotal mới
+    if (appliedCouponType === "percent") {
+      let discount = (subtotal * appliedCouponValue) / 100;
+      if (appliedCouponMaxDiscount && appliedCouponMaxDiscount > 0 && discount > appliedCouponMaxDiscount) {
+        discount = appliedCouponMaxDiscount;
+      }
+      setAppliedDiscount(appliedCouponValue / 100);
+      setAppliedDiscountAmount(Math.round(discount));
+    } else {
+      const discount = Math.min(subtotal, appliedCouponValue);
+      const ratio = subtotal > 0 ? Math.min(1, discount / subtotal) : 0;
+      setAppliedDiscount(ratio);
+      setAppliedDiscountAmount(Math.round(discount));
+    }
+  }, [subtotal, appliedCouponCode, appliedCouponMinOrder, appliedCouponType, appliedCouponValue, appliedCouponMaxDiscount]);
+
   // Xử lý tạo đơn hàng & điều hướng thanh toán chính xác (chỉ đặt các sản phẩm đã tick chọn)
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1784,6 +1860,8 @@ export default function App() {
     setPromoCode("");
     setAppliedCouponCode(null);
     setAppliedDiscountAmount(0);
+    setAppliedCouponMinOrder(0);
+    setAppliedCouponMaxDiscount(null);
 
     // Đóng hoàn toàn Checkout modal
     setIsCheckoutOpen(false);

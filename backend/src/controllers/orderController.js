@@ -171,6 +171,26 @@ exports.createOrder = async (req, res, next) => {
   };
 
   try {
+    // 0. Kiểm tra nghiêm ngặt số lượng tồn kho thực tế trong MongoDB trước khi cho phép tạo đơn hàng
+    if (Array.isArray(items) && items.length > 0) {
+      for (const it of items) {
+        const prodId = it.product?.id;
+        const requestedQty = Number(it.quantity) || 1;
+        if (prodId) {
+          const currentProd = await Product.findOne({ id: prodId }).lean();
+          if (!currentProd) {
+            return res.status(400).json({ message: `Sản phẩm "${it.product?.name || prodId}" không tồn tại trên hệ thống.` });
+          }
+          const availableStock = typeof currentProd.stockQuantity === 'number' ? currentProd.stockQuantity : 0;
+          if (!currentProd.inStock || availableStock < requestedQty) {
+            return res.status(400).json({
+              message: `Sản phẩm "${currentProd.name}" trong kho chỉ còn ${availableStock} cuốn, không đủ số lượng (${requestedQty} cuốn) bạn đặt mua!`
+            });
+          }
+        }
+      }
+    }
+
     // 1. Lưu bản ghi vào bảng Orders
     const created = await Order.create(newOrder);
 

@@ -81,39 +81,66 @@ exports.getProducts = async (req, res, next) => {
       }
     }
 
-    // 3. Tinh tong so luong san pham thoa man dieu kien loc va tong so san pham toan he thong
-    const totalCount = await Product.countDocuments(query);
-    const totalAllCount = await Product.countDocuments();
-    const inStockCount = await Product.countDocuments({
-      inStock: true,
-      $or: [{ stockQuantity: { $gt: 5 } }, { stockQuantity: { $exists: false } }]
-    });
-    const lowStockCount = await Product.countDocuments({
-      inStock: true,
-      stockQuantity: { $gt: 0, $lte: 5 }
-    });
-    const outOfStockCount = await Product.countDocuments({
-      $or: [{ inStock: false }, { stockQuantity: 0 }]
-    });
+    // 3 & 4. Thực thi song song (Parallel Execution) truy vấn đếm và lấy dữ liệu trang hiện tại qua Promise.all giúp tối ưu tốc độ lật trang < 15ms
+    const [totalCount, totalAllCount, inStockCount, lowStockCount, outOfStockCount, products] = await Promise.all([
+      Product.countDocuments(query),
+      Product.countDocuments(),
+      Product.countDocuments({
+        inStock: true,
+        $or: [{ stockQuantity: { $gt: 5 } }, { stockQuantity: { $exists: false } }]
+      }),
+      Product.countDocuments({
+        inStock: true,
+        stockQuantity: { $gt: 0, $lte: 5 }
+      }),
+      Product.countDocuments({
+        $or: [{ inStock: false }, { stockQuantity: 0 }]
+      }),
+      Product.find(query)
+        .select('-ebookContent')
+        .sort(sortOption)
+        .skip(skip)
+        .limit(limit)
+        .lean()
+    ]);
 
-    // 4. Chi lay dung phan du lieu trang hien tai (skip / limit) va bo qua ebookContent nang de tranh tran RAM
-    const products = await Product.find(query)
-      .select('-ebookContent')
-      .sort(sortOption)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    // 5. Tinh toan rating va reviewsCount thuc te tu bang Reviews (Khong gan mac dinh cung trong bang products)
+    const productIds = products.map(p => p.id);
+    if (productIds.length > 0) {
+      const reviewStats = await Review.aggregate([
+        { $match: { productId: { $in: productIds } } },
+        {
+          $group: {
+            _id: '$productId',
+            avgRating: { $avg: '$rating' },
+            count: { $sum: 1 }
+          }
+        }
+      ]);
 
-    // Giữ nguyên thông số đánh giá thực tế từ MongoDB
-    const sanitizedProducts = products.map((p) => {
-      return {
-        ...p,
-        rating: typeof p.rating === 'number' ? p.rating : 0,
-        reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 0
-      };
-    });
+      const reviewStatsMap = new Map();
+      reviewStats.forEach(st => {
+        reviewStatsMap.set(String(st._id), {
+          rating: Number(st.avgRating.toFixed(1)),
+          reviewsCount: st.count
+        });
+      });
 
-    // 5. Tra ve ket qua phan trang chuan Server-Side
+      products.forEach(p => {
+        const stat = reviewStatsMap.get(String(p.id)) || { rating: 0, reviewsCount: 0 };
+        p.rating = stat.rating;
+        p.reviewsCount = stat.reviewsCount;
+      });
+    }
+
+    // 5. Chuẩn hóa dữ liệu trả về và đảm bảo trường rating/reviewsCount luôn là số hợp lệ
+    const sanitizedProducts = products.map((p) => ({
+      ...p,
+      rating: typeof p.rating === 'number' ? p.rating : 0,
+      reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 0
+    }));
+
+    // 6. Trả về kết quả phân trang chuẩn Server-Side
     return res.json({
       source: 'mongodb',
       count: totalCount,
@@ -150,16 +177,16 @@ exports.getProductById = async (req, res, next) => {
       return res.status(404).json({ message: 'Không tìm thấy sản phẩm trong cơ sở dữ liệu' });
     }
 
-    // Đếm số lượng review thực tế trong MongoDB để phản ánh chính xác nhất
-    const actualReviews = await Review.find({ productId: { $in: [product.id, ...possibleIds] } }).lean();
-    if (actualReviews.length > 0) {
-      product.reviewsCount = actualReviews.length;
-      const totalScore = actualReviews.reduce((sum, r) => sum + (r.rating || 5), 0);
-      product.rating = Number((totalScore / actualReviews.length).toFixed(1));
-    } else if (typeof product.reviewsCount !== 'number' || product.reviewsCount < 0) {
-      product.rating = 0;
-      product.reviewsCount = 0;
-    }
+    // Lấy danh sách đánh giá thực tế từ bảng reviews và tính rating chuẩn xác
+    const reviews = await Review.find({ productId: { $in: [product.id, ...possibleIds] } })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    product.reviews = reviews;
+    product.reviewsCount = reviews.length;
+    product.rating = reviews.length > 0
+      ? Number((reviews.reduce((sum, r) => sum + (r.rating || 5), 0) / reviews.length).toFixed(1))
+      : 0;
 
     return res.json({ source: 'mongodb', data: product });
   } catch (err) {
@@ -178,8 +205,6 @@ exports.createProduct = async (req, res, next) => {
       price: Number(req.body.price) || 0,
       originalPrice: Number(req.body.originalPrice) || Number(req.body.price) || 0,
       discountPercent: Number(req.body.discountPercent) || 0,
-      rating: Number(req.body.rating) || 0,
-      reviewsCount: Number(req.body.reviewsCount) || 0,
       imageUrl: req.body.imageUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80',
       description: req.body.description || '',
       author: req.body.author || req.body.specs?.['Tác giả'] || '',

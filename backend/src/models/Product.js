@@ -25,8 +25,6 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     originalPrice: { type: Number, required: true },
     discountPercent: { type: Number, default: 0 },
-    rating: { type: Number, default: 0 },
-    reviewsCount: { type: Number, default: 0 },
     imageUrl: { type: String, default: '' },
     description: { type: String, default: '' },
     // Các thuộc tính chuyên biệt cho Nhà Sách (BookStore)
@@ -39,8 +37,7 @@ const productSchema = new mongoose.Schema(
     specs: { type: Object, default: {} },
     inStock: { type: Boolean, default: true },
     stockQuantity: { type: Number, default: 25 },
-    featured: { type: Boolean, default: false },
-    reviews: { type: [reviewSchema], default: [] }
+    featured: { type: Boolean, default: false }
   },
   { timestamps: true }
 );
@@ -49,6 +46,5 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ createdAt: -1 });
 productSchema.index({ category: 1, createdAt: -1 });
 productSchema.index({ price: 1 });
-productSchema.index({ rating: -1 });
 
 module.exports = mongoose.model('Product', productSchema);

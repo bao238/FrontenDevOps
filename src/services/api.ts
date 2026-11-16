@@ -291,7 +291,7 @@ export const api = {
             totalPages: json.totalPages || 1,
             currentPage: json.currentPage || (params?.page || 1),
             stats: json.stats,
-            data: applyRatingBalancing(json.data)
+            data: json.data
           };
         }
       }

@@ -400,13 +400,21 @@ export default function App() {
     switchTab("cart");
   };
 
-  // Mở modal thanh toán chỉ khi người dùng đã đăng nhập tài khoản
+  // Mở modal thanh toán chỉ khi người dùng đã đăng nhập tài khoản và số lượng tồn kho hợp lệ
   const handleOpenCheckout = () => {
     if (!currentUser) {
       showToast("Vui lòng đăng nhập tài khoản để tiến hành đặt hàng và thanh toán!");
       setAuthTab("login");
       setIsAuthModalOpen(true);
       return;
+    }
+    // Kiểm tra từng sản phẩm được tick chọn có vượt quá số lượng tồn kho hay không
+    for (const item of selectedCartItems) {
+      const maxStock = typeof item.product.stockQuantity === "number" ? item.product.stockQuantity : 999;
+      if (item.quantity > maxStock) {
+        showToast(`Sản phẩm "${item.product.name}" trong kho chỉ còn ${maxStock} cuốn. Vui lòng điều chỉnh lại số lượng trước khi đặt hàng!`);
+        return;
+      }
     }
     setIsCheckoutOpen(true);
   };
@@ -1051,7 +1059,7 @@ export default function App() {
     showToast("Đã đăng xuất tài khoản thành công. Giỏ hàng và dữ liệu phiên đã được xóa.");
   };
 
-  // Add to Cart - Ngăn chặn thêm giỏ hàng nếu chưa đăng nhập
+  // Add to Cart - Ngăn chặn thêm giỏ hàng nếu chưa đăng nhập hoặc vượt quá số lượng tồn kho
   const addToCart = (product: Product, quantity = 1) => {
     if (!currentUser) {
       showToast("Vui lòng đăng nhập tài khoản để thêm sản phẩm vào giỏ hàng!");
@@ -1059,14 +1067,23 @@ export default function App() {
       setIsAuthModalOpen(true);
       return;
     }
-    if (!product.inStock) {
+    const maxStock = typeof product.stockQuantity === "number" ? product.stockQuantity : 999;
+    if (!product.inStock || maxStock <= 0) {
       showToast("Sản phẩm hiện đang tạm hết hàng!");
       return;
     }
+
+    const existing = cart.find((item) => item.product.id === product.id);
+    const currentQtyInCart = existing ? existing.quantity : 0;
+    if (currentQtyInCart + quantity > maxStock) {
+      showToast(`Kho chỉ còn ${maxStock} cuốn. Giỏ hàng của bạn hiện đã có ${currentQtyInCart} cuốn!`);
+      return;
+    }
+
     setCart((prev) => {
       let nextCart: CartItem[];
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
+      const exists = prev.find((item) => item.product.id === product.id);
+      if (exists) {
         nextCart = prev.map((item) =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
@@ -1083,18 +1100,29 @@ export default function App() {
     showToast(`Đã thêm "${product.name.slice(0, 25)}..." vào giỏ hàng!`);
   };
 
-  // Update Cart Quantity
+  // Update Cart Quantity - Kiểm soát giới hạn tồn kho
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prev) => {
+      let limitHit = false;
+      let availableMax = 0;
       const updated = prev
         .map((item) => {
           if (item.product.id === productId) {
+            const maxStock = typeof item.product.stockQuantity === "number" ? item.product.stockQuantity : 999;
             const newQty = item.quantity + delta;
+            if (delta > 0 && newQty > maxStock) {
+              limitHit = true;
+              availableMax = maxStock;
+              return item;
+            }
             return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
           return item;
         })
         .filter(Boolean) as CartItem[];
+      if (limitHit) {
+        showToast(`Kho chỉ còn tối đa ${availableMax} cuốn sản phẩm này!`);
+      }
       saveUserCart(updated, currentUser);
       return updated;
     });
@@ -1324,13 +1352,6 @@ export default function App() {
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
 
-  // Đảm bảo trang hiện tại không vượt quá tổng số trang
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
   // Cắt danh sách sản phẩm hiển thị trên trang hiện tại theo phân trang
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1354,6 +1375,51 @@ export default function App() {
 
   // Bộ nhớ đệm phân trang Cửa Hàng (In-Memory Page Cache) - Lật trang siêu tốc 0ms
   const storePageCacheRef = useRef<Map<string, { data: Product[]; count: number; totalPages: number }>>(new Map());
+
+  // Hàm tải trước trang dữ liệu ngầm (Smart Background & Hover Prefetching)
+  const prefetchStorePage = async (targetPage: number) => {
+    if (targetPage < 1 || (totalStorePages > 0 && targetPage > totalStorePages)) return;
+
+    let minP: number | undefined;
+    let maxP: number | undefined;
+    if (selectedPriceRange === "under-100k") maxP = 100000;
+    else if (selectedPriceRange === "100k-250k") { minP = 100000; maxP = 250000; }
+    else if (selectedPriceRange === "250k-500k") { minP = 250000; maxP = 500000; }
+    else if (selectedPriceRange === "over-500k") minP = 500000;
+
+    let sortParam = "default";
+    if (sortBy === "price-asc") sortParam = "price_asc";
+    else if (sortBy === "price-desc") sortParam = "price_desc";
+    else if (sortBy === "rating") sortParam = "rating_desc";
+
+    const cacheKey = `${targetPage}-${itemsPerPage}-${selectedCategory}-${debouncedStoreSearch}-${selectedPriceRange}-${selectedMinRating}-${sortBy}-${onlyInStock}`;
+    if (storePageCacheRef.current.has(cacheKey)) return;
+
+    try {
+      const res = await api.getProducts({
+        page: targetPage,
+        limit: itemsPerPage,
+        category: selectedCategory,
+        search: debouncedStoreSearch,
+        stock: onlyInStock ? "in_stock" : "all",
+        minPrice: minP,
+        maxPrice: maxP,
+        rating: selectedMinRating > 0 ? selectedMinRating : undefined,
+        sortBy: sortParam
+      });
+      if (res && res.data) {
+        const count = res.count ?? res.totalAllCount ?? res.data.length;
+        const totalP = res.totalPages || Math.ceil(count / itemsPerPage) || 1;
+        storePageCacheRef.current.set(cacheKey, {
+          data: res.data,
+          count,
+          totalPages: totalP
+        });
+      }
+    } catch {
+      // Tải trước ngầm không làm gián đoạn UI
+    }
+  };
 
   // Reset trang về 1 khi người dùng đổi thể loại, từ khóa tìm kiếm hoặc bộ lọc giá/sao/sắp xếp
   useEffect(() => {
@@ -1381,6 +1447,14 @@ export default function App() {
       setStoreProducts(cached.data);
       setTotalStoreProducts(cached.count);
       setTotalStorePages(cached.totalPages);
+
+      // Tự động tải trước trang tiếp theo và trang trước đó từ bộ nhớ đệm
+      if (page < cached.totalPages) {
+        setTimeout(() => prefetchStorePage(page + 1), 60);
+      }
+      if (page > 1) {
+        setTimeout(() => prefetchStorePage(page - 1), 120);
+      }
       return; // Phản hồi tức thì 0ms!
     }
 
@@ -1408,6 +1482,14 @@ export default function App() {
           count,
           totalPages: totalP
         });
+
+        // Tự động tải trước trang tiếp theo và trang trước đó ngầm (0ms khi người dùng chuyển trang)
+        if (page < totalP) {
+          setTimeout(() => prefetchStorePage(page + 1), 60);
+        }
+        if (page > 1) {
+          setTimeout(() => prefetchStorePage(page - 1), 120);
+        }
       }
     } catch (err) {
       console.error("Lỗi khi tải sản phẩm phân trang cửa hàng:", err);
@@ -1423,6 +1505,13 @@ export default function App() {
   const displayStoreProducts = storeProducts.length > 0 ? storeProducts : paginatedProducts;
   const displayTotalStoreProducts = totalStoreProducts > 0 ? totalStoreProducts : filteredProducts.length;
   const displayTotalStorePages = totalStoreProducts > 0 ? totalStorePages : totalPages;
+
+  // Đảm bảo trang hiện tại không vượt quá tổng số trang hiển thị của Cửa Hàng (10.549 cuốn MongoDB)
+  useEffect(() => {
+    if (currentPage > displayTotalStorePages && displayTotalStorePages > 0) {
+      setCurrentPage(displayTotalStorePages);
+    }
+  }, [currentPage, displayTotalStorePages]);
 
   // Cart Calculations - Tính toán dựa trên các sản phẩm được tick chọn để mua trước
   const selectedCartItems = useMemo(() => {
@@ -2927,23 +3016,30 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {displayStoreProducts.map((prod) => (
-                    <div
-                      key={prod.id}
-                      className="bg-white rounded-3xl border border-slate-200/80 p-3.5 shadow-sm hover:shadow-xl hover:border-blue-300 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group"
-                    >
-                      {/* Khung Bìa Sách 3D Tỷ Lệ 3:4 Chuẩn NXB */}
+                <div className="relative">
+                  {/* Thanh chỉ báo tải trang siêu tốc (Top Progress Bar) */}
+                  {isLoadingStoreProducts && (
+                    <div className="absolute -top-3.5 left-0 right-0 h-1 bg-blue-100 overflow-hidden rounded-full z-10 shadow-xs">
+                      <div className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 animate-pulse w-full"></div>
+                    </div>
+                  )}
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 transition-all duration-200 ${isLoadingStoreProducts ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                    {displayStoreProducts.map((prod) => (
                       <div
-                        className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 cursor-pointer shadow-inner"
-                        onClick={() => handleSelectProduct(prod)}
+                        key={prod.id}
+                        className="bg-white rounded-3xl border border-slate-200/80 p-3.5 shadow-sm hover:shadow-xl hover:border-blue-300 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group"
                       >
-                        <img
-                          src={prod.imageUrl}
-                          alt={prod.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
+                        {/* Khung Bìa Sách 3D Tỷ Lệ 3:4 Chuẩn NXB */}
+                        <div
+                          className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 cursor-pointer shadow-inner"
+                          onClick={() => handleSelectProduct(prod)}
+                        >
+                          <img
+                            src={prod.imageUrl}
+                            alt={prod.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
 
                         {/* Hiệu ứng gáy sách chiều sâu 3D */}
                         <div className="absolute inset-y-0 left-0 w-3.5 bg-gradient-to-r from-black/30 via-black/10 to-transparent pointer-events-none z-10" />
@@ -3067,6 +3163,7 @@ export default function App() {
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
               )}
 
@@ -3116,11 +3213,12 @@ export default function App() {
                           setCurrentPage(newPage);
                           document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth" });
                         }}
+                        onMouseEnter={() => prefetchStorePage(Math.max(1, currentPage - 1))}
                         disabled={currentPage === 1}
                         className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
                           currentPage === 1
                             ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                            : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs"
+                            : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 shadow-xs cursor-pointer"
                         }`}
                         title="Trang trước"
                       >
@@ -3158,6 +3256,7 @@ export default function App() {
                                 setCurrentPage(pageNum);
                                 document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth" });
                               }}
+                              onMouseEnter={() => prefetchStorePage(pageNum)}
                               className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                 currentPage === pageNum
                                   ? "bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 scale-105"
@@ -3177,6 +3276,7 @@ export default function App() {
                           setCurrentPage(newPage);
                           document.getElementById("product-grid")?.scrollIntoView({ behavior: "smooth" });
                         }}
+                        onMouseEnter={() => prefetchStorePage(Math.min(displayTotalStorePages, currentPage + 1))}
                         disabled={currentPage === displayTotalStorePages}
                         className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 border transition-all ${
                           currentPage === displayTotalStorePages

@@ -73,12 +73,16 @@ export default function ProductDetailPage({
       api.getProductReviews(product.id).then((data) => {
         if (Array.isArray(data)) {
           setReviews(data);
+        } else {
+          setReviews(data || []);
         }
       }).catch(() => {
         setReviews(product.reviews || []);
       }).finally(() => {
         setIsReviewsLoaded(true);
       });
+    } else {
+      setReviews([]);
     }
   }, [product?.id]);
 
@@ -456,8 +460,10 @@ export default function ProductDetailPage({
                 <span className="text-xs font-bold text-slate-700">Số lượng:</span>
                 <div className="flex items-center border border-slate-300 rounded-xl bg-white shadow-xs">
                   <button
+                    type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-l-xl transition-colors"
+                    disabled={quantity <= 1}
+                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-l-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
@@ -465,13 +471,28 @@ export default function ProductDetailPage({
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-r-xl transition-colors"
+                    type="button"
+                    onClick={() => {
+                      const maxStock = typeof product.stockQuantity === "number" ? product.stockQuantity : 999;
+                      if (quantity < maxStock) {
+                        setQuantity(quantity + 1);
+                      }
+                    }}
+                    disabled={typeof product.stockQuantity === "number" && quantity >= product.stockQuantity}
+                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-r-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={
+                      typeof product.stockQuantity === "number" && quantity >= product.stockQuantity
+                        ? `Kho chỉ còn tối đa ${product.stockQuantity} cuốn`
+                        : "Tăng số lượng"
+                    }
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <span className="text-xs text-slate-400">
+                  {typeof product.stockQuantity === "number" && product.stockQuantity <= 10 && (
+                    <span className="text-amber-600 font-bold mr-2">(Kho còn: {product.stockQuantity})</span>
+                  )}
                   Tổng tiền: <strong className="text-red-600 font-bold">{formatVND(product.price * quantity)}</strong>
                 </span>
               </div>

@@ -304,26 +304,42 @@ export default function CartPage({
                       {/* Quantity & Subtotal & Delete */}
                       <div className="flex items-center justify-between sm:justify-end space-x-6 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                         {/* Quantity controls */}
-                        <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 p-1 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => onUpdateQuantity(item.product.id, -1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
-                            title="Giảm số lượng"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="w-8 text-center text-xs font-bold text-slate-900">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateQuantity(item.product.id, 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
-                            title="Tăng số lượng"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="flex flex-col items-center sm:items-end space-y-1">
+                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50 p-1 shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => onUpdateQuantity(item.product.id, -1)}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
+                              title="Giảm số lượng"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="w-8 text-center text-xs font-bold text-slate-900">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateQuantity(item.product.id, 1)}
+                              disabled={typeof item.product.stockQuantity === "number" && item.quantity >= item.product.stockQuantity}
+                              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
+                                typeof item.product.stockQuantity === "number" && item.quantity >= item.product.stockQuantity
+                                  ? "text-slate-300 cursor-not-allowed bg-slate-100"
+                                  : "hover:bg-white text-slate-600 hover:text-slate-900 cursor-pointer"
+                              }`}
+                              title={
+                                typeof item.product.stockQuantity === "number" && item.quantity >= item.product.stockQuantity
+                                  ? `Đã đạt giới hạn tối đa trong kho (${item.product.stockQuantity} cuốn)`
+                                  : "Tăng số lượng"
+                              }
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {typeof item.product.stockQuantity === "number" && item.product.stockQuantity <= 5 && (
+                            <span className="text-[10px] text-amber-600 font-semibold">
+                              (Kho còn: {item.product.stockQuantity})
+                            </span>
+                          )}
                         </div>
 
                         {/* Line Total */}

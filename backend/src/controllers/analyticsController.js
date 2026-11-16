@@ -52,11 +52,23 @@ exports.getAnalyticsSummary = async (req, res, next) => {
       });
     }
 
-    // 3. Top 5 sách bán chạy nhất lấy từ các đầu sách tiêu biểu trong MongoDB
-    const topProducts = await Product.find()
-      .sort({ reviewsCount: -1, rating: -1 })
-      .limit(5)
-      .lean();
+    // 3. Top 5 sách tiêu biểu nhất tính từ số lượng đánh giá thực tế trong bảng Reviews
+    const topReviewsAgg = await Review.aggregate([
+      { $group: { _id: '$productId', count: { $sum: 1 }, avgRating: { $avg: '$rating' } } },
+      { $sort: { count: -1, avgRating: -1 } },
+      { $limit: 5 }
+    ]);
+
+    let topProducts = [];
+    if (topReviewsAgg.length > 0) {
+      const topIds = topReviewsAgg.map(r => r._id);
+      const prods = await Product.find({ id: { $in: topIds } }).lean();
+      const prodMap = new Map(prods.map(p => [p.id, p]));
+      topProducts = topIds.map(id => prodMap.get(id)).filter(Boolean);
+    }
+    if (topProducts.length === 0) {
+      topProducts = await Product.find().sort({ createdAt: -1 }).limit(5).lean();
+    }
 
     const topSellingBooks = topProducts.map((p, idx) => ({
       id: p.id,

@@ -397,6 +397,17 @@ export const api = {
     }
   },
 
+  // 9c-2. Cập nhật thông tin hồ sơ tài khoản hiện tại
+  async updateMe(payload: { name?: string; phone?: string; address?: string; avatarUrl?: string }) {
+    const res = await apiFetch("/auth/me", {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) throw new Error(data.message || data.error || "Cập nhật hồ sơ thất bại");
+    return data;
+  },
+
   // 9d. Quên mật khẩu - Yêu cầu cấp mã OTP xác thực
   async forgotPassword(emailOrPhone: string) {
     const res = await apiFetch("/auth/forgot-password", {

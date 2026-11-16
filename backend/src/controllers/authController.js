@@ -84,11 +84,89 @@ exports.login = async (req, res, next) => {
 };
 
 // GET /api/auth/me
-exports.getMe = async (req, res) => {
-  return res.json({
-    success: true,
-    user: formatAuthUser(req.user)
-  });
+exports.getMe = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ id: req.user.id }).select('-password').lean();
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản người dùng' });
+    }
+    return res.json({
+      success: true,
+      user: formatAuthUser(user)
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// PUT /api/auth/me - Cập nhật hồ sơ cá nhân của người dùng đang đăng nhập
+exports.updateMe = async (req, res, next) => {
+  try {
+    const { name, phone, address, avatarUrl } = req.body;
+    const user = await User.findOne({ id: req.user.id });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy thông tin tài khoản người dùng' });
+    }
+
+    if (name && String(name).trim()) {
+      const cleanName = String(name).trim();
+      if (cleanName !== user.name) {
+        const existName = await User.findOne({ name: cleanName, id: { $ne: user.id } });
+        if (existName) {
+          return res.status(400).json({ message: `Tên người dùng "${cleanName}" đã tồn tại trong hệ thống!` });
+        }
+        user.name = cleanName;
+      }
+    }
+
+    if (phone !== undefined) {
+      const cleanPhone = String(phone).trim();
+      if (cleanPhone && cleanPhone !== user.phone) {
+        const phoneNoSpace = cleanPhone.replace(/\s+/g, '');
+        if (!/^0\d{9}$/.test(phoneNoSpace)) {
+          return res.status(400).json({
+            message: 'Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0 (Ví dụ: 0905123456)'
+          });
+        }
+        const phoneConditions = [
+          { phone: cleanPhone },
+          { phone: phoneNoSpace }
+        ];
+        if (/^0\d{9}$/.test(phoneNoSpace)) {
+          phoneConditions.push({
+            phone: `${phoneNoSpace.slice(0, 4)} ${phoneNoSpace.slice(4, 7)} ${phoneNoSpace.slice(7)}`
+          });
+        }
+        const existPhone = await User.findOne({
+          $or: phoneConditions,
+          id: { $ne: user.id }
+        });
+        if (existPhone) {
+          return res.status(400).json({ message: `Số điện thoại "${cleanPhone}" đã được sử dụng bởi tài khoản khác!` });
+        }
+        user.phone = cleanPhone;
+      }
+    }
+
+    if (address !== undefined) {
+      user.address = String(address).trim();
+    }
+
+    if (avatarUrl !== undefined && String(avatarUrl).trim()) {
+      user.avatarUrl = String(avatarUrl).trim();
+    }
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Cập nhật hồ sơ cá nhân thành công!',
+      user: formatAuthUser(user)
+    });
+  } catch (err) {
+    return next(err);
+  }
 };
 
 // POST /api/auth/register hoặc POST /api/users
@@ -363,13 +441,25 @@ exports.forgotPassword = async (req, res, next) => {
       return res.status(400).json({ message: 'Vui lòng nhập Email hoặc Số điện thoại đã đăng ký' });
     }
 
+    const phoneNoSpace = cleanInput.replace(/\s+/g, '');
+    let formattedPhone = '';
+    if (/^0\d{9}$/.test(phoneNoSpace)) {
+      formattedPhone = `${phoneNoSpace.slice(0, 4)} ${phoneNoSpace.slice(4, 7)} ${phoneNoSpace.slice(7)}`;
+    }
+
+    const orConditions = [
+      { email: cleanEmail },
+      { phone: cleanInput }
+    ];
+    if (phoneNoSpace && phoneNoSpace !== cleanInput) {
+      orConditions.push({ phone: phoneNoSpace });
+    }
+    if (formattedPhone && formattedPhone !== cleanInput) {
+      orConditions.push({ phone: formattedPhone });
+    }
+
     // Tìm kiếm tài khoản độc giả qua Email hoặc Số điện thoại
-    const user = await User.findOne({
-      $or: [
-        { email: cleanEmail },
-        { phone: cleanInput }
-      ]
-    });
+    const user = await User.findOne({ $or: orConditions });
 
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản nào khớp với thông tin cung cấp' });
@@ -414,13 +504,25 @@ exports.resetPassword = async (req, res, next) => {
       return res.status(400).json({ message: 'Mật khẩu mới phải có tối thiểu 6 ký tự' });
     }
 
+    const phoneNoSpace = cleanInput.replace(/\s+/g, '');
+    let formattedPhone = '';
+    if (/^0\d{9}$/.test(phoneNoSpace)) {
+      formattedPhone = `${phoneNoSpace.slice(0, 4)} ${phoneNoSpace.slice(4, 7)} ${phoneNoSpace.slice(7)}`;
+    }
+
+    const orConditions = [
+      { email: cleanEmail },
+      { phone: cleanInput }
+    ];
+    if (phoneNoSpace && phoneNoSpace !== cleanInput) {
+      orConditions.push({ phone: phoneNoSpace });
+    }
+    if (formattedPhone && formattedPhone !== cleanInput) {
+      orConditions.push({ phone: formattedPhone });
+    }
+
     // Tìm kiếm tài khoản
-    const user = await User.findOne({
-      $or: [
-        { email: cleanEmail },
-        { phone: cleanInput }
-      ]
-    });
+    const user = await User.findOne({ $or: orConditions });
 
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản trong hệ thống' });
@@ -454,14 +556,19 @@ exports.resetPassword = async (req, res, next) => {
 exports.changePassword = async (req, res, next) => {
   try {
     const { oldPassword, newPassword } = req.body;
+    const cleanOldPass = String(oldPassword || '').trim();
     const cleanNewPass = String(newPassword || '').trim();
 
-    if (!oldPassword || !cleanNewPass) {
+    if (!cleanOldPass || !cleanNewPass) {
       return res.status(400).json({ message: 'Vui lòng nhập đầy đủ mật khẩu cũ và mật khẩu mới' });
     }
 
     if (cleanNewPass.length < 6) {
       return res.status(400).json({ message: 'Mật khẩu mới phải có tối thiểu 6 ký tự' });
+    }
+
+    if (cleanNewPass === cleanOldPass) {
+      return res.status(400).json({ message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại' });
     }
 
     // Lấy thông tin tài khoản từ payload xác thực JWT
@@ -471,7 +578,7 @@ exports.changePassword = async (req, res, next) => {
     }
 
     // Kiểm tra mật khẩu hiện tại
-    const { isMatch } = await verifyPassword(String(oldPassword), user.password);
+    const { isMatch } = await verifyPassword(cleanOldPass, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Mật khẩu cũ không chính xác' });
     }

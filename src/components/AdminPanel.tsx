@@ -66,6 +66,7 @@ import AnalyticsTab from "./admin/AnalyticsTab";
 import CategoriesTab from "./admin/CategoriesTab";
 import AdminPagination from "./admin/AdminPagination";
 import InvoiceModal from "./InvoiceModal";
+import { SearchableSelect } from "./SearchableSelect";
 
 interface CartItem {
   product: Product;
@@ -122,6 +123,27 @@ interface AdminPanelProps {
   onToggleLockUser?: (userId: string) => void;
   onResetDefaultUsers?: () => void;
 }
+
+const DEFAULT_PUBLISHERS = [
+  "NXB Trẻ",
+  "NXB Kim Đồng",
+  "NXB Tổng Hợp TP.HCM",
+  "NXB Hội Nhà Văn",
+  "NXB Văn Học",
+  "NXB Thế Giới",
+  "NXB Lao Động",
+  "NXB Thông Tin & Truyền Thông",
+  "NXB Tri Thức",
+  "NXB Bách Khoa",
+  "NXB Công Thương",
+  "NXB Khoa Học Xã Hội",
+  "Cambridge University",
+  "Oxford University Press",
+  "NXB Giáo Dục Việt Nam",
+  "NXB Phụ Nữ Việt Nam",
+  "NXB Dân Trí",
+  "NXB Chính Trị Quốc Gia Sự Thật",
+];
 
 const SAMPLE_IMAGES = [
   { label: "Văn học", url: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80" },
@@ -181,6 +203,36 @@ export default function AdminPanel({
       isMounted = false;
     };
   }, []);
+
+  // Danh sách các Nhà xuất bản cho dropdown thanh xổ xuống khi tạo/sửa sách
+  const [availablePublishers, setAvailablePublishers] = useState<string[]>(DEFAULT_PUBLISHERS);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.getFilterOptions().then((res) => {
+      if (isMounted && res && res.publishers && res.publishers.length > 0) {
+        setAvailablePublishers((prev) => {
+          const set = new Set([...prev, ...res.publishers]);
+          return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+        });
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Tổng hợp danh sách NXB từ database, danh sách mặc định và từ các sản phẩm hiện có
+  const publisherOptions = useMemo(() => {
+    const set = new Set(availablePublishers);
+    products.forEach((p) => {
+      if (p.publisher && p.publisher.trim()) set.add(p.publisher.trim());
+      if (p.specs && p.specs["Nhà xuất bản"] && p.specs["Nhà xuất bản"].trim()) {
+        set.add(p.specs["Nhà xuất bản"].trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [availablePublishers, products]);
   // Quản lý Bộ lọc Kho sách (Stock Filter: Tất cả, Còn hàng, Sắp hết <=5, Hết hàng)
   const [selectedStockFilter, setSelectedStockFilter] = useState<
     "all" | "in_stock" | "low_stock" | "out_of_stock"
@@ -3763,7 +3815,7 @@ export default function AdminPanel({
                           ({Object.keys(formSpecs).length} thông số)
                         </span>
                       </div>
-                      <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-0.5">
+                      <div className="space-y-1.5 pr-0.5">
                         {Object.entries(formSpecs).map(([key, val]) => {
                           const isFixedField = key === "Tác giả" || key === "Nhà xuất bản";
                           return (
@@ -3776,14 +3828,29 @@ export default function AdminPanel({
                                 {key}:
                               </span>
 
-                              {/* Cho phép sửa trực tiếp giá trị (tên tác giả, tên nhà xuất bản, năm...) */}
-                              <input
-                                type="text"
-                                value={val}
-                                onChange={(e) => handleSpecValueChange(key, e.target.value)}
-                                placeholder={`Nhập ${key.toLowerCase()}...`}
-                                className="flex-1 min-w-0 bg-white border border-slate-200 rounded-md px-2 py-0.5 text-[11px] text-slate-900 font-semibold focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
-                              />
+                              {/* Cho phép sửa trực tiếp giá trị: Nếu là Nhà xuất bản thì hiển thị thanh xổ xuống SearchableSelect */}
+                              {key === "Nhà xuất bản" ? (
+                                <div className="flex-1 min-w-0">
+                                  <SearchableSelect
+                                    value={val}
+                                    onChange={(newPub) => handleSpecValueChange("Nhà xuất bản", newPub)}
+                                    options={publisherOptions}
+                                    placeholder="Chọn nhà xuất bản..."
+                                    searchPlaceholder="🔍 Tìm theo tên NXB..."
+                                    hideAllOption={true}
+                                    allowCustom={true}
+                                    triggerClassName="bg-white border border-slate-200 rounded-md px-2 py-0.5 text-[11px] text-slate-900 font-semibold hover:border-slate-300 shadow-2xs"
+                                  />
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={val}
+                                  onChange={(e) => handleSpecValueChange(key, e.target.value)}
+                                  placeholder={`Nhập ${key.toLowerCase()}...`}
+                                  className="flex-1 min-w-0 bg-white border border-slate-200 rounded-md px-2 py-0.5 text-[11px] text-slate-900 font-semibold focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
+                                />
+                              )}
 
                               {/* Nút xóa chỉ dành cho các thông số phụ, các trường cố định như Tác giả và NXB được bảo vệ */}
                               {!isFixedField ? (

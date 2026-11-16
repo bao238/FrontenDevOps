@@ -219,11 +219,11 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
             </button>
           )}
 
-          {notifications.length > 0 && onDeleteAllNotifications && (
+          {notifications.length > 0 && (
             <button
               onClick={() => setIsConfirmDeleteAllOpen(true)}
-              className="px-4 py-2.5 bg-rose-500/90 hover:bg-rose-600 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center space-x-2 active:scale-95 cursor-pointer border border-rose-400/30"
-              title="Xóa tất cả thông báo"
+              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center space-x-2 active:scale-95 cursor-pointer border border-rose-400/40"
+              title="Xóa toàn bộ thông báo trong hộp thư"
             >
               <Trash2 className="w-4 h-4" />
               <span>Xóa tất cả</span>
@@ -404,16 +404,28 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           })}
         </div>
 
-        {/* Ô tìm kiếm thông báo */}
-        <div className="relative min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm theo tiêu đề, nội dung..."
-            className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-          />
+        {/* Nhóm tìm kiếm và nút thao tác nhanh */}
+        <div className="flex items-center space-x-2 w-full md:w-auto">
+          <div className="relative flex-1 md:min-w-[240px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm theo tiêu đề, nội dung..."
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+          </div>
+          {notifications.length > 0 && (
+            <button
+              onClick={() => setIsConfirmDeleteAllOpen(true)}
+              className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap active:scale-95"
+              title="Xóa tất cả thông báo"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Xóa hết</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -450,10 +462,11 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
             return (
               <div
                 key={item.id}
-                className={`bg-white rounded-2xl p-4 sm:p-5 border transition-all duration-200 shadow-sm hover:shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden group ${
+                onClick={() => handleItemAction(item)}
+                className={`bg-white rounded-2xl p-4 sm:p-5 border transition-all duration-200 shadow-sm hover:shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden group cursor-pointer ${
                   !item.isRead
-                    ? "border-blue-200/90 bg-gradient-to-r from-blue-50/30 via-white to-white ring-1 ring-blue-500/10"
-                    : "border-slate-200/80"
+                    ? "border-blue-200/90 bg-gradient-to-r from-blue-50/30 via-white to-white ring-1 ring-blue-500/10 hover:border-blue-400/80"
+                    : "border-slate-200/80 hover:border-slate-300"
                 }`}
               >
                 {/* Dải màu nhấn tinh tế bên trái cho thông báo chưa đọc */}
@@ -503,40 +516,26 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                   </div>
                 </div>
 
-                {/* Cột các nút hành động bên phải - CỐ ĐỊNH KÍCH THƯỚC GIÓNG HÀNG THẲNG TẮP (KHÔNG THỤT THÒ) */}
-                <div className="flex items-center justify-end space-x-2 w-full sm:w-[240px] flex-shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                  {/* 1. Nút hành động chính: Chiều rộng cố định chuẩn 135px */}
+                {/* Cột các nút hành động bên phải - CỐ ĐỊNH KÍCH THƯỚC GIÓNG HÀNG THẲNG TẮP (Nút Xem + Nút Thùng Rác) */}
+                <div className="flex items-center justify-end space-x-3 w-full sm:w-[185px] flex-shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                  {/* 1. Nút hành động chính: Chiều rộng cố định chuẩn 135px, bấm vào đọc và điều hướng */}
                   <button
-                    onClick={() => handleItemAction(item)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleItemAction(item);
+                    }}
                     className="w-[135px] min-w-[135px] px-3 py-2 bg-slate-900 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 cursor-pointer group-hover:bg-blue-600"
                   >
                     <span className="truncate">{config.actionText}</span>
                     <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                   </button>
 
-                  {/* 2. Ô cố định kích thước cho nút Đánh dấu đã đọc / Trạng thái đã đọc (36x36px) */}
-                  <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
-                    {!item.isRead ? (
-                      <button
-                        onClick={() => onMarkAsRead(item.id)}
-                        className="w-9 h-9 flex items-center justify-center text-blue-600 hover:text-white hover:bg-blue-600 rounded-xl transition-all border border-blue-200 hover:border-blue-600 shadow-sm cursor-pointer active:scale-95"
-                        title="Đánh dấu đã đọc"
-                      >
-                        <CheckCheck className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <span
-                        className="w-9 h-9 flex items-center justify-center text-emerald-600 bg-emerald-50 rounded-xl border border-emerald-100/80"
-                        title="Đã đọc"
-                      >
-                        <CheckCircle className="w-4 h-4 text-emerald-500 opacity-80" />
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 3. Ô cố định kích thước cho nút Xóa thông báo (36x36px) */}
+                  {/* 2. Ô cố định kích thước cho nút Xóa thông báo (36x36px), ngăn nổi bọt sự kiện */}
                   <button
-                    onClick={() => onDeleteNotification(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteNotification(item.id);
+                    }}
                     className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors border border-transparent hover:border-rose-100 flex-shrink-0 cursor-pointer active:scale-95"
                     title="Xóa thông báo"
                   >

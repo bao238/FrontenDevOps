@@ -571,19 +571,52 @@ export default function ProductDetailPage({
             <div className="overflow-hidden rounded-2xl border border-slate-200">
               <table className="w-full text-left text-xs">
                 <tbody className="divide-y divide-slate-200">
-                  {Object.entries(product.specs).map(([key, val], idx) => (
-                    <tr
-                      key={key}
-                      className={idx % 2 === 0 ? "bg-slate-50/60" : "bg-white"}
-                    >
-                      <td className="py-3 px-4 font-bold text-slate-700 w-1/3 sm:w-1/4">
-                        {key}
-                      </td>
-                      <td className="py-3 px-4 text-slate-900 font-medium">
-                        {val}
-                      </td>
-                    </tr>
-                  ))}
+                  {(() => {
+                    // Tự động tổng hợp dữ liệu từ các thuộc tính cốt lõi của sách để bảng luôn đầy đủ 7 - 8 dòng
+                    const mergedSpecs: { [key: string]: any } = {
+                      ...(product.author ? { "Tác giả": product.author } : {}),
+                      ...(product.publisher ? { "Nhà xuất bản": product.publisher } : {}),
+                      ...(product.publicationYear ? { "Năm xuất bản": String(product.publicationYear) } : {}),
+                      ...(product.pages ? { "Số trang": `${product.pages} trang` } : {}),
+                      ...(product.bookFormat ? { "Hình thức": product.bookFormat } : {}),
+                      "Ngôn ngữ": "Tiếng Việt",
+                      ...(product.isbn ? { "Mã ISBN": product.isbn } : {}),
+                      ...(product.specs || {})
+                    };
+
+                    return Object.entries(mergedSpecs).map(([key, val], idx) => {
+                      // Chuẩn hóa nhãn thông số tiếng Việt (phòng vệ đa tầng chống lỗi font)
+                      let displayKey = key;
+                      if (displayKey.includes("H?nh th?c") || displayKey === "Hinh thuc") displayKey = "Hình thức";
+                      if (displayKey.includes("T?c gi?") || displayKey === "Tac gia") displayKey = "Tác giả";
+                      if (displayKey.includes("Nh? xu?t b?n") || displayKey === "Nha xuat ban") displayKey = "Nhà xuất bản";
+                      if (displayKey.includes("S? trang") || displayKey === "So trang") displayKey = "Số trang";
+                      if (displayKey.includes("Ng?n ng?") || displayKey === "Ngon ngu") displayKey = "Ngôn ngữ";
+                      if (displayKey.includes("K?ch th??c") || displayKey === "Kich thuoc") displayKey = "Kích thước";
+
+                      let displayVal = val;
+                      if (typeof displayVal === "string") {
+                        if (displayVal.includes("B?a c?ng")) displayVal = "Bìa cứng";
+                        if (displayVal.includes("B?a m?m")) displayVal = "Bìa mềm";
+                        if (displayVal.includes("Ti?ng Vi?t")) displayVal = "Tiếng Việt";
+                        if (displayVal.includes("Ti?ng Anh")) displayVal = "Tiếng Anh";
+                      }
+
+                      return (
+                        <tr
+                          key={key}
+                          className={idx % 2 === 0 ? "bg-slate-50/60" : "bg-white"}
+                        >
+                          <td className="py-3 px-4 font-bold text-slate-700 w-1/3 sm:w-1/4">
+                            {displayKey}
+                          </td>
+                          <td className="py-3 px-4 text-slate-900 font-medium">
+                            {displayVal}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>

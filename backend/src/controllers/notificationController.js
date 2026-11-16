@@ -103,6 +103,7 @@ exports.getNotifications = async (req, res, next) => {
         isRead: false
       }),
       Notification.find(query)
+        .select('-metadata.payloadContent')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api, getAuthToken, setAuthTokens, clearAuthTokens } from "./services/api";
@@ -221,6 +221,30 @@ export default function App() {
   const [ordersTabSelection, setOrdersTabSelection] = useState<OrderTabKey>("all");
   const [users, setUsers] = useState<UserAccount[]>([]);
 
+  // Hàm làm mới danh sách đơn hàng từ máy chủ MongoDB và đồng bộ thời gian thực
+  const refreshOrders = useCallback(async () => {
+    try {
+      const res = await api.getOrders({ page: 1, limit: 20 });
+      if (res && res.source === "mongodb" && Array.isArray(res.data) && res.data.length > 0) {
+        setOrders((prev) => {
+          const prevSig = prev.map((o) => `${o.id}_${o.status}_${o.isPaid}_${o.receivedAt || ""}`).join("|");
+          const newSig = (res.data as OrderRecord[]).map((o) => `${o.id}_${o.status}_${o.isPaid}_${o.receivedAt || ""}`).join("|");
+          if (prevSig !== newSig) {
+            try {
+              localStorage.setItem("bookstore_orders", JSON.stringify(res.data));
+            } catch {
+              // ignore
+            }
+            return res.data;
+          }
+          return prev;
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Wishlist, Order Tracking & Payment QR States
   const [wishlist, setWishlist] = useState<Product[]>(() => {
     try {
@@ -363,6 +387,7 @@ export default function App() {
       if (window.location.pathname !== "/orders") {
         window.history.pushState({}, "", "/orders");
       }
+      refreshOrders();
     } else if (tab === "profile") {
       if (window.location.pathname !== "/profile") {
         window.history.pushState({}, "", "/profile");
@@ -739,6 +764,70 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Hệ thống đồng bộ đơn hàng Real-time đa kênh (BroadcastChannel, StorageEvent, Visibility, Focus & Smart Polling)
+  // Giúp giao diện khách hàng tự động cập nhật ngay khi Admin thao tác mà không cần bấm F5
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.type === "ORDER_STATUS_UPDATED" || event.data?.type === "ORDER_CREATED") {
+          if (Array.isArray(event.data?.orders)) {
+            setOrders(event.data.orders);
+            try {
+              localStorage.setItem("bookstore_orders", JSON.stringify(event.data.orders));
+            } catch {
+              // ignore
+            }
+          } else {
+            refreshOrders();
+          }
+        }
+      };
+    } catch {
+      // Trình duyệt không hỗ trợ BroadcastChannel
+    }
+
+    // Lắng nghe sự kiện StorageEvent khi có tab khác cập nhật localStorage
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "bookstore_orders" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setOrders(parsed);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    // Tự động làm mới dữ liệu khi người dùng chuyển qua lại các tab trình duyệt
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        refreshOrders();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    // Smart Polling mỗi 3.5 giây khi tab đang mở để bắt ngay thay đổi từ Admin trên thiết bị khác
+    const pollTimer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refreshOrders();
+      }
+    }, 3500);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      clearInterval(pollTimer);
+    };
+  }, [refreshOrders]);
 
   // Format VND currency
   const formatVND = (amount: number) => {
@@ -1741,6 +1830,21 @@ export default function App() {
     } catch {
       // ignore
     }
+
+    // Phát tín hiệu Real-time BroadcastChannel sang các tab khác của khách hàng (cập nhật 0ms)
+    try {
+      const channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.postMessage({
+        type: "ORDER_STATUS_UPDATED",
+        orderId,
+        newStatus,
+        orders: updated,
+      });
+      channel.close();
+    } catch {
+      // ignore
+    }
+
     showToast(`Đã đổi trạng thái đơn #${orderId} thành "${newStatus}"!`);
   };
 
@@ -1765,6 +1869,21 @@ export default function App() {
     } catch {
       // ignore
     }
+
+    // Phát tín hiệu Real-time BroadcastChannel
+    try {
+      const channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.postMessage({
+        type: "ORDER_STATUS_UPDATED",
+        orderId,
+        newStatus: "Hoàn tất",
+        orders: updated,
+      });
+      channel.close();
+    } catch {
+      // ignore
+    }
+
     api.updateOrderStatus(orderId, "Hoàn tất", {
       receivedAt: new Date().toISOString(),
       isReviewed: false,
@@ -1796,6 +1915,21 @@ export default function App() {
     } catch {
       // ignore
     }
+
+    // Phát tín hiệu Real-time BroadcastChannel
+    try {
+      const channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.postMessage({
+        type: "ORDER_STATUS_UPDATED",
+        orderId,
+        newStatus: "Hoàn tất",
+        orders: updated,
+      });
+      channel.close();
+    } catch {
+      // ignore
+    }
+
     api.updateOrderStatus(orderId, "Hoàn tất", {
       isReviewed: true,
       reviewRating: rating,
@@ -1851,6 +1985,21 @@ export default function App() {
     } catch {
       // ignore
     }
+
+    // Phát tín hiệu Real-time BroadcastChannel
+    try {
+      const channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.postMessage({
+        type: "ORDER_STATUS_UPDATED",
+        orderId,
+        newStatus: "Chờ giao hàng",
+        orders: updated,
+      });
+      channel.close();
+    } catch {
+      // ignore
+    }
+
     api.updateOrderStatus(orderId, "Chờ giao hàng").catch(console.error);
     showToast(`Shipper đã lấy gói sách #${orderId}! Đã chuyển sang Chờ giao hàng.`);
   };
@@ -1859,6 +2008,7 @@ export default function App() {
   const handleNavigateToOrders = (tabKey: OrderTabKey = "all") => {
     setOrdersTabSelection(tabKey);
     switchTab("orders");
+    refreshOrders();
   };
 
   const handleDeleteOrder = (orderId: string) => {

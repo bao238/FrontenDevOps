@@ -697,6 +697,11 @@ export default function MyOrdersPage({
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Đã thanh toán</span>
                       </span>
+                    ) : ord.paymentMethod?.toLowerCase() === "cod" ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Thu tiền khi nhận (COD)</span>
+                      </span>
                     ) : (
                       <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                         <Clock className="w-3.5 h-3.5 text-amber-600" />
@@ -875,8 +880,8 @@ export default function MyOrdersPage({
                         </button>
                       )}
 
-                      {/* Nút Thanh Toán Ngay nếu chưa thanh toán */}
-                      {!isPaid && ord.status !== "Đã hủy" && onPayOrder && (
+                      {/* Nút Thanh Toán Ngay: Chỉ hiển thị khi đơn đang Chờ xác nhận, chưa thanh toán và không phải COD */}
+                      {!isPaid && ord.status === "Chờ xác nhận" && ord.paymentMethod?.toLowerCase() !== "cod" && onPayOrder && (
                         <button
                           type="button"
                           onClick={() => onPayOrder(ord)}

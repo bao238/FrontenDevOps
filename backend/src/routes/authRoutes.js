@@ -20,4 +20,7 @@ router.post('/reset-password', asyncHandler(authController.resetPassword));
 // 4. Đổi mật khẩu an toàn khi người dùng đã đăng nhập JWT
 router.put('/change-password', authMiddleware, asyncHandler(authController.changePassword));
 
+// 5. Cấp mới Access Token bằng Refresh Token khi Access Token hết hạn
+router.post('/refresh', asyncHandler(authController.refreshToken));
+
 module.exports = router;

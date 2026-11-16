@@ -16,6 +16,14 @@ export function getAuthToken(): string | null {
   }
 }
 
+export function getRefreshToken(): string | null {
+  try {
+    return localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function setAuthTokens(token?: string | null, refreshToken?: string | null) {
   try {
     if (token) {
@@ -49,13 +57,35 @@ async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Re
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  let res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers
   });
 
-  // Nếu token đã lưu bị hết hạn hoặc không hợp lệ, dọn sạch token cũ
-  if (res.status === 401 && token && !endpoint.startsWith("/auth/login")) {
+  // Tự động cấp mới Access Token và thử lại request nếu gặp lỗi 401 do token hết hạn
+  if (res.status === 401 && !endpoint.startsWith("/auth/login") && !endpoint.startsWith("/auth/refresh")) {
+    const rfToken = getRefreshToken();
+    if (rfToken) {
+      try {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken: rfToken })
+        });
+        if (refreshRes.ok) {
+          const rfData = await refreshRes.json();
+          setAuthTokens(rfData.token, rfData.refreshToken);
+          headers.set("Authorization", `Bearer ${rfData.token}`);
+          res = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            headers
+          });
+          return res;
+        }
+      } catch {
+        // bỏ qua lỗi refresh ngầm
+      }
+    }
     clearAuthTokens();
   }
 
@@ -438,6 +468,25 @@ export const api = {
     });
     const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.message || data.error || "Đổi mật khẩu thất bại");
+    return data;
+  },
+
+  // 9g. Cấp mới Access Token bằng Refresh Token khi hết hạn
+  async refreshToken(refreshTokenInput?: string) {
+    const tokenToUse = refreshTokenInput || getRefreshToken();
+    if (!tokenToUse) throw new Error("Không tìm thấy Refresh Token");
+
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: tokenToUse })
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+      clearAuthTokens();
+      throw new Error(data.message || data.error || "Cấp mới Access Token thất bại");
+    }
+    setAuthTokens(data.token, data.refreshToken);
     return data;
   },
 

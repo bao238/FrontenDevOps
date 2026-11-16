@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const { hashPassword, verifyPassword } = require('../utils/password');
-const { JWT_EXPIRES_IN, signAccessToken, signRefreshToken } = require('../utils/jwt');
+const { JWT_EXPIRES_IN, signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 
 function formatAuthUser(user) {
   return {
@@ -590,6 +590,59 @@ exports.changePassword = async (req, res, next) => {
     return res.json({
       success: true,
       message: 'Đổi mật khẩu thành công!'
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// POST /api/auth/refresh - Cấp mới Access Token bằng Refresh Token
+exports.refreshToken = async (req, res, next) => {
+  const token =
+    req.body?.refreshToken ||
+    req.headers['x-refresh-token'] ||
+    (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7).trim()
+      : null);
+
+  if (!token) {
+    return res.status(400).json({ message: 'Vui lòng cung cấp Refresh Token' });
+  }
+
+  try {
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(token);
+    } catch (jwtErr) {
+      if (jwtErr.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Phiên đăng nhập (Refresh Token) đã hết hạn, vui lòng đăng nhập lại' });
+      }
+      return res.status(401).json({ message: 'Refresh Token không hợp lệ' });
+    }
+
+    if (!decoded || decoded.type !== 'refresh') {
+      return res.status(401).json({ message: 'Token cung cấp không phải là Refresh Token hợp lệ' });
+    }
+
+    const user = await User.findOne({ id: decoded.id || decoded.sub });
+    if (!user) {
+      return res.status(401).json({ message: 'Tài khoản người dùng không còn tồn tại trong hệ thống' });
+    }
+
+    if (user.status === 'locked') {
+      return res.status(403).json({ message: 'Tài khoản của bạn đã bị tạm khóa' });
+    }
+
+    const newAccessToken = signAccessToken(user);
+    const newRefreshToken = signRefreshToken(user);
+
+    return res.json({
+      success: true,
+      message: 'Cấp mới Access Token thành công',
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: JWT_EXPIRES_IN,
+      user: formatAuthUser(user)
     });
   } catch (err) {
     return next(err);

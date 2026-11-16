@@ -63,15 +63,21 @@ export default function ProductDetailPage({
   const [reviews, setReviews] = useState<ReviewItem[]>(() => {
     return product.reviews || [];
   });
+  const [isReviewsLoaded, setIsReviewsLoaded] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Tải đánh giá thực tế từ MongoDB khi xem sản phẩm
   useEffect(() => {
     if (product?.id) {
+      setIsReviewsLoaded(false);
       api.getProductReviews(product.id).then((data) => {
-        if (data && data.length > 0) {
+        if (Array.isArray(data)) {
           setReviews(data);
         }
+      }).catch(() => {
+        setReviews(product.reviews || []);
+      }).finally(() => {
+        setIsReviewsLoaded(true);
       });
     }
   }, [product?.id]);
@@ -132,11 +138,21 @@ export default function ProductDetailPage({
     );
   };
 
-  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (nếu chưa có nhận xét thì dùng điểm đã cân bằng của sách)
+  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (đồng bộ tuyệt đối với tab Đánh Giá)
   const hasReviews = reviews.length > 0;
+  const currentReviewsCount = isReviewsLoaded
+    ? reviews.length
+    : (hasReviews
+        ? reviews.length
+        : (typeof product.reviewsCount === "number" && product.reviewsCount > 0 ? product.reviewsCount : 0));
+
   const currentRating = hasReviews
     ? Number((reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / reviews.length).toFixed(1))
-    : (typeof product.rating === "number" ? Number(product.rating.toFixed(1)) : 4.9);
+    : (isReviewsLoaded
+        ? 0
+        : (currentReviewsCount > 0 && typeof product.rating === "number" && product.rating > 0
+            ? Number(product.rating.toFixed(1))
+            : 0));
 
   // Lọc danh sách nhận xét theo tiêu chí
   const filteredReviewsList = reviews.filter((r) => {
@@ -380,7 +396,7 @@ export default function ProductDetailPage({
 
             {/* Star Ratings Summary */}
             <div className="flex items-center space-x-3 text-xs pb-2 border-b border-slate-100">
-              {hasReviews || (product.reviewsCount && product.reviewsCount > 0) ? (
+              {currentReviewsCount > 0 && currentRating > 0 ? (
                 <div className="flex items-center space-x-1 text-amber-500 font-bold">
                   <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                   <span>{currentRating.toFixed(1)}</span>
@@ -393,12 +409,10 @@ export default function ProductDetailPage({
               <span className="text-slate-300">&bull;</span>
               <button
                 onClick={() => setActiveTab("reviews")}
-                className="text-blue-600 font-semibold hover:underline"
+                className="text-blue-600 font-semibold hover:underline cursor-pointer"
               >
-                {hasReviews
-                  ? `${reviews.length} đánh giá từ độc giả`
-                  : product.reviewsCount
-                  ? `${product.reviewsCount} đánh giá từ độc giả`
+                {currentReviewsCount > 0
+                  ? `${currentReviewsCount} đánh giá từ độc giả`
                   : "Viết đánh giá đầu tiên"}
               </button>
               <span className="text-slate-300">&bull;</span>
@@ -631,7 +645,7 @@ export default function ProductDetailPage({
               {hasReviews ? (
                 <div className="text-center sm:text-left space-y-1">
                   <div className="flex items-center justify-center sm:justify-start space-x-2">
-                    <span className="text-4xl font-black text-slate-900">{currentRating}</span>
+                    <span className="text-4xl font-black text-slate-900">{currentRating.toFixed(1)}</span>
                     <div className="space-y-1">
                       <div className="flex text-amber-400">
                         {[1, 2, 3, 4, 5].map((s) => (

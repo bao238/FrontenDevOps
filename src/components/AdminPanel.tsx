@@ -1191,6 +1191,14 @@ export default function AdminPanel({
     fetchServerUsers(adminUserPage, adminUsersPerPage);
   }, [adminUserPage, adminUsersPerPage, userRoleFilter, userStatusFilter, debouncedUserSearchQuery]);
 
+  // Tự động xóa cache và nạp lại người dùng khi chuyển sang tab users hoặc khi danh sách users bên ngoài thay đổi
+  useEffect(() => {
+    if (adminTab === "users") {
+      userPageCacheRef.current.clear();
+      fetchServerUsers(adminUserPage, adminUsersPerPage);
+    }
+  }, [adminTab, users]);
+
   const displayAdminUsers = serverUsers.length > 0 ? serverUsers : paginatedAdminUsers;
   const displayTotalUserCount = serverTotalUsers > 0 ? serverTotalUsers : filteredUsers.length;
   const displayTotalUserPages = serverTotalUsers > 0 ? serverTotalUserPages : totalAdminUserPages;
@@ -2681,17 +2689,19 @@ export default function AdminPanel({
 
               {/* Cụm nút Thao tác Quản lý Người dùng */}
               <div className="flex items-center justify-end space-x-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                {onResetDefaultUsers && (
-                  <button
-                    type="button"
-                    onClick={() => onResetDefaultUsers()}
-                    className="text-xs text-blue-600 hover:text-blue-700 px-3 py-2 rounded-xl border border-blue-200 hover:bg-blue-50 flex items-center space-x-1.5 transition-colors cursor-pointer font-bold"
-                    title="Đồng bộ danh sách tài khoản mới nhất từ MongoDB"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Làm mới</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    userPageCacheRef.current.clear();
+                    fetchServerUsers(adminUserPage, adminUsersPerPage);
+                    if (onResetDefaultUsers) onResetDefaultUsers();
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 px-3 py-2 rounded-xl border border-blue-200 hover:bg-blue-50 flex items-center space-x-1.5 transition-colors cursor-pointer font-bold"
+                  title="Đồng bộ danh sách tài khoản mới nhất từ MongoDB"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Làm mới</span>
+                </button>
                 {onResetDefaultUsers && (
                   <button
                     type="button"

@@ -1,120 +1,91 @@
 /**
- * Module tiện ích cân bằng điểm đánh giá (Rating Balancer) cho hệ thống BookStore.
+ * Module tiện ích quản lý và đồng bộ điểm đánh giá (Rating Balancer) cho hệ sinh thái BookStore.
  * 
- * Mục tiêu:
- * - Thay thế việc toàn bộ sách bị gán cứng cùng một mức "5 sao (20 đánh giá)" gây mất tự nhiên.
- * - Phân bổ ngẫu nhiên có kiểm soát (Deterministic Hashing) dựa trên ID sách để điểm số không bị nhảy khi F5 hoặc lọc.
- * - Cân bằng toán học chuẩn xác để điểm sao trung bình toàn bộ trang web luôn đạt mức 4.9 / 5.0.
+ * Nguyên tắc:
+ * - Dữ liệu đánh giá phải hoàn toàn trung thực, nhất quán 100% giữa thẻ sách ngoài trang chủ,
+ *   thanh tóm tắt đầu trang chi tiết và tab nhận xét thực tế từ độc giả.
+ * - Tuyệt đối KHÔNG tự động băm sinh số ảo (như 4.9 sao và 312 đánh giá) khi sản phẩm chưa có bài đánh giá.
+ * - Sách chưa có nhận xét: Hiển thị rõ ràng "Chưa có đánh giá" (rating = 0, reviewsCount = 0).
+ * - Sách có nhận xét: Điểm sao tính theo trung bình cộng thực tế của các bài nhận xét.
  */
 
 import { Product } from "../data/products";
 
 /**
- * Hàm băm chuỗi thành số nguyên 32-bit dương (Deterministic Hash)
- * @param str Chuỗi ký tự đầu vào (ID, tên hoặc mã sách)
- * @returns Số nguyên dương xác định
+ * Tính toán điểm sao và số lượng đánh giá thực tế của một cuốn sách
+ * @param product Đối tượng sách cần xác định đánh giá
+ * @returns Object chứa điểm rating chuẩn xác và số lượng nhận xét reviewsCount
  */
-export function hashString(str: string): number {
-  let hash = 0;
-  if (!str || str.length === 0) return 42;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0; // Chuyển sang số nguyên 32-bit
+export function getProductRatingInfo(product?: Partial<Product>): { rating: number; reviewsCount: number } {
+  if (!product) {
+    return { rating: 0, reviewsCount: 0 };
   }
-  return Math.abs(hash);
+
+  // Trường hợp 1: Sách có mảng bài nhận xét thực tế (reviews array)
+  if (product.reviews && Array.isArray(product.reviews) && product.reviews.length > 0) {
+    const total = product.reviews.reduce((sum, r) => sum + (Number(r.rating) || 5), 0);
+    const avg = Number((total / product.reviews.length).toFixed(1));
+    return {
+      rating: avg,
+      reviewsCount: product.reviews.length,
+    };
+  }
+
+  // Trường hợp 2: Sách đã có điểm rating và reviewsCount dương từ cơ sở dữ liệu
+  if (
+    typeof product.reviewsCount === "number" &&
+    product.reviewsCount > 0 &&
+    typeof product.rating === "number" &&
+    product.rating > 0
+  ) {
+    return {
+      rating: Number(product.rating.toFixed(1)),
+      reviewsCount: Math.round(product.reviewsCount),
+    };
+  }
+
+  // Trường hợp 3: Sách chưa có bài đánh giá nào => rating = 0, reviewsCount = 0
+  return { rating: 0, reviewsCount: 0 };
 }
 
 /**
- * Tính toán điểm sao và số lượng nhận xét được cân bằng toán học
- * Phân bổ trọng số 100%:
- * - 40% sách đạt 5.0 sao (Sách bán chạy xuất sắc)
- * - 35% sách đạt 4.9 sao (Sách rất hay được đánh giá cao)
- * - 15% sách đạt 4.8 sao (Sách hay tiêu chuẩn)
- * - 8% sách đạt 4.7 sao (Sách khá)
- * - 2% sách đạt 4.6 sao (Sách trung bình khá)
- * 
- * Kỳ vọng toán học (Expected Mean):
- * 5.0 * 0.40 + 4.9 * 0.35 + 4.8 * 0.15 + 4.7 * 0.08 + 4.6 * 0.02 = 4.903 => Làm tròn chuẩn 4.9 / 5.0
- * 
- * @param productId Mã định danh của cuốn sách
- * @param fallbackIndex Chỉ số dự phòng nếu ID không có
- * @returns Object chứa điểm rating và reviewsCount
- */
-export function getBalancedProductRating(
-  productId?: string | number,
-  fallbackIndex: number = 0
-): { rating: number; reviewsCount: number } {
-  const seed = String(productId || `book-index-${fallbackIndex}`);
-  const h = hashString(seed);
-
-  // Phân bổ điểm sao theo modulo 100
-  const mod = h % 100;
-  let rating = 5.0;
-  if (mod < 40) {
-    rating = 5.0;
-  } else if (mod < 75) {
-    rating = 4.9;
-  } else if (mod < 90) {
-    rating = 4.8;
-  } else if (mod < 98) {
-    rating = 4.7;
-  } else {
-    rating = 4.6;
-  }
-
-  // Số lượng đánh giá dao động tự nhiên từ 24 đến 368 lượt
-  const reviewsCount = ((h % 43) * 8) + 24;
-
-  return { rating, reviewsCount };
-}
-
-/**
- * Chuẩn hóa và áp dụng cân bằng điểm đánh giá cho danh sách sản phẩm
- * Tự động phát hiện các sản phẩm đang bị gán cứng tĩnh (rating 5 và reviewCount 20) để thay bằng điểm cân bằng tự nhiên.
+ * Chuẩn hóa danh sách sản phẩm để điểm số và số lượng đánh giá luôn đồng bộ
+ * Không tự động sinh điểm số ảo cho các sản phẩm chưa có nhận xét.
  * 
  * @param products Danh sách sản phẩm từ API hoặc mock data
- * @returns Danh sách sản phẩm đã được cân bằng điểm sao
+ * @returns Danh sách sản phẩm với rating và reviewsCount đồng bộ thực tế
  */
 export function applyRatingBalancing<T extends Product>(products: T[]): T[] {
   if (!products || !Array.isArray(products) || products.length === 0) {
     return products;
   }
 
-  return products.map((prod, idx) => {
-    // Nếu sản phẩm chưa có rating hoặc đang bị gán cứng toàn bộ là 5 sao và 20 đánh giá
-    const isHardcodedMonotonous =
-      !prod.rating ||
-      !prod.reviewsCount ||
-      (prod.rating === 5 && prod.reviewsCount === 20) ||
-      (prod.rating === 4.8 && prod.reviewsCount === 15);
-
-    if (isHardcodedMonotonous) {
-      const balanced = getBalancedProductRating(prod.id || (prod as any)._id, idx);
-      return {
-        ...prod,
-        rating: balanced.rating,
-        reviewsCount: balanced.reviewsCount,
-      };
-    }
-
-    return prod;
+  return products.map((prod) => {
+    const ratingInfo = getProductRatingInfo(prod);
+    return {
+      ...prod,
+      rating: ratingInfo.rating,
+      reviewsCount: ratingInfo.reviewsCount,
+    };
   });
 }
 
 /**
- * Tính điểm sao trung bình thực tế của toàn bộ sách trên hệ thống
+ * Tính điểm sao trung bình thực tế của toàn bộ sách có đánh giá trên hệ thống
  * @param products Danh sách sản phẩm
- * @returns Điểm sao trung bình định dạng 1 chữ số thập phân (ví dụ: 4.9)
+ * @returns Điểm sao trung bình định dạng 1 chữ số thập phân (hoặc 5.0 nếu chưa có sách nào được đánh giá)
  */
-export function calculateAverageRating(products: Array<{ rating?: number }>): number {
-  if (!products || products.length === 0) return 4.9;
-  const validRatings = products
-    .map((p) => p.rating)
-    .filter((r): r is number => typeof r === "number" && r > 0);
+export function calculateAverageRating(products: Array<{ rating?: number; reviewsCount?: number }>): number {
+  if (!products || products.length === 0) return 5.0;
 
-  if (validRatings.length === 0) return 4.9;
-  const sum = validRatings.reduce((acc, curr) => acc + curr, 0);
-  const avg = sum / validRatings.length;
+  // Chỉ lấy các sản phẩm đã có đánh giá thực tế (rating > 0 và reviewsCount > 0)
+  const ratedProducts = products.filter(
+    (p) => typeof p.rating === "number" && p.rating > 0 && typeof p.reviewsCount === "number" && p.reviewsCount > 0
+  );
+
+  if (ratedProducts.length === 0) return 5.0;
+
+  const sum = ratedProducts.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+  const avg = sum / ratedProducts.length;
   return Number(avg.toFixed(1));
 }

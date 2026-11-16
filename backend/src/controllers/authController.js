@@ -102,7 +102,7 @@ exports.getMe = async (req, res, next) => {
 // PUT /api/auth/me - Cập nhật hồ sơ cá nhân của người dùng đang đăng nhập
 exports.updateMe = async (req, res, next) => {
   try {
-    const { name, phone, address, avatarUrl } = req.body;
+    const { name, email, phone, address, avatarUrl } = req.body;
     const user = await User.findOne({ id: req.user.id });
 
     if (!user) {
@@ -117,6 +117,17 @@ exports.updateMe = async (req, res, next) => {
           return res.status(400).json({ message: `Tên người dùng "${cleanName}" đã tồn tại trong hệ thống!` });
         }
         user.name = cleanName;
+      }
+    }
+
+    if (email && String(email).trim()) {
+      const cleanEmail = String(email).trim().toLowerCase();
+      if (cleanEmail !== user.email) {
+        const existEmail = await User.findOne({ email: cleanEmail, id: { $ne: user.id } });
+        if (existEmail) {
+          return res.status(400).json({ message: `Địa chỉ email "${cleanEmail}" đã được đăng ký bởi tài khoản khác!` });
+        }
+        user.email = cleanEmail;
       }
     }
 
@@ -159,10 +170,15 @@ exports.updateMe = async (req, res, next) => {
 
     await user.save();
 
+    const token = signAccessToken(user);
+    const refreshToken = signRefreshToken(user);
+
     return res.json({
       success: true,
       message: 'Cập nhật hồ sơ cá nhân thành công!',
-      user: formatAuthUser(user)
+      user: formatAuthUser(user),
+      token,
+      refreshToken
     });
   } catch (err) {
     return next(err);
@@ -376,16 +392,62 @@ exports.updateUser = async (req, res, next) => {
       queryConditions.push({ phone: req.body.phone });
     }
 
+    // Kiểm tra tài khoản tồn tại trước khi cập nhật
+    const existingUser = await User.findOne({ $or: queryConditions });
+    if (!existingUser) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản trong cơ sở dữ liệu' });
+    }
+
+    // Nếu có đổi email, kiểm tra xem email mới đã được tài khoản khác sử dụng chưa
+    if (updateData.email && updateData.email !== existingUser.email) {
+      const duplicateEmailUser = await User.findOne({
+        email: updateData.email,
+        id: { $ne: existingUser.id }
+      });
+      if (duplicateEmailUser) {
+        return res.status(400).json({ message: `Địa chỉ email "${updateData.email}" đã được đăng ký bởi tài khoản khác!` });
+      }
+    }
+
+    // Nếu có đổi số điện thoại, kiểm tra tính hợp lệ và không trùng lặp
+    if (updateData.phone && updateData.phone !== existingUser.phone) {
+      const phoneNoSpace = updateData.phone.replace(/\s+/g, '');
+      const duplicatePhoneUser = await User.findOne({
+        $or: [
+          { phone: updateData.phone },
+          { phone: phoneNoSpace }
+        ],
+        id: { $ne: existingUser.id }
+      });
+      if (duplicatePhoneUser) {
+        return res.status(400).json({ message: `Số điện thoại "${updateData.phone}" đã được sử dụng bởi tài khoản khác!` });
+      }
+    }
+
     const updated = await User.findOneAndUpdate(
-      { $or: queryConditions },
+      { id: existingUser.id },
       { $set: updateData },
-      { returnDocument: 'after' }
+      { new: true }
     ).select('-password');
 
     if (!updated) {
-      return res.status(404).json({ message: 'Không tìm thấy tài khoản trong cơ sở dữ liệu' });
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản để cập nhật' });
     }
-    return res.json({ message: 'Cập nhật tài khoản thành công trên MongoDB', user: updated });
+
+    // Tạo token mới nếu đây là tài khoản đang đăng nhập và có cập nhật thông tin nhận diện
+    let token = undefined;
+    let refreshToken = undefined;
+    if (req.user && req.user.id === updated.id) {
+      token = signAccessToken(updated);
+      refreshToken = signRefreshToken(updated);
+    }
+
+    return res.json({
+      message: 'Cập nhật tài khoản thành công trên MongoDB',
+      user: formatAuthUser(updated),
+      token,
+      refreshToken
+    });
   } catch (err) {
     return next(err);
   }

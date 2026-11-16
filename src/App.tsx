@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
-import { api, getAuthToken, clearAuthTokens } from "./services/api";
+import { api, getAuthToken, setAuthTokens, clearAuthTokens } from "./services/api";
 import { applyRatingBalancing, calculateAverageRating } from "./utils/ratingBalancer";
 
 // Ánh xạ icon/emoji trực quan cho 11 thể loại sách mở rộng
@@ -419,105 +419,106 @@ export default function App() {
   };
 
   // Cập nhật thông tin hồ sơ cá nhân độc giả và đồng bộ vào hệ thống
-  const handleUpdateProfile = (updated: Partial<UserProfile>) => {
-    if (!currentUser) return;
+  const handleUpdateProfile = async (updated: Partial<UserProfile>): Promise<{ success: boolean; message?: string }> => {
+    if (!currentUser) return { success: false, message: "Vui lòng đăng nhập để thực hiện" };
     const oldId = currentUser.id;
     const oldEmail = currentUser.email;
     const newProf: UserProfile = { ...currentUser, ...updated };
-    setCurrentUser(newProf);
-    showToast("Cập nhật thông tin hồ sơ và ảnh đại diện thành công!");
+
     try {
-      localStorage.setItem("bookstore_user", JSON.stringify(newProf));
-    } catch (err) {
-      console.error("Lỗi khi lưu hồ sơ:", err);
-    }
+      // 1. Đồng bộ lên Backend REST API (MongoDB)
+      const res = await api.updateUser(oldId, {
+        name: newProf.name,
+        email: newProf.email,
+        phone: newProf.phone,
+        address: newProf.address,
+        avatarUrl: newProf.avatarUrl,
+        oldEmail: oldEmail,
+        id: oldId,
+      } as any);
 
-    // 1. Cập nhật danh sách users trong state để AdminPanel thấy ngay và lưu local storage
-    setUsers((prevUsers) => {
-      const updatedUsers = prevUsers.map((u) => {
-        if (
-          u.id === oldId ||
-          (oldEmail && u.email && u.email.toLowerCase() === oldEmail.toLowerCase()) ||
-          (newProf.phone && u.phone && u.phone.trim() === newProf.phone.trim())
-        ) {
-          return {
-            ...u,
-            name: newProf.name,
-            email: newProf.email,
-            phone: newProf.phone,
-            address: newProf.address || u.address,
-            avatarUrl: newProf.avatarUrl || u.avatarUrl,
-          };
-        }
-        return u;
-      });
+      // Cập nhật token mới nếu backend trả về (trường hợp đổi email hoặc định danh)
+      if (res && res.token) {
+        setAuthTokens(res.token, res.refreshToken);
+      }
+
+      // 2. Cập nhật state currentUser và LocalStorage
+      setCurrentUser(newProf);
       try {
-        localStorage.setItem("bookstore_users", JSON.stringify(updatedUsers));
+        localStorage.setItem("bookstore_user", JSON.stringify(newProf));
       } catch (err) {
-        console.error("Lỗi khi lưu danh sách users:", err);
+        console.error("Lỗi khi lưu hồ sơ:", err);
       }
-      return updatedUsers;
-    });
 
-    // 2. Cập nhật thông tin giao hàng customerInfo
-    setCustomerInfo((prev) => ({
-      ...prev,
-      fullName: newProf.name,
-      phone: newProf.phone,
-      address: newProf.address || prev.address,
-    }));
-
-    // 3. Đồng bộ lên Backend REST API (MongoDB) và cập nhật lại danh sách users
-    api.updateUser(oldId, {
-      name: newProf.name,
-      email: newProf.email,
-      phone: newProf.phone,
-      address: newProf.address,
-      avatarUrl: newProf.avatarUrl,
-      oldEmail: oldEmail,
-      id: oldId,
-    } as any).then(() => {
-      if (currentUser.role === "admin" || currentUser.role === "staff") {
-        api.getUsers({ page: 1, limit: 20 }).then((res) => {
-          if (res && res.source === "mongodb" && Array.isArray(res.data)) {
-            setUsers(res.data);
-            try {
-              localStorage.setItem("bookstore_users", JSON.stringify(res.data));
-            } catch {}
-          }
-        });
-      }
-    }).catch((err) => {
-      console.warn("[App] Lỗi đồng bộ updateUser lên MongoDB:", err);
-    });
-
-    // 4. Nếu email thay đổi, cập nhật các đơn hàng liên quan
-    if (newProf.email !== oldEmail) {
-      setOrders((prevOrders) => {
-        const updatedOrders = prevOrders.map((ord) => {
-          if (ord.userId === oldId || (ord.userEmail && ord.userEmail.toLowerCase() === oldEmail.toLowerCase())) {
+      // 3. Cập nhật danh sách users trong state để AdminPanel thấy ngay và lưu local storage
+      setUsers((prevUsers) => {
+        const updatedUsers = prevUsers.map((u) => {
+          if (
+            u.id === oldId ||
+            (oldEmail && u.email && u.email.toLowerCase() === oldEmail.toLowerCase()) ||
+            (newProf.phone && u.phone && u.phone.trim() === newProf.phone.trim())
+          ) {
             return {
-              ...ord,
-              userEmail: newProf.email,
-              customerInfo: {
-                ...ord.customerInfo,
-                fullName: newProf.name,
-                phone: newProf.phone,
-              }
+              ...u,
+              name: newProf.name,
+              email: newProf.email,
+              phone: newProf.phone,
+              address: newProf.address || u.address,
+              avatarUrl: newProf.avatarUrl || u.avatarUrl,
             };
           }
-          return ord;
+          return u;
         });
         try {
-          localStorage.setItem("bookstore_orders", JSON.stringify(updatedOrders));
-        } catch {
-          // ignore
+          localStorage.setItem("bookstore_users", JSON.stringify(updatedUsers));
+        } catch (err) {
+          console.error("Lỗi khi lưu danh sách users:", err);
         }
-        return updatedOrders;
+        return updatedUsers;
       });
-    }
 
-    showToast("Cập nhật thông tin hồ sơ và đồng bộ hệ thống thành công!");
+      // 4. Cập nhật thông tin giao hàng customerInfo
+      setCustomerInfo((prev) => ({
+        ...prev,
+        fullName: newProf.name,
+        phone: newProf.phone,
+        address: newProf.address || prev.address,
+      }));
+
+      // 5. Nếu email thay đổi, cập nhật các đơn hàng liên quan
+      if (newProf.email !== oldEmail) {
+        setOrders((prevOrders) => {
+          const updatedOrders = prevOrders.map((ord) => {
+            if (ord.userId === oldId || (ord.userEmail && ord.userEmail.toLowerCase() === oldEmail.toLowerCase())) {
+              return {
+                ...ord,
+                userEmail: newProf.email,
+                customerInfo: {
+                  ...ord.customerInfo,
+                  fullName: newProf.name,
+                  phone: newProf.phone,
+                }
+              };
+            }
+            return ord;
+          });
+          try {
+            localStorage.setItem("bookstore_orders", JSON.stringify(updatedOrders));
+          } catch {
+            // ignore
+          }
+          return updatedOrders;
+        });
+      }
+
+      showToast("Cập nhật thông tin hồ sơ và ảnh đại diện thành công!");
+      return { success: true };
+    } catch (err: any) {
+      console.error("[App] Lỗi đồng bộ updateUser lên MongoDB:", err);
+      const errMsg = err?.message || "Không thể đồng bộ hồ sơ lên máy chủ. Vui lòng thử lại!";
+      showToast(errMsg);
+      return { success: false, message: errMsg };
+    }
   };
 
   // Mua lại toàn bộ sách từ đơn hàng đã đặt

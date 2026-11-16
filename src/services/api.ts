@@ -428,7 +428,7 @@ export const api = {
   },
 
   // 9c-2. Cập nhật thông tin hồ sơ tài khoản hiện tại
-  async updateMe(payload: { name?: string; phone?: string; address?: string; avatarUrl?: string }) {
+  async updateMe(payload: { name?: string; email?: string; phone?: string; address?: string; avatarUrl?: string }) {
     const res = await apiFetch("/auth/me", {
       method: "PUT",
       body: JSON.stringify(payload)

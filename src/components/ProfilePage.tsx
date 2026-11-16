@@ -103,7 +103,7 @@ const ReviewStarIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: s
 
 interface ProfilePageProps {
   currentUser: UserProfile | null;
-  onUpdateProfile: (updated: Partial<UserProfile>) => void;
+  onUpdateProfile: (updated: Partial<UserProfile>) => Promise<{ success: boolean; message?: string } | void> | void;
   orders?: OrderRecord[];
   ordersCount: number;
   wishlistCount?: number;
@@ -159,6 +159,8 @@ export default function ProfilePage({
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "");
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
   const [isSavedSuccess, setIsSavedSuccess] = useState(false);
+  const [isSavingInfo, setIsSavingInfo] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [customUrl, setCustomUrl] = useState("");
 
@@ -279,20 +281,36 @@ export default function ProfilePage({
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // Lưu thông tin cá nhân
-  const handleSaveInfo = (e: React.FormEvent) => {
+  const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    if (!name.trim() || !email.trim()) {
+      setProfileError("Vui lòng nhập đầy đủ họ và tên cùng địa chỉ email.");
+      return;
+    }
 
-    onUpdateProfile({
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-      avatarUrl: avatarUrl.trim() || undefined,
-    });
+    setProfileError(null);
+    setIsSavingInfo(true);
 
-    setIsSavedSuccess(true);
-    setTimeout(() => setIsSavedSuccess(false), 3000);
+    try {
+      const res = await onUpdateProfile({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        avatarUrl: avatarUrl.trim() || undefined,
+      });
+
+      if (res && (res as any).success === false) {
+        setProfileError((res as any).message || "Cập nhật thông tin thất bại!");
+      } else {
+        setIsSavedSuccess(true);
+        setTimeout(() => setIsSavedSuccess(false), 3500);
+      }
+    } catch (err: any) {
+      setProfileError(err?.message || "Đã xảy ra lỗi khi lưu thông tin.");
+    } finally {
+      setIsSavingInfo(false);
+    }
   };
 
   // Đổi mật khẩu thực tế vào MongoDB thông qua API
@@ -643,6 +661,13 @@ export default function ProfilePage({
               </p>
             </div>
 
+            {profileError && (
+              <div className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-2xl text-xs flex items-center space-x-2 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{profileError}</span>
+              </div>
+            )}
+
             {isSavedSuccess && (
               <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs flex items-center space-x-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -842,10 +867,11 @@ export default function ProfilePage({
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2"
+                  disabled={isSavingInfo}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2 cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
-                  <span>Lưu Thay Đổi Hồ Sơ</span>
+                  <span>{isSavingInfo ? "Đang lưu thay đổi..." : "Lưu Thay Đổi Hồ Sơ"}</span>
                 </button>
               </div>
             </form>

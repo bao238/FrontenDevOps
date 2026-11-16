@@ -39,7 +39,6 @@ import {
   UserX,
   Shield,
   Lock,
-  Unlock,
   Key,
   UserPlus,
   Mail,
@@ -260,24 +259,77 @@ export default function AdminPanel({
   // Lọc đánh giá theo nhóm cảm xúc (Tất cả, 5 sao, 4 sao, Tích cực 4-5 sao, Cần hỗ trợ 1-2 sao)
   const [reviewSentimentFilter, setReviewSentimentFilter] = useState<string>("all");
 
-  // Xử lý lưu Phân Quyền & Khóa/Mở Khóa Người Dùng (Optimistic UI 0ms)
+  // Xử lý lưu Phân Quyền & Khóa/Mở Khóa Người Dùng (Cập nhật tức thì không cần load lại trang)
   const handleSaveUserRoleStatus = async () => {
     if (!roleModalUser) return;
     setIsUpdatingUserRole(true);
     try {
-      // Cập nhật Optimistic tức thì trên giao diện
+      const updatedUser: UserAccount = {
+        ...roleModalUser,
+        role: roleModalRole,
+        status: roleModalStatus
+      };
+
+      // 1. Cập nhật tức thì danh sách hiển thị trên giao diện (Optimistic UI)
       setServerUsers((prev) =>
-        prev.map((u) =>
-          u.id === roleModalUser.id ? { ...u, role: roleModalRole, status: roleModalStatus } : u
-        )
+        prev.map((u) => (u.id === roleModalUser.id ? updatedUser : u))
       );
-      // Xóa cache cũ để đồng bộ dữ liệu mới nhất
+
+      // 2. Cập nhật lên state users của App.tsx để đồng bộ toàn bộ app & hiển thị toast
+      if (onUpdateUser) {
+        onUpdateUser(updatedUser);
+      }
+
+      // 3. Cập nhật tức thì các thẻ thống kê KPI Cards (Quản trị, Nhân viên, Khách hàng, Bị khóa)
+      setServerUserStats((prev: any) => {
+        if (!prev) return prev;
+        const oldRole = roleModalUser.role || "customer";
+        const newRole = roleModalRole;
+        const oldStatus = roleModalUser.status || "active";
+        const newStatus = roleModalStatus;
+
+        let adminCount = prev.adminCount || 0;
+        let staffCount = prev.staffCount || 0;
+        let customerCount = prev.customerCount || 0;
+        let lockedCount = prev.lockedCount || 0;
+
+        // Cập nhật số đếm theo vai trò
+        if (oldRole !== newRole) {
+          if (oldRole === "admin") adminCount = Math.max(0, adminCount - 1);
+          if (oldRole === "staff") staffCount = Math.max(0, staffCount - 1);
+          if (oldRole === "customer") customerCount = Math.max(0, customerCount - 1);
+
+          if (newRole === "admin") adminCount++;
+          if (newRole === "staff") staffCount++;
+          if (newRole === "customer") customerCount++;
+        }
+
+        // Cập nhật số đếm theo trạng thái khóa/mở khóa
+        if (oldStatus !== newStatus) {
+          if (newStatus === "locked") lockedCount++;
+          else lockedCount = Math.max(0, lockedCount - 1);
+        }
+
+        return {
+          ...prev,
+          adminCount,
+          staffCount,
+          customerCount,
+          lockedCount
+        };
+      });
+
+      // 4. Xóa cache cũ để đồng bộ dữ liệu mới nhất
       userPageCacheRef.current.clear();
 
+      // 5. Gửi request cập nhật lên MongoDB
       await api.updateUser(roleModalUser.id, {
         role: roleModalRole,
         status: roleModalStatus
       });
+
+      // 6. Nạp lại dữ liệu người dùng từ MongoDB để đồng bộ phân trang tuyệt đối
+      await fetchServerUsers(adminUserPage, adminUsersPerPage);
 
       setRoleModalUser(null);
     } catch (err) {
@@ -1423,6 +1475,10 @@ export default function AdminPanel({
       };
       setServerUsers((prev) => prev.map((u) => (u.id === editingUser.id ? updatedUser : u)));
       if (onUpdateUser) onUpdateUser(updatedUser);
+      userPageCacheRef.current.clear();
+      api.updateUser(editingUser.id, updatedUser).then(() => {
+        fetchServerUsers(adminUserPage, adminUsersPerPage);
+      }).catch(console.error);
     } else {
       const newUser: UserAccount = {
         id: "usr-" + Date.now(),
@@ -1439,6 +1495,8 @@ export default function AdminPanel({
       setServerUsers((prev) => [newUser, ...prev]);
       setServerTotalUsers((prev) => prev + 1);
       if (onAddUser) onAddUser(newUser);
+      userPageCacheRef.current.clear();
+      fetchServerUsers(adminUserPage, adminUsersPerPage);
     }
     setIsUserModalOpen(false);
   };
@@ -1449,6 +1507,8 @@ export default function AdminPanel({
       setServerUsers((prev) => prev.filter((u) => u.id !== deletingUserId));
       setServerTotalUsers((prev) => Math.max(0, prev - 1));
       if (onDeleteUser) onDeleteUser(deletingUserId);
+      userPageCacheRef.current.clear();
+      fetchServerUsers(adminUserPage, adminUsersPerPage);
       setDeletingUserId(null);
     }
   };
@@ -1939,19 +1999,6 @@ export default function AdminPanel({
 
             {/* Cụm nút Thao tác Sản phẩm (Chuyển từ phía trên xuống đây theo yêu cầu) */}
             <div className="flex items-center justify-end space-x-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm("Bạn có chắc muốn khôi phục về danh sách sản phẩm mẫu ban đầu không?")) {
-                    onResetDefaultProducts();
-                  }
-                }}
-                className="text-xs text-slate-500 hover:text-red-600 px-3 py-2 rounded-xl border border-slate-200 hover:bg-red-50 flex items-center space-x-1 transition-colors cursor-pointer"
-                title="Khôi phục dữ liệu gốc"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Khôi phục mặc định</span>
-              </button>
               <button
                 type="button"
                 onClick={handleOpenCreate}
@@ -2902,21 +2949,6 @@ export default function AdminPanel({
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Làm mới</span>
                 </button>
-                {onResetDefaultUsers && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm("Bạn có chắc muốn khôi phục về danh sách tài khoản người dùng mặc định ban đầu không?")) {
-                        onResetDefaultUsers();
-                      }
-                    }}
-                    className="text-xs text-slate-500 hover:text-red-600 px-3 py-2 rounded-xl border border-slate-200 hover:bg-red-50 flex items-center space-x-1 transition-colors cursor-pointer"
-                    title="Khôi phục tài khoản mặc định"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Khôi phục mặc định</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={handleOpenCreateUser}
@@ -3038,7 +3070,7 @@ export default function AdminPanel({
                         {/* Actions */}
                         <td className="py-3 px-3 text-right">
                           <div className="flex items-center justify-end space-x-1.5">
-                            {/* Phân Quyền & Đổi Trạng Thái Modal */}
+                            {/* Phân Quyền & Quản Lý Tài Khoản Modal */}
                             <button
                               type="button"
                               onClick={() => {
@@ -3050,28 +3082,6 @@ export default function AdminPanel({
                               title="Phân quyền & Khóa/Mở khóa tài khoản"
                             >
                               <Shield className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Toggle Lock Nhanh */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRoleModalUser(user);
-                                setRoleModalRole(user.role || "customer");
-                                setRoleModalStatus(user.status === "active" ? "locked" : "active");
-                              }}
-                              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                                user.status === "active"
-                                  ? "text-slate-500 hover:text-amber-600 hover:bg-amber-50 border-slate-200"
-                                  : "text-red-600 hover:text-emerald-600 hover:bg-emerald-50 border-red-200"
-                              }`}
-                              title={user.status === "active" ? "Khóa tài khoản" : "Mở khóa tài khoản"}
-                            >
-                              {user.status === "active" ? (
-                                <Lock className="w-3.5 h-3.5" />
-                              ) : (
-                                <Unlock className="w-3.5 h-3.5" />
-                              )}
                             </button>
 
                             {/* Edit */}

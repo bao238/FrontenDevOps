@@ -60,6 +60,20 @@ export default function CouponsTab() {
 
   useEffect(() => {
     fetchCoupons();
+    // Lắng nghe tín hiệu đặt hàng từ BroadcastChannel để cập nhật số lượt dùng tức thì 0ms
+    try {
+      const channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.type === "ORDER_CREATED") {
+          fetchCoupons();
+        }
+      };
+      return () => {
+        channel.close();
+      };
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Mở modal tạo mới mã giảm giá

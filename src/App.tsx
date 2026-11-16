@@ -178,6 +178,8 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [promoCode, setPromoCode] = useState<string>("");
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [appliedDiscountAmount, setAppliedDiscountAmount] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Xử lý bật/tắt tick chọn 1 sản phẩm trong giỏ hàng
@@ -1282,16 +1284,22 @@ export default function App() {
     try {
       const res = await api.applyCoupon(cleanCode, subtotal);
       if (res && res.success && res.coupon) {
+        setAppliedCouponCode(cleanCode);
         if (res.coupon.discountType === "percent") {
           setAppliedDiscount(res.coupon.discountValue / 100);
+          setAppliedDiscountAmount(res.coupon.discountAmount || Math.round((subtotal * res.coupon.discountValue) / 100));
         } else {
           // Loại tiền cố định (fixed VND)
           const ratio = subtotal > 0 ? Math.min(1, res.coupon.discountAmount / subtotal) : 0;
           setAppliedDiscount(ratio);
+          setAppliedDiscountAmount(res.coupon.discountAmount || 0);
         }
         showToast(res.message || `Áp dụng mã "${cleanCode}" thành công!`);
         return;
       } else if (res && res.error) {
+        setAppliedCouponCode(null);
+        setAppliedDiscount(0);
+        setAppliedDiscountAmount(0);
         showToast(res.error);
         return;
       }
@@ -1304,9 +1312,14 @@ export default function App() {
       cleanCode === "DEVOPS10" ||
       cleanCode === "DINHBAO10"
     ) {
+      setAppliedCouponCode(cleanCode);
       setAppliedDiscount(0.1);
+      setAppliedDiscountAmount(Math.round(subtotal * 0.1));
       showToast("Áp dụng mã giảm 10% thành công!");
     } else {
+      setAppliedCouponCode(null);
+      setAppliedDiscount(0);
+      setAppliedDiscountAmount(0);
       showToast("Mã giảm giá không hợp lệ hoặc đã hết hạn!");
     }
   };
@@ -1732,11 +1745,16 @@ export default function App() {
     }
 
     // Gửi đơn hàng chỉ gồm các sản phẩm đã tick lên Backend / MongoDB
+    const finalCouponCode = appliedDiscount > 0 && appliedCouponCode ? appliedCouponCode : undefined;
+    const finalDiscountAmt = appliedDiscount > 0 ? appliedDiscountAmount : 0;
+
     api.createOrder({
       customerInfo: { ...customerInfo },
       items: [...selectedCartItems],
       totalAmount: orderTotalToPay,
-      paymentMethod: customerInfo.paymentMethod
+      paymentMethod: customerInfo.paymentMethod,
+      couponCode: finalCouponCode,
+      discountAmount: finalDiscountAmt
     })
       .then(() => {
         fetchNotifications();
@@ -1764,6 +1782,8 @@ export default function App() {
     setSelectedCartIds([]);
     setAppliedDiscount(0);
     setPromoCode("");
+    setAppliedCouponCode(null);
+    setAppliedDiscountAmount(0);
 
     // Đóng hoàn toàn Checkout modal
     setIsCheckoutOpen(false);

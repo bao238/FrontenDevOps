@@ -21,6 +21,8 @@ const orderSchema = new mongoose.Schema(
       }
     ],
     totalAmount: { type: Number, required: true },
+    couponCode: { type: String, uppercase: true, trim: true, default: null }, // Mã giảm giá áp dụng (nếu có)
+    discountAmount: { type: Number, default: 0 }, // Số tiền được giảm giá
     paymentMethod: { type: String, default: 'Thanh toán khi nhận hàng (COD)' },
     // Trạng thái đơn hàng: hỗ trợ 4 bước mới (Chờ xác nhận -> Chờ lấy hàng -> Chờ giao hàng -> Hoàn tất/Đánh giá) và tương thích ngược
     status: {

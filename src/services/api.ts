@@ -113,6 +113,8 @@ export interface OrderPayload {
   }>;
   totalAmount: number;
   paymentMethod: string;
+  couponCode?: string;
+  discountAmount?: number;
   status?: string;
   pickupTime?: string;
   shippingCarrier?: string;

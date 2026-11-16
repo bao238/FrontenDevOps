@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Product = require('../models/Product');
+const Coupon = require('../models/Coupon');
 const { createInternalNotification } = require('./notificationController');
 
 function buildCustomerOrderScope(user) {
@@ -143,7 +144,7 @@ exports.getAllOrderItems = async (req, res, next) => {
 
 // POST /api/orders (Tạo đơn hàng mới)
 exports.createOrder = async (req, res, next) => {
-  const { customerInfo, items, totalAmount, paymentMethod, userId, status, pickupTime, shippingCarrier } = req.body;
+  const { customerInfo, items, totalAmount, paymentMethod, userId, status, pickupTime, shippingCarrier, couponCode, discountAmount } = req.body;
   const orderId = `ORD-${Date.now().toString().slice(-6)}`;
 
   const newOrder = {
@@ -158,6 +159,8 @@ exports.createOrder = async (req, res, next) => {
     },
     items: items || [],
     totalAmount: Number(totalAmount) || 0,
+    couponCode: couponCode ? String(couponCode).trim().toUpperCase() : null,
+    discountAmount: Number(discountAmount) || 0,
     paymentMethod: paymentMethod || 'Thanh toán khi nhận hàng (COD)',
     status: status || 'Chờ xác nhận',
     isPaid: Boolean(req.body.isPaid),
@@ -222,6 +225,15 @@ exports.createOrder = async (req, res, next) => {
       }
     }
 
+    // 4. Nếu đơn hàng sử dụng mã giảm giá, tự động tăng số lượt đã sử dụng (usedCount) của coupon trong MongoDB
+    if (newOrder.couponCode) {
+      await Coupon.findOneAndUpdate(
+        { code: newOrder.couponCode },
+        { $inc: { usedCount: 1 } },
+        { new: true }
+      );
+    }
+
     // Tự động gửi thông báo hệ thống đến người dùng về đơn hàng vừa tạo
     try {
       createInternalNotification({
@@ -278,6 +290,14 @@ exports.updateOrderStatus = async (req, res, next) => {
       { new: true }
     );
 
+    // Nếu đơn hàng bị hủy, hoàn lại lượt sử dụng cho mã giảm giá trong MongoDB
+    if (req.body.status === 'Đã hủy' && existingOrder.status !== 'Đã hủy' && existingOrder.couponCode) {
+      await Coupon.findOneAndUpdate(
+        { code: existingOrder.couponCode, usedCount: { $gt: 0 } },
+        { $inc: { usedCount: -1 } }
+      );
+    }
+
     // Tự động gửi thông báo cập nhật tiến độ đơn hàng cho khách hàng
     if (req.body.status && req.body.status !== existingOrder.status) {
       try {
@@ -306,6 +326,14 @@ exports.deleteOrder = async (req, res, next) => {
     const deleted = await Order.findOneAndDelete({ id: req.params.id });
     if (!deleted) {
       return res.status(404).json({ message: 'Không tìm thấy đơn hàng cần xóa' });
+    }
+
+    // Nếu đơn hàng bị xóa có sử dụng mã giảm giá, hoàn lại lượt sử dụng cho mã giảm giá trong MongoDB
+    if (deleted.couponCode) {
+      await Coupon.findOneAndUpdate(
+        { code: deleted.couponCode, usedCount: { $gt: 0 } },
+        { $inc: { usedCount: -1 } }
+      );
     }
 
     // Xóa toàn bộ OrderItems liên quan trong bảng riêng order_items

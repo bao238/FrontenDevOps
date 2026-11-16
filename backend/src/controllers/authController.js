@@ -29,13 +29,25 @@ exports.login = async (req, res, next) => {
   }
 
   try {
-    const user = await User.findOne({
-      $or: [
-        { email: cleanEmail },
-        { phone: rawInput },
-        { name: rawInput }
-      ]
-    });
+    const phoneNoSpace = rawInput.replace(/\s+/g, '');
+    let formattedPhone = '';
+    if (/^0\d{9}$/.test(phoneNoSpace)) {
+      formattedPhone = `${phoneNoSpace.slice(0, 4)} ${phoneNoSpace.slice(4, 7)} ${phoneNoSpace.slice(7)}`;
+    }
+
+    const orConditions = [
+      { email: cleanEmail },
+      { phone: rawInput },
+      { name: rawInput }
+    ];
+    if (phoneNoSpace && phoneNoSpace !== rawInput) {
+      orConditions.push({ phone: phoneNoSpace });
+    }
+    if (formattedPhone && formattedPhone !== rawInput) {
+      orConditions.push({ phone: formattedPhone });
+    }
+
+    const user = await User.findOne({ $or: orConditions });
 
     if (!user) {
       return res.status(401).json({ message: 'Email hoặc mật khẩu không chính xác' });
@@ -101,9 +113,13 @@ exports.register = async (req, res, next) => {
     });
   }
 
-  const rawPassword = password ? String(password) : '123456';
-  if (rawPassword.length < 6) {
-    return res.status(400).json({ message: 'Mật khẩu phải có tối thiểu 6 ký tự' });
+  const isAdminRequest = Boolean(req.user?.role === 'admin' && req.baseUrl !== '/api/auth');
+  const rawPassword = (password !== undefined && password !== null)
+    ? String(password).trim()
+    : (isAdminRequest ? '123456' : '');
+
+  if (!rawPassword || rawPassword.length < 6) {
+    return res.status(400).json({ message: 'Mật khẩu là bắt buộc và phải có tối thiểu 6 ký tự' });
   }
 
   const cleanEmail = email.trim().toLowerCase();
@@ -123,14 +139,31 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ message: `Tên người dùng "${cleanName}" đã tồn tại trong hệ thống!` });
     }
 
-    const isAdminRequest = req.user?.role === 'admin';
+    // 4. Kiểm tra trùng Số điện thoại
+    const phoneNoSpace = cleanPhone.replace(/\s+/g, '');
+    const phoneConditions = [{ phone: cleanPhone }];
+    if (phoneNoSpace && phoneNoSpace !== cleanPhone) phoneConditions.push({ phone: phoneNoSpace });
+    if (/^0\d{9}$/.test(phoneNoSpace)) {
+      phoneConditions.push({
+        phone: `${phoneNoSpace.slice(0, 4)} ${phoneNoSpace.slice(4, 7)} ${phoneNoSpace.slice(7)}`
+      });
+    }
+    const existPhone = await User.findOne({ $or: phoneConditions });
+    if (existPhone) {
+      return res.status(400).json({ message: `Số điện thoại "${cleanPhone}" đã được sử dụng bởi tài khoản khác!` });
+    }
+
+    // Khóa gán role từ client: nếu không phải request từ Admin đã qua xác thực thì luôn gán role: 'customer' & status: 'active'
+    const finalRole = isAdminRequest && role ? role : 'customer';
+    const finalStatus = isAdminRequest && status ? status : 'active';
+
     const newUser = {
       id: req.body.id || `usr-cust-${Date.now()}`,
       name: cleanName,
       email: cleanEmail,
       phone: cleanPhone,
-      role: isAdminRequest ? (role || 'customer') : 'customer',
-      status: isAdminRequest ? (status || 'active') : 'active',
+      role: finalRole,
+      status: finalStatus,
       password: rawPassword,
       avatarUrl: finalAvatar,
       address: (address || '').trim(),
@@ -143,7 +176,7 @@ exports.register = async (req, res, next) => {
     const refreshToken = signRefreshToken(safeUser);
 
     return res.status(201).json({
-      message: 'Thêm tài khoản thành công trên MongoDB',
+      message: isAdminRequest ? 'Thêm tài khoản thành công trên MongoDB' : 'Đăng ký tài khoản thành công',
       token,
       refreshToken,
       expiresIn: JWT_EXPIRES_IN,
@@ -268,7 +301,7 @@ exports.updateUser = async (req, res, next) => {
     const updated = await User.findOneAndUpdate(
       { $or: queryConditions },
       { $set: updateData },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
 
     if (!updated) {
@@ -294,7 +327,7 @@ exports.toggleUserStatus = async (req, res, next) => {
     const updated = await User.findOneAndUpdate(
       { id: req.params.id },
       { $set: { status: nextStatus } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updated) {

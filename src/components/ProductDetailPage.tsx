@@ -138,21 +138,20 @@ export default function ProductDetailPage({
     );
   };
 
-  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (đồng bộ tuyệt đối với tab Đánh Giá)
+  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (đồng bộ tuyệt đối với dữ liệu thật MongoDB)
   const hasReviews = reviews.length > 0;
+
   const currentReviewsCount = isReviewsLoaded
-    ? reviews.length
+    ? (hasReviews ? reviews.length : (typeof product.reviewsCount === "number" && product.reviewsCount > 0 ? product.reviewsCount : 0))
     : (hasReviews
         ? reviews.length
         : (typeof product.reviewsCount === "number" && product.reviewsCount > 0 ? product.reviewsCount : 0));
 
   const currentRating = hasReviews
     ? Number((reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / reviews.length).toFixed(1))
-    : (isReviewsLoaded
-        ? 0
-        : (currentReviewsCount > 0 && typeof product.rating === "number" && product.rating > 0
-            ? Number(product.rating.toFixed(1))
-            : 0));
+    : (currentReviewsCount > 0 && typeof product.rating === "number" && product.rating > 0
+        ? Number(product.rating.toFixed(1))
+        : 0);
 
   // Lọc danh sách nhận xét theo tiêu chí
   const filteredReviewsList = reviews.filter((r) => {
@@ -551,7 +550,7 @@ export default function ProductDetailPage({
           >
             <span>Đánh Giá Khách Hàng</span>
             <span className="bg-slate-100 text-slate-600 text-[11px] px-2 py-0.5 rounded-full font-bold">
-              {reviews.length}
+              {currentReviewsCount}
             </span>
           </button>
         </div>

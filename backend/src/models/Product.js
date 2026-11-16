@@ -25,7 +25,7 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     originalPrice: { type: Number, required: true },
     discountPercent: { type: Number, default: 0 },
-    rating: { type: Number, default: 5.0 },
+    rating: { type: Number, default: 0 },
     reviewsCount: { type: Number, default: 0 },
     imageUrl: { type: String, default: '' },
     description: { type: String, default: '' },

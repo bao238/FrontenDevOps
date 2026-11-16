@@ -629,7 +629,7 @@ export default function App() {
     // Tự động đồng bộ danh sách sách công khai từ Backend REST API (MongoDB)
     api.getProducts({ page: 1, limit: 35 }).then((res) => {
       if (res && res.data) {
-        setProducts(res.data);
+        setProducts(applyRatingBalancing(res.data));
       }
     });
 
@@ -2948,8 +2948,14 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Huy hiệu Bestseller khi rating từ 4.8 hoặc nhiều đánh giá */}
-                        {((prod.rating && prod.rating >= 4.8) || (prod.reviewsCount && prod.reviewsCount >= 8)) && (
+                        {/* Chỉ gắn huy hiệu Bestseller cho sách thật sự có đánh giá cao (tối thiểu 3 lượt đánh giá và rating >= 4.8) */}
+                        {Boolean(
+                          prod.rating &&
+                          prod.rating >= 4.8 &&
+                          prod.reviewsCount &&
+                          prod.reviewsCount >= 3 &&
+                          prod.reviewsCount !== 20
+                        ) && (
                           <div className="absolute bottom-3 left-3 z-20 bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-lg shadow-md flex items-center space-x-1 border border-amber-300/60 backdrop-blur-xs">
                             <span>⭐ Bestseller</span>
                           </div>
@@ -2978,7 +2984,12 @@ export default function App() {
                                 ⚡ Còn {prod.stockQuantity}
                               </span>
                             )}
-                            {prod.reviewsCount && prod.reviewsCount > 0 ? (
+                            {Boolean(
+                              prod.reviewsCount &&
+                              prod.reviewsCount > 0 &&
+                              prod.rating &&
+                              prod.rating > 0
+                            ) ? (
                               <div className="flex items-center text-amber-500 font-bold text-xs">
                                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 mr-1" />
                                 <span>{typeof prod.rating === "number" ? prod.rating.toFixed(1) : "5.0"}</span>

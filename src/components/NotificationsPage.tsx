@@ -190,62 +190,6 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in duration-200">
-      {/* 1. Header Trang Thông Báo */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="relative z-10 space-y-2">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold text-blue-100 border border-white/20">
-            <Bell className="w-3.5 h-3.5" />
-            <span>Hộp thư thông báo BookStore</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Trung Tâm Thông Báo
-          </h1>
-          <p className="text-xs sm:text-sm text-blue-100 max-w-xl leading-relaxed">
-            {currentUser
-              ? `Xin chào ${currentUser.name}! Cập nhật tình trạng đơn hàng thời gian thực, nhận voucher độc quyền và các tin tức mới nhất.`
-              : "Theo dõi các tin tức ưu đãi, khuyến mãi sách hấp dẫn và thông báo mới nhất từ BookStore."}
-          </p>
-        </div>
-
-        {/* Nút hành động nhanh trên banner */}
-        <div className="relative z-10 flex flex-wrap items-center gap-3">
-          {unreadCount > 0 && (
-            <button
-              onClick={onMarkAllAsRead}
-              className="px-4 py-2.5 bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center space-x-2 active:scale-95 cursor-pointer"
-            >
-              <CheckCheck className="w-4 h-4" />
-              <span>Đã đọc tất cả</span>
-            </button>
-          )}
-
-          {notifications.length > 0 && (
-            <button
-              onClick={() => setIsConfirmDeleteAllOpen(true)}
-              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center space-x-2 active:scale-95 cursor-pointer border border-rose-400/40"
-              title="Xóa toàn bộ thông báo trong hộp thư"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Xóa tất cả</span>
-            </button>
-          )}
-
-          {onRefresh && (
-            <button
-              onClick={handleRefreshClick}
-              disabled={isRefreshing}
-              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm rounded-2xl border border-white/20 transition-all flex items-center space-x-2 active:scale-95 disabled:opacity-50 cursor-pointer"
-              title="Làm mới thông báo"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              <span>{isRefreshing ? "Đang tải..." : "Làm mới"}</span>
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Modal xác nhận xóa tất cả thông báo an toàn */}
       {isConfirmDeleteAllOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -288,24 +232,24 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
 
       {/* Banner nhắc đăng nhập nếu là khách vãng lai */}
       {!currentUser && (
-        <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
-              <ShieldAlert className="w-5 h-5" />
+        <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+              <ShieldAlert className="w-4 h-4" />
             </div>
             <div>
               <h4 className="text-xs sm:text-sm font-bold text-amber-900">
                 Bạn đang xem thông báo chung của hệ thống
               </h4>
               <p className="text-xs text-amber-700">
-                Đăng nhập tài khoản để nhận thông báo cập nhật đơn hàng riêng và ưu đãi dành riêng cho bạn.
+                Đăng nhập tài khoản để nhận thông báo cập nhật đơn hàng riêng và ưu đãi cá nhân.
               </p>
             </div>
           </div>
           {onOpenAuthModal && (
             <button
               onClick={onOpenAuthModal}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer active:scale-95"
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer active:scale-95"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Đăng Nhập Ngay</span>
@@ -314,118 +258,204 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
       )}
 
-      {/* 2. Thẻ Thống Kê Tổng Quan (KPI Badges) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold flex-shrink-0">
-            <Bell className="w-5 h-5 text-slate-600" />
+      {/* KHỐI HEADER TRUNG TÂM THÔNG BÁO GỌN GÀNG - THIẾT KẾ CHUẨN CARD HÌNH ẢNH 2 (ĐƠN MUA SHOPEE STYLE) */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-5 sm:p-6 transition-all">
+        {/* Header khối Thông Báo: Trái là Tiêu đề & Badge mới, Phải là các nút thao tác nhanh */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center space-x-2.5">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
+              <span>Thông báo</span>
+            </h2>
+            {unreadCount > 0 && (
+              <span className="px-2 py-0.5 bg-rose-500 text-white text-[11px] font-black rounded-full shadow-sm animate-pulse">
+                {unreadCount} mới
+              </span>
+            )}
           </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Tổng thông báo
-            </p>
-            <p className="text-lg font-black text-slate-800">{stats.total}</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold flex-shrink-0">
-            <CheckCircle className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Chưa đọc
-            </p>
-            <p className="text-lg font-black text-blue-600">{stats.unread}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold flex-shrink-0">
-            <Package className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Đơn hàng
-            </p>
-            <p className="text-lg font-black text-slate-800">{stats.order}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold flex-shrink-0">
-            <Tag className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Khuyến mãi
-            </p>
-            <p className="text-lg font-black text-slate-800">{stats.coupon}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Thanh Lọc Danh Mục & Ô Tìm Kiếm */}
-      <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        {/* Bộ nút phân loại */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          {[
-            { id: "all", label: "Tất cả", count: stats.total },
-            { id: "unread", label: "Chưa đọc", count: stats.unread },
-            { id: "order", label: "Đơn hàng", count: stats.order },
-            { id: "coupon", label: "Ưu đãi", count: stats.coupon },
-            { id: "system", label: "Hệ thống" }
-          ].map((tab) => {
-            const isActive = activeFilter === tab.id;
-            return (
+          <div className="flex items-center space-x-3 text-xs sm:text-sm font-semibold">
+            {unreadCount > 0 && (
               <button
-                key={tab.id}
-                onClick={() => setActiveFilter(tab.id as NotificationFilter)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 cursor-pointer ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                }`}
+                type="button"
+                onClick={onMarkAllAsRead}
+                className="text-blue-600 hover:text-blue-700 transition-colors flex items-center space-x-1 cursor-pointer"
+                title="Đánh dấu tất cả thông báo là đã đọc"
               >
-                <span>{tab.label}</span>
-                {typeof tab.count === "number" && tab.count > 0 && (
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                      isActive
-                        ? "bg-white text-blue-700"
-                        : "bg-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                )}
+                <CheckCheck className="w-4 h-4" />
+                <span className="hidden sm:inline">Đã đọc tất cả</span>
               </button>
-            );
-          })}
+            )}
+
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsConfirmDeleteAllOpen(true)}
+                className="text-slate-400 hover:text-rose-600 transition-colors flex items-center space-x-1 cursor-pointer"
+                title="Xóa tất cả thông báo"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Xóa tất cả</span>
+              </button>
+            )}
+
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={handleRefreshClick}
+                disabled={isRefreshing}
+                className="text-slate-400 hover:text-slate-700 transition-colors flex items-center space-x-1 cursor-pointer disabled:opacity-50"
+                title="Làm mới danh sách thông báo"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">{isRefreshing ? "Đang tải..." : "Làm mới"}</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Nhóm tìm kiếm và nút thao tác nhanh */}
-        <div className="flex items-center space-x-2 w-full md:w-auto">
-          <div className="relative flex-1 md:min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        {/* 4 Ô trạng thái phân loại chuẩn hình ảnh 2: Tất cả | Chưa đọc | Đơn hàng | Khuyến mãi */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-4 pt-5">
+          {/* Ô 1: Tất cả */}
+          <button
+            type="button"
+            onClick={() => setActiveFilter("all")}
+            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+              activeFilter === "all"
+                ? "bg-blue-50/70 ring-2 ring-blue-400/70"
+                : "hover:bg-slate-50"
+            }`}
+          >
+            <div className="relative">
+              <Bell
+                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                  activeFilter === "all" ? "text-blue-600" : "text-slate-800"
+                }`}
+              />
+              {stats.total > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-slate-600 text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  {stats.total}
+                </span>
+              )}
+            </div>
+            <span
+              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+                activeFilter === "all" ? "text-blue-700" : "text-slate-800"
+              }`}
+            >
+              Tất cả
+            </span>
+          </button>
+
+          {/* Ô 2: Chưa đọc (badge đỏ đếm thông báo chưa xem) */}
+          <button
+            type="button"
+            onClick={() => setActiveFilter("unread")}
+            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+              activeFilter === "unread"
+                ? "bg-rose-50/70 ring-2 ring-rose-400/70"
+                : "hover:bg-slate-50"
+            }`}
+          >
+            <div className="relative">
+              <Inbox
+                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                  activeFilter === "unread" ? "text-rose-600" : "text-slate-800"
+                }`}
+              />
+              {stats.unread > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                  {stats.unread}
+                </span>
+              )}
+            </div>
+            <span
+              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+                activeFilter === "unread" ? "text-rose-700" : "text-slate-800"
+              }`}
+            >
+              Chưa đọc
+            </span>
+          </button>
+
+          {/* Ô 3: Đơn hàng */}
+          <button
+            type="button"
+            onClick={() => setActiveFilter("order")}
+            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+              activeFilter === "order"
+                ? "bg-emerald-50/70 ring-2 ring-emerald-400/70"
+                : "hover:bg-slate-50"
+            }`}
+          >
+            <div className="relative">
+              <Package
+                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                  activeFilter === "order" ? "text-emerald-600" : "text-slate-800"
+                }`}
+              />
+              {stats.order > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-emerald-600 text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  {stats.order}
+                </span>
+              )}
+            </div>
+            <span
+              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+                activeFilter === "order" ? "text-emerald-700" : "text-slate-800"
+              }`}
+            >
+              Đơn hàng
+            </span>
+          </button>
+
+          {/* Ô 4: Khuyến mãi */}
+          <button
+            type="button"
+            onClick={() => setActiveFilter("coupon")}
+            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+              activeFilter === "coupon"
+                ? "bg-amber-50/70 ring-2 ring-amber-400/70"
+                : "hover:bg-slate-50"
+            }`}
+          >
+            <div className="relative">
+              <Tag
+                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                  activeFilter === "coupon" ? "text-amber-600" : "text-slate-800"
+                }`}
+              />
+              {stats.coupon > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  {stats.coupon}
+                </span>
+              )}
+            </div>
+            <span
+              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+                activeFilter === "coupon" ? "text-amber-700" : "text-slate-800"
+              }`}
+            >
+              Khuyến mãi
+            </span>
+          </button>
+        </div>
+
+        {/* Hàng dưới cùng: Hiển thị số lượng thông báo bên trái và ô tìm kiếm bên phải (giống hệt hàng dưới của hình ảnh 2) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-5 mt-5 border-t border-slate-100">
+          <div className="text-xs sm:text-sm font-semibold text-slate-500">
+            Hiển thị tất cả thông báo ({filteredNotifications.length} / {notifications.length} thông báo)
+          </div>
+
+          <div className="relative w-full sm:w-80">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo tiêu đề, nội dung..."
+              placeholder="Tìm theo mã đơn, tiêu đề, nội dung..."
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
-          {notifications.length > 0 && (
-            <button
-              onClick={() => setIsConfirmDeleteAllOpen(true)}
-              className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap active:scale-95"
-              title="Xóa tất cả thông báo"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Xóa hết</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -463,7 +493,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
               <div
                 key={item.id}
                 onClick={() => handleItemAction(item)}
-                className={`bg-white rounded-2xl p-4 sm:p-5 border transition-all duration-200 shadow-sm hover:shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden group cursor-pointer ${
+                className={`bg-white rounded-2xl p-3.5 sm:p-4 border transition-all duration-200 shadow-sm hover:shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 relative overflow-hidden group cursor-pointer ${
                   !item.isRead
                     ? "border-blue-200/90 bg-gradient-to-r from-blue-50/30 via-white to-white ring-1 ring-blue-500/10 hover:border-blue-400/80"
                     : "border-slate-200/80 hover:border-slate-300"
@@ -471,27 +501,27 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
               >
                 {/* Dải màu nhấn tinh tế bên trái cho thông báo chưa đọc */}
                 {!item.isRead && (
-                  <div className="absolute left-0 top-3 bottom-3 w-1.5 bg-blue-600 rounded-r-full" />
+                  <div className="absolute left-0 top-2.5 bottom-2.5 w-1.5 bg-blue-600 rounded-r-full" />
                 )}
 
                 {/* Phần thân thông báo */}
-                <div className="flex items-start space-x-3.5 flex-1 min-w-0 pl-1">
+                <div className="flex items-start space-x-3 flex-1 min-w-0 pl-1">
                   {/* Icon phân loại */}
                   <div
-                    className={`w-11 h-11 rounded-2xl border flex-shrink-0 flex items-center justify-center ${config.bgColor}`}
+                    className={`w-10 h-10 rounded-2xl border flex-shrink-0 flex items-center justify-center ${config.bgColor}`}
                   >
                     {config.icon}
                   </div>
 
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span
-                        className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${config.badgeBg}`}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${config.badgeBg}`}
                       >
                         {config.label}
                       </span>
                       {!item.isRead && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-600 text-white animate-pulse">
+                        <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-600 text-white animate-pulse">
                           Mới
                         </span>
                       )}
@@ -501,7 +531,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                     </div>
 
                     <h4
-                      className={`text-sm sm:text-base leading-snug ${
+                      className={`text-xs sm:text-sm leading-snug ${
                         !item.isRead
                           ? "font-extrabold text-slate-900"
                           : "font-bold text-slate-800"
@@ -510,33 +540,33 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                       {item.title}
                     </h4>
 
-                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    <p className="text-xs text-slate-600 leading-relaxed">
                       {item.message}
                     </p>
                   </div>
                 </div>
 
                 {/* Cột các nút hành động bên phải - CỐ ĐỊNH KÍCH THƯỚC GIÓNG HÀNG THẲNG TẮP (Nút Xem + Nút Thùng Rác) */}
-                <div className="flex items-center justify-end space-x-3 w-full sm:w-[185px] flex-shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                  {/* 1. Nút hành động chính: Chiều rộng cố định chuẩn 135px, bấm vào đọc và điều hướng */}
+                <div className="flex items-center justify-end space-x-2.5 w-full sm:w-[175px] flex-shrink-0 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                  {/* 1. Nút hành động chính: Chiều rộng cố định chuẩn 130px, bấm vào đọc và điều hướng */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleItemAction(item);
                     }}
-                    className="w-[135px] min-w-[135px] px-3 py-2 bg-slate-900 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 cursor-pointer group-hover:bg-blue-600"
+                    className="w-[130px] min-w-[130px] px-3 py-1.5 bg-slate-900 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 cursor-pointer group-hover:bg-blue-600"
                   >
                     <span className="truncate">{config.actionText}</span>
                     <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                   </button>
 
-                  {/* 2. Ô cố định kích thước cho nút Xóa thông báo (36x36px), ngăn nổi bọt sự kiện */}
+                  {/* 2. Ô cố định kích thước cho nút Xóa thông báo (34x34px), ngăn nổi bọt sự kiện */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onDeleteNotification(item.id);
                     }}
-                    className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors border border-transparent hover:border-rose-100 flex-shrink-0 cursor-pointer active:scale-95"
+                    className="w-[34px] h-[34px] flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors border border-transparent hover:border-rose-100 flex-shrink-0 cursor-pointer active:scale-95"
                     title="Xóa thông báo"
                   >
                     <Trash2 className="w-4 h-4" />

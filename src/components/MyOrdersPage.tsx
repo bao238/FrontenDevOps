@@ -880,8 +880,8 @@ export default function MyOrdersPage({
                         </button>
                       )}
 
-                      {/* Nút Thanh Toán Ngay: Chỉ hiển thị khi đơn đang Chờ xác nhận, chưa thanh toán và không phải COD */}
-                      {!isPaid && ord.status === "Chờ xác nhận" && ord.paymentMethod?.toLowerCase() !== "cod" && onPayOrder && (
+                      {/* Nút Thanh Toán Ngay: Hiển thị khi đơn mới đặt đang Chờ xác nhận và chưa thanh toán */}
+                      {!isPaid && ord.status === "Chờ xác nhận" && onPayOrder && (
                         <button
                           type="button"
                           onClick={() => onPayOrder(ord)}

@@ -13,9 +13,20 @@ exports.getProducts = async (req, res, next) => {
     // 2. Xay dung dieu kien loc linh hoat (Category, Search, Kho hang)
     const query = {};
 
-    // Loc theo the loai sach
+    // Loc theo the loai sach (Ho tro ca ten chuan va cac bien the cu de dong bo tuyet doi)
     if (req.query.category && req.query.category !== 'Tất cả') {
-      query.category = req.query.category;
+      const catReq = req.query.category.trim();
+      const CATEGORY_ALIASES = {
+        'Lịch sử - Địa lý - Văn hóa': ['Lịch sử - Địa lý', 'Lịch Sử - Địa lý', 'Lịch sử - địa lý', 'Lịch Sử - Địa Lý'],
+        'Thiếu nhi': ['Sách Thiếu nhi', 'Sách thiếu nhi', 'sách thiếu nhi', 'Thiếu Nhi'],
+        'Ngoại ngữ - Từ điển': ['Ngoại ngữ', 'Ngoại Ngữ', 'ngoại ngữ']
+      };
+      const aliases = CATEGORY_ALIASES[catReq] || [];
+      if (aliases.length > 0) {
+        query.category = { $in: [catReq, ...aliases] };
+      } else {
+        query.category = catReq;
+      }
     }
 
     // Loc theo tu khoa tim kiem (ten sach, the loai, ma dinh danh id, tac gia, nha xuat ban)

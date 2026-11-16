@@ -14,15 +14,25 @@ function generateSlug(text) {
     .replace(/--+/g, '-');
 }
 
+// Bảng ánh xạ các biến thể tên cũ của thể loại để đảm bảo đếm số lượng sách chính xác tuyệt đối
+const CATEGORY_ALIASES = {
+  'Lịch sử - Địa lý - Văn hóa': ['Lịch sử - Địa lý', 'Lịch Sử - Địa lý', 'Lịch sử - địa lý', 'Lịch Sử - Địa Lý'],
+  'Thiếu nhi': ['Sách Thiếu nhi', 'Sách thiếu nhi', 'sách thiếu nhi', 'Thiếu Nhi'],
+  'Ngoại ngữ - Từ điển': ['Ngoại ngữ', 'Ngoại Ngữ', 'ngoại ngữ']
+};
+
 // Lấy danh sách tất cả thể loại sách kèm số lượng đầu sách tương ứng
 exports.getCategories = async (req, res, next) => {
   try {
     const categories = await Category.find().sort({ displayOrder: 1, createdAt: 1 }).lean();
 
-    // Tính toán số lượng sách thực tế trong từng thể loại
+    // Tính toán số lượng sách thực tế trong từng thể loại (hỗ trợ cả các biến thể alias)
     const categoriesWithCount = await Promise.all(
       categories.map(async (cat) => {
-        const bookCount = await Product.countDocuments({ category: cat.name });
+        const aliases = CATEGORY_ALIASES[cat.name] || [];
+        const bookCount = await Product.countDocuments({
+          category: { $in: [cat.name, ...aliases] }
+        });
         return {
           ...cat,
           bookCount

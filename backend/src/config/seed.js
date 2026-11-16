@@ -983,6 +983,40 @@ async function migrateLegacySeedUsers() {
   }
 }
 
+// Chuẩn hóa đồng bộ 100% thể loại sách giữa bảng products và bảng categories
+async function standardizeProductCategories() {
+  try {
+    await Product.updateMany(
+      { category: { $in: ['Lịch sử - Địa lý', 'Lịch Sử - Địa lý', 'Lịch sử - địa lý', 'Lịch Sử - Địa Lý'] } },
+      { $set: { category: 'Lịch sử - Địa lý - Văn hóa' } }
+    );
+    await Product.updateMany(
+      { category: { $in: ['Sách Thiếu nhi', 'Sách thiếu nhi', 'sách thiếu nhi', 'Thiếu Nhi'] } },
+      { $set: { category: 'Thiếu nhi' } }
+    );
+    await Product.updateMany(
+      { category: { $in: ['Ngoại ngữ', 'Ngoại Ngữ', 'ngoại ngữ'] } },
+      { $set: { category: 'Ngoại ngữ - Từ điển' } }
+    );
+    await Product.updateMany(
+      {
+        category: 'Khoa học - Công nghệ',
+        $or: [
+          { author: { $regex: /Robert C\. Martin|DevOps|Martin Fowler|Gene Kim/i } },
+          { name: { $regex: /Lập Trình|Phần Mềm|Hệ Thống|CI\/CD|DevOps|Docker|Kubernetes|Web|API|Database|Microservices/i } }
+        ]
+      },
+      { $set: { category: 'Công nghệ - Lập trình' } }
+    );
+    await Product.updateMany(
+      { category: 'Khoa học - Công nghệ' },
+      { $set: { category: 'Khoa học - Triết học' } }
+    );
+  } catch (err) {
+    console.error('⚠️ [Category Sync] Lỗi khi chuẩn hóa danh mục sản phẩm:', err.message);
+  }
+}
+
 // Hàm nạp dữ liệu tự động vào MongoDB
 async function seedData() {
   try {
@@ -990,6 +1024,7 @@ async function seedData() {
     const totalExistingProducts = await Product.countDocuments();
     if (totalExistingProducts > 0) {
       await migrateLegacySeedUsers();
+      await standardizeProductCategories();
       console.log(`📦 [MongoDB Seed] Database da co ${totalExistingProducts} cuon sach, bo qua seed de bao ve du lieu.`);
       return;
     }

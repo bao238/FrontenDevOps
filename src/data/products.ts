@@ -61,6 +61,19 @@ export const CATEGORIES = [
   "Y học - Sức khỏe"
 ];
 
+/**
+ * Hàm chuẩn hóa tên thể loại sách để đồng bộ tuyệt đối giữa cơ sở dữ liệu MongoDB và giao diện
+ */
+export function normalizeCategoryName(cat?: string): string {
+  if (!cat) return "Văn học - Tiểu thuyết";
+  const trimmed = cat.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === "lịch sử - địa lý" || lower === "lich su - dia ly") return "Lịch sử - Địa lý - Văn hóa";
+  if (lower === "sách thiếu nhi" || lower === "sach thieu nhi") return "Thiếu nhi";
+  if (lower === "ngoại ngữ" || lower === "ngoai ngu") return "Ngoại ngữ - Từ điển";
+  return trimmed;
+}
+
 // Danh sách 18 cuốn sách Bestseller khởi tạo làm dữ liệu mẫu dự phòng
 export const INITIAL_BOOKS: Product[] = [
   // --- THỂ LOẠI: VĂN HỌC - TIỂU THUYẾT ---

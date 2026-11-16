@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 // Import createPortal để render modal trực tiếp ra document.body, tránh lỗi cắt ngang header do stacking context hoặc space-y
 import { createPortal } from "react-dom";
-import { Product, CATEGORIES, ReviewItem } from "../data/products";
+import { Product, CATEGORIES, ReviewItem, normalizeCategoryName } from "../data/products";
 import { UserAccount } from "../data/users";
 import { api } from "../services/api";
 import {
@@ -995,7 +995,9 @@ export default function AdminPanel({
   const filteredProducts = useMemo(() => {
     return products.filter((item) => {
       const matchCat =
-        selectedCategory === "Tất cả" || item.category === selectedCategory;
+        selectedCategory === "Tất cả" ||
+        item.category === selectedCategory ||
+        normalizeCategoryName(item.category) === selectedCategory;
       const matchQuery =
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1483,7 +1485,7 @@ export default function AdminPanel({
   const handleOpenEdit = (product: Product) => {
     setEditingProduct(product);
     setFormName(product.name);
-    setFormCategory(product.category);
+    setFormCategory(normalizeCategoryName(product.category));
     setFormPrice(product.price);
     setFormOriginalPrice(product.originalPrice || product.price);
     setFormImageUrl(product.imageUrl);
@@ -3665,6 +3667,12 @@ export default function AdminPanel({
                               {c}
                             </option>
                           ))}
+                          {/* Bảo đảm nếu thể loại sách chưa có trong danh mục vẫn hiển thị chính xác, không bị nhảy sang option đầu tiên */}
+                          {formCategory && !adminCategories.includes(formCategory) && (
+                            <option key={formCategory} value={formCategory}>
+                              {formCategory}
+                            </option>
+                          )}
                         </select>
                       </div>
 

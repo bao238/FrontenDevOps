@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { CATEGORIES, Product, INITIAL_BOOKS } from "./data/products";
+import { CATEGORIES, Product, INITIAL_BOOKS, normalizeCategoryName } from "./data/products";
 import { UserAccount, DEFAULT_AVATAR } from "./data/users";
 import { api, getAuthToken, setAuthTokens, clearAuthTokens } from "./services/api";
 import { applyRatingBalancing, calculateAverageRating } from "./utils/ratingBalancer";
@@ -1378,9 +1378,11 @@ export default function App() {
   // Filter & Sort Products (Đã nâng cấp lọc theo Thể loại & Loại quyển sách)
   const filteredProducts = useMemo(() => {
     const result = products.filter((item) => {
-      // 1. Lọc theo danh mục thể loại
+      // 1. Lọc theo danh mục thể loại (Hỗ trợ chuẩn hóa đồng bộ với MongoDB)
       const matchCat =
-        selectedCategory === "Tất cả" || item.category === selectedCategory;
+        selectedCategory === "Tất cả" ||
+        item.category === selectedCategory ||
+        normalizeCategoryName(item.category) === selectedCategory;
 
       // 3. Lọc theo từ khóa tìm kiếm
       const query = searchQuery.toLowerCase().trim();
@@ -3014,7 +3016,9 @@ export default function App() {
                           const count =
                             cat === "Tất cả"
                               ? products.length
-                              : products.filter((p) => p.category === cat).length;
+                              : products.filter(
+                                  (p) => p.category === cat || normalizeCategoryName(p.category) === cat
+                                ).length;
                           return (
                             <option key={cat} value={cat}>
                               {icon} {cat} ({count} cuốn)

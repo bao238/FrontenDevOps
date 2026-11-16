@@ -884,7 +884,7 @@ export const INITIAL_BOOKS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80',
     description: 'Giáo trình ngữ pháp tiếng Anh chuẩn mực số 1 thế giới của Raymond Murphy, trình bày súc tích với 145 chuyên đề ngữ pháp và bài tập thực hành thiết thực.',
     author: 'Raymond Murphy',
-    publisher: 'Cambridge University Press / NXB Trẻ',
+    publisher: 'Cambridge University',
     publicationYear: 2023,
     pages: 390,
     isbn: '978-110-84-5765-1',

@@ -86,6 +86,7 @@ import BlogPage from "./components/BlogPage";
 import { NotificationDropdown } from "./components/NotificationDropdown";
 import { NotificationsPage } from "./components/NotificationsPage";
 import { NotificationItem } from "./types/notification";
+import { SearchableSelect } from "./components/SearchableSelect";
 
 interface CartItem {
   product: Product;
@@ -242,6 +243,9 @@ export default function App() {
   const [selectedPublisher, setSelectedPublisher] = useState<string>("all");
   const [selectedMinRating, setSelectedMinRating] = useState<number>(0);
   const [onlyInStock, setOnlyInStock] = useState<boolean>(false);
+  // Danh sách Tác giả và NXB thực tế lấy từ cơ sở dữ liệu MongoDB
+  const [serverPublishers, setServerPublishers] = useState<string[]>([]);
+  const [serverAuthors, setServerAuthors] = useState<string[]>([]);
 
   // Trạng thái Modal In Hóa Đơn Bán Lẻ
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<OrderRecord | null>(null);
@@ -638,6 +642,18 @@ export default function App() {
     api.getProducts({ page: 1, limit: 35 }).then((res) => {
       if (res && res.data) {
         setProducts(applyRatingBalancing(res.data));
+      }
+    });
+
+    // Tự động tải danh sách Tác giả và NXB thực tế từ database MongoDB
+    api.getFilterOptions().then((filterRes) => {
+      if (filterRes) {
+        if (filterRes.publishers && filterRes.publishers.length > 0) {
+          setServerPublishers(filterRes.publishers);
+        }
+        if (filterRes.authors && filterRes.authors.length > 0) {
+          setServerAuthors(filterRes.authors);
+        }
       }
     });
 
@@ -1201,9 +1217,12 @@ export default function App() {
     }
   };
 
-  // Danh sách Tác giả duy nhất trích xuất tự động từ danh mục sách
+  // Danh sách Tác giả duy nhất trích xuất tự động từ database và danh mục sách
   const authorsList = useMemo(() => {
     const set = new Set<string>();
+    serverAuthors.forEach((a) => {
+      if (a && a.trim()) set.add(a.trim());
+    });
     INITIAL_BOOKS.forEach((p) => {
       if (p.author && p.author.trim()) set.add(p.author.trim());
     });
@@ -1211,11 +1230,14 @@ export default function App() {
       if (p.author && p.author.trim()) set.add(p.author.trim());
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [products]);
+  }, [serverAuthors, products]);
 
-  // Danh sách Nhà xuất bản duy nhất
+  // Danh sách Nhà xuất bản duy nhất trích xuất tự động từ database và danh mục sách
   const publishersList = useMemo(() => {
     const set = new Set<string>();
+    serverPublishers.forEach((p) => {
+      if (p && p.trim()) set.add(p.trim());
+    });
     INITIAL_BOOKS.forEach((p) => {
       if (p.publisher && p.publisher.trim()) set.add(p.publisher.trim());
     });
@@ -1223,7 +1245,7 @@ export default function App() {
       if (p.publisher && p.publisher.trim()) set.add(p.publisher.trim());
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [products]);
+  }, [serverPublishers, products]);
 
   // Số lượng bộ lọc nâng cao đang kích hoạt
   const activeFiltersCount = useMemo(() => {
@@ -2927,42 +2949,34 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* 2. Lọc theo Tác giả */}
+                    {/* 2. Lọc theo Tác giả (Searchable Dropdown) */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Tác giả tác phẩm:
                       </label>
-                      <select
+                      <SearchableSelect
                         value={selectedAuthor}
-                        onChange={(e) => setSelectedAuthor(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="all">Tất cả tác giả ({authorsList.length})</option>
-                        {authorsList.map((author) => (
-                          <option key={author} value={author}>
-                            {author}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setSelectedAuthor(val)}
+                        options={authorsList}
+                        allLabel="Tất cả tác giả"
+                        placeholder="Chọn tác giả..."
+                        searchPlaceholder="🔍 Tìm theo tên tác giả..."
+                      />
                     </div>
 
-                    {/* 3. Lọc theo Nhà xuất bản */}
+                    {/* 3. Lọc theo Nhà xuất bản (Searchable Dropdown - Tìm kiếm theo tên siêu tốc) */}
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700 block">
                         Nhà xuất bản (NXB):
                       </label>
-                      <select
+                      <SearchableSelect
                         value={selectedPublisher}
-                        onChange={(e) => setSelectedPublisher(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="all">Tất cả NXB ({publishersList.length})</option>
-                        {publishersList.map((pub) => (
-                          <option key={pub} value={pub}>
-                            {pub}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setSelectedPublisher(val)}
+                        options={publishersList}
+                        allLabel="Tất cả NXB"
+                        placeholder="Chọn nhà xuất bản..."
+                        searchPlaceholder="🔍 Tìm theo tên NXB..."
+                      />
                     </div>
 
                     {/* 5. Lọc theo Đánh giá sao */}
@@ -3011,23 +3025,114 @@ export default function App() {
                   ))}
                 </div>
               ) : displayStoreProducts.length === 0 ? (
-                <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-300">
-                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="text-lg font-bold text-slate-700">Không tìm thấy sản phẩm</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Không có sản phẩm nào phù hợp với bộ lọc hoặc từ khóa &ldquo;{searchQuery}&rdquo;.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedCategory("Tất cả");
-                      setSortBy("default");
-                      handleResetFilters();
-                    }}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
-                  >
-                    Xóa bộ lọc
-                  </button>
+                <div className="space-y-8">
+                  <div className="bg-white rounded-3xl p-8 sm:p-12 text-center border border-dashed border-slate-300 shadow-xs">
+                    <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-slate-700">Không tìm thấy sản phẩm chính xác</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      Không có sản phẩm nào khớp hoàn toàn với các tiêu chí bộ lọc đang chọn. Bạn có thể xóa bộ lọc hoặc khám phá ngay các tựa sách gợi ý nổi bật bên dưới:
+                    </p>
+                    <div className="mt-4 flex items-center justify-center space-x-3">
+                      <button
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSelectedCategory("Tất cả");
+                          setSortBy("default");
+                          handleResetFilters();
+                        }}
+                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer flex items-center space-x-1.5"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Xóa tất cả bộ lọc</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Phần Gợi ý sách phổ biến để không bao giờ để trang bị trống trơn */}
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                      <div className="flex items-center space-x-2">
+                        <Sparkles className="w-5 h-5 text-amber-500" />
+                        <h4 className="text-base font-extrabold text-slate-900">
+                          Gợi Ý Các Tựa Sách Nổi Bật Dành Cho Bạn
+                        </h4>
+                      </div>
+                      <span className="text-xs text-slate-400 font-medium hidden sm:inline">Tuyển chọn sách đọc nhiều nhất</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {(products.length > 0 ? products.slice(0, 8) : INITIAL_BOOKS.slice(0, 8)).map((prod) => (
+                        <div
+                          key={`rec-${prod.id}`}
+                          className="bg-white rounded-3xl border border-slate-200/80 p-3.5 shadow-sm hover:shadow-xl hover:border-blue-300 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group"
+                        >
+                          <div
+                            className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 cursor-pointer shadow-inner"
+                            onClick={() => handleSelectProduct(prod)}
+                          >
+                            <img
+                              src={prod.imageUrl}
+                              alt={prod.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-y-0 left-0 w-3.5 bg-gradient-to-r from-black/30 via-black/10 to-transparent pointer-events-none z-10" />
+                            {prod.discountPercent > 0 && (
+                              <div className="absolute top-2.5 left-2.5 bg-gradient-to-r from-red-600 to-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-lg shadow-sm">
+                                -{prod.discountPercent}%
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-3.5 flex-1 flex flex-col justify-between space-y-3">
+                            <div>
+                              <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 flex-wrap gap-1">
+                                <span className="font-bold text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                                  {prod.category}
+                                </span>
+                                {Boolean(prod.rating && prod.rating > 0) && (
+                                  <div className="flex items-center text-amber-500 font-bold text-xs">
+                                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 mr-1" />
+                                    <span>{typeof prod.rating === "number" ? prod.rating.toFixed(1) : "5.0"}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <h3
+                                onClick={() => handleSelectProduct(prod)}
+                                className="font-bold text-sm text-slate-900 line-clamp-2 hover:text-blue-600 cursor-pointer transition-colors leading-snug h-10 flex items-start"
+                                title={prod.name}
+                              >
+                                {prod.name}
+                              </h3>
+                              <p className="text-xs text-slate-500 font-medium truncate mt-1">
+                                Tác giả: <span className="text-slate-700 font-semibold">{prod.author || "Nhiều tác giả"}</span>
+                              </p>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                              <div>
+                                <span className="font-extrabold text-blue-600 text-base">
+                                  {prod.price.toLocaleString("vi-VN")} đ
+                                </span>
+                                {prod.originalPrice > prod.price && (
+                                  <span className="text-[10px] text-slate-400 line-through block">
+                                    {prod.originalPrice.toLocaleString("vi-VN")} đ
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => addToCart(prod)}
+                                className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+                                title="Thêm vào giỏ hàng"
+                              >
+                                <ShoppingCart className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="relative">

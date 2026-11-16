@@ -30,16 +30,36 @@ exports.getProducts = async (req, res, next) => {
       ];
     }
 
-    // Loc theo tac gia (Author Filter) - Ho tro bo loc nang cao
+    // Loc theo tac gia (Author Filter) - Ho tro bo loc nang cao va tim kiem linh hoat
     if (req.query.author && req.query.author !== 'all' && req.query.author.trim()) {
-      const escapedAuthor = req.query.author.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      query.author = { $regex: new RegExp(`^\\s*${escapedAuthor}\\s*$`, 'i') };
+      const rawAuthor = req.query.author.trim();
+      const authorTokens = rawAuthor.split(/[\/,]/).map(t => t.trim()).filter(Boolean);
+      const orAuthorConditions = [];
+      authorTokens.forEach(tok => {
+        const escaped = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        orAuthorConditions.push({ author: { $regex: escaped, $options: 'i' } });
+        orAuthorConditions.push({ 'specs.Tác giả': { $regex: escaped, $options: 'i' } });
+      });
+      if (orAuthorConditions.length > 0) {
+        if (!query.$and) query.$and = [];
+        query.$and.push({ $or: orAuthorConditions });
+      }
     }
 
-    // Loc theo nha xuat ban (Publisher Filter) - Ho tro bo loc nang cao
+    // Loc theo nha xuat ban (Publisher Filter) - Ho tro bo loc nang cao va tach token da NXB
     if (req.query.publisher && req.query.publisher !== 'all' && req.query.publisher.trim()) {
-      const escapedPublisher = req.query.publisher.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      query.publisher = { $regex: new RegExp(`^\\s*${escapedPublisher}\\s*$`, 'i') };
+      const rawPub = req.query.publisher.trim();
+      const pubTokens = rawPub.split(/[\/,]/).map(t => t.trim()).filter(Boolean);
+      const orPubConditions = [];
+      pubTokens.forEach(tok => {
+        const escaped = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        orPubConditions.push({ publisher: { $regex: escaped, $options: 'i' } });
+        orPubConditions.push({ 'specs.Nhà xuất bản': { $regex: escaped, $options: 'i' } });
+      });
+      if (orPubConditions.length > 0) {
+        if (!query.$and) query.$and = [];
+        query.$and.push({ $or: orPubConditions });
+      }
     }
 
     // Loc theo tinh trang kho sach (Stock Filter)
@@ -559,6 +579,39 @@ exports.updateReviewModeration = async (req, res, next) => {
     await review.save();
 
     return res.json({ message: 'Cập nhật trạng thái kiểm duyệt thành công', data: review });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// GET /api/products/meta/filters
+// Lay danh sach tat ca Tac gia va Nha xuat ban thuc te tu database MongoDB
+exports.getFilterOptions = async (req, res, next) => {
+  try {
+    const [publishers, authors] = await Promise.all([
+      Product.distinct('publisher'),
+      Product.distinct('author')
+    ]);
+
+    const cleanPublishers = (publishers || [])
+      .filter(p => typeof p === 'string' && p.trim())
+      .map(p => p.trim())
+      .filter((val, idx, self) => self.indexOf(val) === idx)
+      .sort((a, b) => a.localeCompare(b, 'vi'));
+
+    const cleanAuthors = (authors || [])
+      .filter(a => typeof a === 'string' && a.trim())
+      .map(a => a.trim())
+      .filter((val, idx, self) => self.indexOf(val) === idx)
+      .sort((a, b) => a.localeCompare(b, 'vi'));
+
+    return res.json({
+      success: true,
+      data: {
+        publishers: cleanPublishers,
+        authors: cleanAuthors
+      }
+    });
   } catch (err) {
     return next(err);
   }

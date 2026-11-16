@@ -12,6 +12,8 @@ const router = express.Router();
 
 // Public storefront endpoints
 router.get('/', asyncHandler(productController.getProducts));
+// Endpoint lay danh sach Tac gia va Nha xuat ban thuc te tu MongoDB (dat truoc /:id)
+router.get('/meta/filters', asyncHandler(productController.getFilterOptions));
 router.get('/:id', asyncHandler(productController.getProductById));
 router.get('/:id/reviews', asyncHandler(productController.getProductReviews));
 

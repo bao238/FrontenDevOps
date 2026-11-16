@@ -320,6 +320,25 @@ export const api = {
     };
   },
 
+  // 2.1. Lay danh sach Tac gia va Nha xuat ban thuc te tu MongoDB
+  async getFilterOptions(): Promise<{ publishers: string[]; authors: string[] }> {
+    try {
+      const res = await apiFetch("/products/meta/filters");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          return {
+            publishers: Array.isArray(json.data.publishers) ? json.data.publishers : [],
+            authors: Array.isArray(json.data.authors) ? json.data.authors : []
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("⚠️ [API] Khong the tai danh sach bo loc tu MongoDB, dung fallback cuc bo:", err);
+    }
+    return { publishers: [], authors: [] };
+  },
+
   // 3. Thêm sản phẩm mới (Admin/Staff)
   async createProduct(product: Partial<Product>) {
     const res = await apiFetch("/products", {

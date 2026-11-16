@@ -1394,7 +1394,19 @@ export default function AdminPanel({
     setFormInStock(product.inStock);
     setFormStockQuantity(product.stockQuantity ?? (product.inStock ? 25 : 0));
     setFormFeatured(Boolean(product.featured));
-    setFormSpecs(product.specs || {});
+    
+    // Đảm bảo các thông số xuất bản cốt lõi luôn có sẵn trong formSpecs để chỉnh sửa trực tiếp
+    const currentSpecs = { ...(product.specs || {}) };
+    if (product.author && !currentSpecs["Tác giả"]) {
+      currentSpecs["Tác giả"] = product.author;
+    }
+    if (product.publisher && !currentSpecs["Nhà xuất bản"]) {
+      currentSpecs["Nhà xuất bản"] = product.publisher;
+    }
+    if (product.publicationYear && !currentSpecs["Năm xuất bản"]) {
+      currentSpecs["Năm xuất bản"] = String(product.publicationYear);
+    }
+    setFormSpecs(currentSpecs);
     setNewSpecKey("");
     setNewSpecVal("");
     setIsModalOpen(true);
@@ -1420,6 +1432,11 @@ export default function AdminPanel({
 
     const qty = Number(formStockQuantity) || 0;
 
+    // Trích xuất trực tiếp giá trị Tác giả và NXB từ formSpecs đã sửa
+    const authorVal = formSpecs["Tác giả"] || formSpecs["author"] || (editingProduct ? editingProduct.author : "") || "";
+    const publisherVal = formSpecs["Nhà xuất bản"] || formSpecs["publisher"] || (editingProduct ? editingProduct.publisher : "") || "";
+    const pubYearVal = parseInt(formSpecs["Năm xuất bản"] || formSpecs["publicationYear"] || "") || (editingProduct ? editingProduct.publicationYear : 2024) || 2024;
+
     if (editingProduct) {
       // Update (Cập nhật ngay vào serverProducts để giao diện thay đổi tức thì 0ms không cần reload trang)
       productPageCacheRef.current.clear();
@@ -1432,6 +1449,9 @@ export default function AdminPanel({
         discountPercent,
         imageUrl: formImageUrl || SAMPLE_IMAGES[0].url,
         description: formDescription,
+        author: authorVal,
+        publisher: publisherVal,
+        publicationYear: pubYearVal,
         inStock: qty > 0 ? formInStock : false,
         stockQuantity: qty,
         featured: formFeatured,
@@ -1453,6 +1473,9 @@ export default function AdminPanel({
         reviewsCount: 1,
         imageUrl: formImageUrl || SAMPLE_IMAGES[0].url,
         description: formDescription,
+        author: authorVal || "Đang cập nhật",
+        publisher: publisherVal || "NXB Trẻ",
+        publicationYear: pubYearVal || 2024,
         inStock: qty > 0 ? formInStock : false,
         stockQuantity: qty,
         featured: formFeatured,
@@ -1479,7 +1502,7 @@ export default function AdminPanel({
     onUpdateProduct(updated);
   };
 
-  // Add Specification row
+  // Thêm một dòng thông số xuất bản mới
   const handleAddSpec = () => {
     if (!newSpecKey.trim() || !newSpecVal.trim()) return;
     setFormSpecs((prev) => ({
@@ -1490,13 +1513,24 @@ export default function AdminPanel({
     setNewSpecVal("");
   };
 
-  // Remove Specification row
+  // Xóa một dòng thông số xuất bản (bảo vệ các trường cố định cốt lõi)
   const handleRemoveSpec = (keyToRemove: string) => {
+    if (keyToRemove === "Tác giả" || keyToRemove === "Nhà xuất bản") {
+      return;
+    }
     setFormSpecs((prev) => {
       const copy = { ...prev };
       delete copy[keyToRemove];
       return copy;
     });
+  };
+
+  // Chỉnh sửa trực tiếp giá trị của từng thông số xuất bản (Tên tác giả, Tên NXB, Năm xuất bản...)
+  const handleSpecValueChange = (key: string, value: string) => {
+    setFormSpecs((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
   // Confirm delete (Xóa ngay khỏi serverProducts)
@@ -3719,7 +3753,7 @@ export default function AdminPanel({
                       )}
                     </div>
 
-                    {/* Thông số xuất bản */}
+                    {/* Thông số xuất bản: Tên trường cố định (Tác giả, NXB...), cho phép sửa trực tiếp giá trị */}
                     <div className="space-y-1.5 border-t border-slate-100 pt-2.5">
                       <div className="flex items-center justify-between">
                         <label className="block font-bold text-slate-800 text-[11px]">
@@ -3729,40 +3763,65 @@ export default function AdminPanel({
                           ({Object.keys(formSpecs).length} thông số)
                         </span>
                       </div>
-                      <div className="space-y-1 max-h-24 overflow-y-auto custom-scrollbar">
-                        {Object.entries(formSpecs).map(([key, val]) => (
-                          <div key={key} className="flex items-center justify-between bg-slate-50 px-2.5 py-1 rounded-md border text-[11px]">
-                            <span className="text-slate-600 font-medium truncate">{key}: <span className="text-slate-900 font-semibold">{val}</span></span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSpec(key)}
-                              className="text-red-500 hover:text-red-700 p-0.5 shrink-0 ml-1"
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-0.5">
+                        {Object.entries(formSpecs).map(([key, val]) => {
+                          const isFixedField = key === "Tác giả" || key === "Nhà xuất bản";
+                          return (
+                            <div
+                              key={key}
+                              className="flex items-center space-x-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-[11px] hover:border-slate-300 transition-colors"
                             >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
+                              {/* Tên trường được giữ cố định, không sửa trực tiếp tên trường */}
+                              <span className="text-slate-700 font-bold shrink-0 min-w-[85px] max-w-[110px] truncate select-none text-[10.5px]">
+                                {key}:
+                              </span>
+
+                              {/* Cho phép sửa trực tiếp giá trị (tên tác giả, tên nhà xuất bản, năm...) */}
+                              <input
+                                type="text"
+                                value={val}
+                                onChange={(e) => handleSpecValueChange(key, e.target.value)}
+                                placeholder={`Nhập ${key.toLowerCase()}...`}
+                                className="flex-1 min-w-0 bg-white border border-slate-200 rounded-md px-2 py-0.5 text-[11px] text-slate-900 font-semibold focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
+                              />
+
+                              {/* Nút xóa chỉ dành cho các thông số phụ, các trường cố định như Tác giả và NXB được bảo vệ */}
+                              {!isFixedField ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSpec(key)}
+                                  title={`Xóa ${key}`}
+                                  className="text-slate-400 hover:text-red-600 p-0.5 shrink-0 rounded transition-colors"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <div className="w-4 shrink-0" />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <div className="flex space-x-1.5 pt-1">
                         <input
                           type="text"
-                          placeholder="Thông số (VD: Tác giả)"
+                          placeholder="Thông số (VD: Dịch giả)"
                           value={newSpecKey}
                           onChange={(e) => setNewSpecKey(e.target.value)}
-                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px]"
+                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <input
                           type="text"
-                          placeholder="Giá trị (VD: Dale Carnegie)"
+                          placeholder="Giá trị (VD: Nguyễn Văn A)"
                           value={newSpecVal}
                           onChange={(e) => setNewSpecVal(e.target.value)}
-                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px]"
+                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <button
                           type="button"
                           onClick={handleAddSpec}
-                          className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-[11px] font-bold hover:bg-slate-700 shrink-0"
+                          className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-[11px] font-bold hover:bg-slate-700 shrink-0 transition-colors"
                         >
                           Thêm
                         </button>

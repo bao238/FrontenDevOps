@@ -1711,6 +1711,19 @@ export default function App() {
       // ignore
     }
 
+    // Phát tín hiệu Real-time BroadcastChannel sang tab Admin và các tab khác (cập nhật 0ms)
+    try {
+      const channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.postMessage({
+        type: "ORDER_CREATED",
+        newOrder,
+        orders: updatedOrders,
+      });
+      channel.close();
+    } catch {
+      // ignore
+    }
+
     // Gửi đơn hàng chỉ gồm các sản phẩm đã tick lên Backend / MongoDB
     api.createOrder({
       customerInfo: { ...customerInfo },
@@ -1718,7 +1731,21 @@ export default function App() {
       totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod
     })
-      .then(() => fetchNotifications())
+      .then(() => {
+        fetchNotifications();
+        // Phát lại tín hiệu đồng bộ sau khi MongoDB đã lưu đơn hàng thành công
+        try {
+          const channel = new BroadcastChannel("bookstore_orders_sync");
+          channel.postMessage({
+            type: "ORDER_CREATED",
+            newOrder,
+            orders: updatedOrders,
+          });
+          channel.close();
+        } catch {
+          // ignore
+        }
+      })
       .catch(console.error);
 
     // Xóa khỏi giỏ hàng CHỈ các sản phẩm đã được tick mua, GIỮ LẠI các sản phẩm chưa tick mua

@@ -444,9 +444,9 @@ export default function AdminPanel({
     } catch {}
   };
 
-  const fetchServerOrders = async (page = adminOrderPage, limit = adminOrdersPerPage) => {
+  const fetchServerOrders = async (page = adminOrderPage, limit = adminOrdersPerPage, skipCache = false) => {
     const cacheKey = `${page}-${limit}-${adminOrderFilter}-${debouncedOrderSearch}`;
-    if (orderPageCacheRef.current.has(cacheKey)) {
+    if (!skipCache && orderPageCacheRef.current.has(cacheKey)) {
       const cached = orderPageCacheRef.current.get(cacheKey)!;
       setServerOrders(cached.data);
       setServerTotalOrders(cached.count);
@@ -488,6 +488,55 @@ export default function AdminPanel({
       console.error("Lỗi khi tải đơn hàng từ MongoDB:", err);
     }
   };
+
+  // Hệ thống đồng bộ đơn hàng Real-time cho Admin Console (BroadcastChannel, StorageEvent, Visibility, Focus & Smart Polling)
+  // Tự động nhận và cập nhật đơn hàng mới ngay khi khách hàng bấm Đặt Hàng mà không cần load lại trang
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("bookstore_orders_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.type === "ORDER_CREATED" || event.data?.type === "ORDER_STATUS_UPDATED") {
+          orderPageCacheRef.current.clear();
+          fetchServerOrders(adminOrderPage, adminOrdersPerPage, true);
+        }
+      };
+    } catch {
+      // ignore
+    }
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "bookstore_orders") {
+        orderPageCacheRef.current.clear();
+        fetchServerOrders(adminOrderPage, adminOrdersPerPage, true);
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        orderPageCacheRef.current.clear();
+        fetchServerOrders(adminOrderPage, adminOrdersPerPage, true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    // Smart Polling mỗi 3 giây khi Admin đang mở tab Đơn Hàng để tự động tải đơn mới ngay lập tức
+    const pollTimer = setInterval(() => {
+      if (document.visibilityState === "visible" && adminTab === "orders") {
+        fetchServerOrders(adminOrderPage, adminOrdersPerPage, true);
+      }
+    }, 3000);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      clearInterval(pollTimer);
+    };
+  }, [adminOrderPage, adminOrdersPerPage, adminOrderFilter, debouncedOrderSearch, adminTab]);
 
   // Reset trang về 1 khi người dùng đổi bộ lọc trạng thái hoặc từ khóa tìm kiếm
   useEffect(() => {

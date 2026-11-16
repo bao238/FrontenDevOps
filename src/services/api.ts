@@ -227,6 +227,9 @@ export interface ProductQueryParams {
   maxPrice?: number;
   rating?: number;
   sortBy?: string;
+  // Bổ sung lọc theo tác giả và nhà xuất bản cho Bộ lọc nâng cao
+  author?: string;
+  publisher?: string;
 }
 
 export interface OrderQueryParams {
@@ -278,6 +281,9 @@ export const api = {
       if (params?.maxPrice !== undefined && params.maxPrice !== null) query.append("maxPrice", String(params.maxPrice));
       if (params?.rating) query.append("rating", String(params.rating));
       if (params?.sortBy && params.sortBy !== "default") query.append("sortBy", params.sortBy);
+      // Gửi tham số lọc tác giả và nhà xuất bản lên Backend API
+      if (params?.author && params.author !== "all") query.append("author", params.author);
+      if (params?.publisher && params.publisher !== "all") query.append("publisher", params.publisher);
 
       const qs = query.toString() ? `?${query.toString()}` : "";
       const res = await apiFetch(`/products${qs}`);

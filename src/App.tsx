@@ -1204,6 +1204,9 @@ export default function App() {
   // Danh sách Tác giả duy nhất trích xuất tự động từ danh mục sách
   const authorsList = useMemo(() => {
     const set = new Set<string>();
+    INITIAL_BOOKS.forEach((p) => {
+      if (p.author && p.author.trim()) set.add(p.author.trim());
+    });
     products.forEach((p) => {
       if (p.author && p.author.trim()) set.add(p.author.trim());
     });
@@ -1213,6 +1216,9 @@ export default function App() {
   // Danh sách Nhà xuất bản duy nhất
   const publishersList = useMemo(() => {
     const set = new Set<string>();
+    INITIAL_BOOKS.forEach((p) => {
+      if (p.publisher && p.publisher.trim()) set.add(p.publisher.trim());
+    });
     products.forEach((p) => {
       if (p.publisher && p.publisher.trim()) set.add(p.publisher.trim());
     });
@@ -1287,13 +1293,15 @@ export default function App() {
         matchPrice = item.price > 500000;
       }
 
-      // 5. Lọc theo tác giả
+      // 5. Lọc theo tác giả (hỗ trợ kiểm tra không phân biệt hoa thường)
       const matchAuthor =
-        selectedAuthor === "all" || item.author === selectedAuthor;
+        selectedAuthor === "all" ||
+        (item.author != null && item.author.trim().toLowerCase() === selectedAuthor.trim().toLowerCase());
 
-      // 6. Lọc theo nhà xuất bản
+      // 6. Lọc theo nhà xuất bản (hỗ trợ kiểm tra không phân biệt hoa thường)
       const matchPublisher =
-        selectedPublisher === "all" || item.publisher === selectedPublisher;
+        selectedPublisher === "all" ||
+        (item.publisher != null && item.publisher.trim().toLowerCase() === selectedPublisher.trim().toLowerCase());
 
       // 7. Lọc theo đánh giá tối thiểu
       const matchRating =
@@ -1363,6 +1371,7 @@ export default function App() {
   const [totalStoreProducts, setTotalStoreProducts] = useState<number>(10549);
   const [totalStorePages, setTotalStorePages] = useState<number>(879);
   const [isLoadingStoreProducts, setIsLoadingStoreProducts] = useState<boolean>(false);
+  const [hasFetchedStoreProducts, setHasFetchedStoreProducts] = useState<boolean>(false);
 
   // Debounce tìm kiếm cửa hàng 300ms
   const [debouncedStoreSearch, setDebouncedStoreSearch] = useState(searchQuery);
@@ -1392,7 +1401,7 @@ export default function App() {
     else if (sortBy === "price-desc") sortParam = "price_desc";
     else if (sortBy === "rating") sortParam = "rating_desc";
 
-    const cacheKey = `${targetPage}-${itemsPerPage}-${selectedCategory}-${debouncedStoreSearch}-${selectedPriceRange}-${selectedMinRating}-${sortBy}-${onlyInStock}`;
+    const cacheKey = `${targetPage}-${itemsPerPage}-${selectedCategory}-${debouncedStoreSearch}-${selectedPriceRange}-${selectedAuthor}-${selectedPublisher}-${selectedMinRating}-${sortBy}-${onlyInStock}`;
     if (storePageCacheRef.current.has(cacheKey)) return;
 
     try {
@@ -1405,7 +1414,9 @@ export default function App() {
         minPrice: minP,
         maxPrice: maxP,
         rating: selectedMinRating > 0 ? selectedMinRating : undefined,
-        sortBy: sortParam
+        sortBy: sortParam,
+        author: selectedAuthor !== "all" ? selectedAuthor : undefined,
+        publisher: selectedPublisher !== "all" ? selectedPublisher : undefined
       });
       if (res && res.data) {
         const count = res.count ?? res.totalAllCount ?? res.data.length;
@@ -1421,10 +1432,10 @@ export default function App() {
     }
   };
 
-  // Reset trang về 1 khi người dùng đổi thể loại, từ khóa tìm kiếm hoặc bộ lọc giá/sao/sắp xếp
+  // Reset trang về 1 khi người dùng đổi thể loại, từ khóa tìm kiếm hoặc bộ lọc giá/sao/sắp xếp/tác giả/nhà xuất bản
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, debouncedStoreSearch, selectedPriceRange, selectedMinRating, sortBy, onlyInStock]);
+  }, [selectedCategory, debouncedStoreSearch, selectedPriceRange, selectedAuthor, selectedPublisher, selectedMinRating, sortBy, onlyInStock]);
 
   // Hàm tải dữ liệu phân trang máy chủ cho Cửa Hàng kết nối 100% MongoDB
   const fetchStoreProducts = async (page = currentPage, limit = itemsPerPage) => {
@@ -1441,12 +1452,13 @@ export default function App() {
     else if (sortBy === "price-desc") sortParam = "price_desc";
     else if (sortBy === "rating") sortParam = "rating_desc";
 
-    const cacheKey = `${page}-${limit}-${selectedCategory}-${debouncedStoreSearch}-${selectedPriceRange}-${selectedMinRating}-${sortBy}-${onlyInStock}`;
+    const cacheKey = `${page}-${limit}-${selectedCategory}-${debouncedStoreSearch}-${selectedPriceRange}-${selectedAuthor}-${selectedPublisher}-${selectedMinRating}-${sortBy}-${onlyInStock}`;
     if (storePageCacheRef.current.has(cacheKey)) {
       const cached = storePageCacheRef.current.get(cacheKey)!;
       setStoreProducts(cached.data);
       setTotalStoreProducts(cached.count);
       setTotalStorePages(cached.totalPages);
+      setHasFetchedStoreProducts(true);
 
       // Tự động tải trước trang tiếp theo và trang trước đó từ bộ nhớ đệm
       if (page < cached.totalPages) {
@@ -1469,7 +1481,9 @@ export default function App() {
         minPrice: minP,
         maxPrice: maxP,
         rating: selectedMinRating > 0 ? selectedMinRating : undefined,
-        sortBy: sortParam
+        sortBy: sortParam,
+        author: selectedAuthor !== "all" ? selectedAuthor : undefined,
+        publisher: selectedPublisher !== "all" ? selectedPublisher : undefined
       });
       if (res && res.data) {
         setStoreProducts(res.data);
@@ -1477,6 +1491,7 @@ export default function App() {
         const totalP = res.totalPages || Math.ceil(count / limit) || 1;
         setTotalStoreProducts(count);
         setTotalStorePages(totalP);
+        setHasFetchedStoreProducts(true);
         storePageCacheRef.current.set(cacheKey, {
           data: res.data,
           count,
@@ -1500,11 +1515,11 @@ export default function App() {
 
   useEffect(() => {
     fetchStoreProducts(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, selectedCategory, debouncedStoreSearch, selectedPriceRange, selectedMinRating, sortBy, onlyInStock]);
+  }, [currentPage, itemsPerPage, selectedCategory, debouncedStoreSearch, selectedPriceRange, selectedAuthor, selectedPublisher, selectedMinRating, sortBy, onlyInStock]);
 
-  const displayStoreProducts = storeProducts.length > 0 ? storeProducts : paginatedProducts;
-  const displayTotalStoreProducts = totalStoreProducts > 0 ? totalStoreProducts : filteredProducts.length;
-  const displayTotalStorePages = totalStoreProducts > 0 ? totalStorePages : totalPages;
+  const displayStoreProducts = hasFetchedStoreProducts ? storeProducts : paginatedProducts;
+  const displayTotalStoreProducts = hasFetchedStoreProducts ? totalStoreProducts : filteredProducts.length;
+  const displayTotalStorePages = hasFetchedStoreProducts ? totalStorePages : totalPages;
 
   // Đảm bảo trang hiện tại không vượt quá tổng số trang hiển thị của Cửa Hàng (10.549 cuốn MongoDB)
   useEffect(() => {
@@ -3007,6 +3022,7 @@ export default function App() {
                       setSearchQuery("");
                       setSelectedCategory("Tất cả");
                       setSortBy("default");
+                      handleResetFilters();
                     }}
                     className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
                   >

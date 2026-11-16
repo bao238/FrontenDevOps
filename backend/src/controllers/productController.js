@@ -18,14 +18,28 @@ exports.getProducts = async (req, res, next) => {
       query.category = req.query.category;
     }
 
-    // Loc theo tu khoa tim kiem (ten sach, the loai, ma dinh danh id)
+    // Loc theo tu khoa tim kiem (ten sach, the loai, ma dinh danh id, tac gia, nha xuat ban)
     if (req.query.search && req.query.search.trim()) {
       const q = req.query.search.trim();
       query.$or = [
         { name: { $regex: q, $options: 'i' } },
         { category: { $regex: q, $options: 'i' } },
-        { id: { $regex: q, $options: 'i' } }
+        { id: { $regex: q, $options: 'i' } },
+        { author: { $regex: q, $options: 'i' } },
+        { publisher: { $regex: q, $options: 'i' } }
       ];
+    }
+
+    // Loc theo tac gia (Author Filter) - Ho tro bo loc nang cao
+    if (req.query.author && req.query.author !== 'all' && req.query.author.trim()) {
+      const escapedAuthor = req.query.author.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.author = { $regex: new RegExp(`^\\s*${escapedAuthor}\\s*$`, 'i') };
+    }
+
+    // Loc theo nha xuat ban (Publisher Filter) - Ho tro bo loc nang cao
+    if (req.query.publisher && req.query.publisher !== 'all' && req.query.publisher.trim()) {
+      const escapedPublisher = req.query.publisher.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.publisher = { $regex: new RegExp(`^\\s*${escapedPublisher}\\s*$`, 'i') };
     }
 
     // Loc theo tinh trang kho sach (Stock Filter)

@@ -1167,10 +1167,11 @@ export default function AdminPanel({
     (p) => !p.inStock || (p.stockQuantity ?? 25) === 0
   ).length;
 
-  const displayTotalBooks = serverProdStats.total > 0 ? serverProdStats.total : (serverTotalProducts > 0 ? serverTotalProducts : products.length);
-  const displayInStockCount = serverProdStats.inStock > 0 ? serverProdStats.inStock : inStockCount;
-  const displayLowStockCount = serverProdStats.lowStock > 0 ? serverProdStats.lowStock : lowStockCount;
-  const displayOutOfStockCount = serverProdStats.outOfStock > 0 ? serverProdStats.outOfStock : outOfStockCount;
+  const hasServerStats = serverProdStats.total > 0;
+  const displayTotalBooks = hasServerStats ? serverProdStats.total : (serverTotalProducts > 0 ? serverTotalProducts : products.length);
+  const displayInStockCount = hasServerStats ? serverProdStats.inStock : inStockCount;
+  const displayLowStockCount = hasServerStats ? serverProdStats.lowStock : lowStockCount;
+  const displayOutOfStockCount = hasServerStats ? serverProdStats.outOfStock : outOfStockCount;
 
   // Filtered Users for Admin Table
   const filteredUsers = useMemo(() => {
@@ -1539,6 +1540,18 @@ export default function AdminPanel({
     const pubYearVal = parseInt(formSpecs["Năm xuất bản"] || formSpecs["publicationYear"] || "") || (editingProduct ? editingProduct.publicationYear : 2024) || 2024;
 
     if (editingProduct) {
+      // Cập nhật thống kê tồn kho 0ms nếu có thay đổi số lượng / trạng thái kho
+      const oldStock = editingProduct.stockQuantity !== undefined ? editingProduct.stockQuantity : (editingProduct.inStock ? 25 : 0);
+      const oldCat = !editingProduct.inStock || oldStock === 0 ? "outOfStock" : (oldStock <= 5 ? "lowStock" : "inStock");
+      const newCat = qty === 0 || !formInStock ? "outOfStock" : (qty <= 5 ? "lowStock" : "inStock");
+      if (oldCat !== newCat) {
+        setServerProdStats((prev) => ({
+          ...prev,
+          [oldCat]: Math.max(0, prev[oldCat] - 1),
+          [newCat]: prev[newCat] + 1,
+        }));
+      }
+
       // Update (Cập nhật ngay vào serverProducts để giao diện thay đổi tức thì 0ms không cần reload trang)
       productPageCacheRef.current.clear();
       const updated: Product = {
@@ -1563,6 +1576,12 @@ export default function AdminPanel({
     } else {
       // Create (Thêm ngay vào serverProducts để hiển thị đầu danh sách)
       productPageCacheRef.current.clear();
+      const newCat = qty === 0 || !formInStock ? "outOfStock" : (qty <= 5 ? "lowStock" : "inStock");
+      setServerProdStats((prev) => ({
+        ...prev,
+        total: prev.total + 1,
+        [newCat]: prev[newCat] + 1,
+      }));
       const newProduct: Product = {
         id: "prod-" + Date.now(),
         name: formName.trim(),
@@ -1592,13 +1611,30 @@ export default function AdminPanel({
 
   // Cập nhật nhanh số lượng tồn kho trực tiếp từ bảng sản phẩm (Cập nhật giao diện lập tức 0ms)
   const handleUpdateStockQuantity = (product: Product, deltaOrAbsolute: number, isAbsolute = false) => {
-    const currentStock = product.stockQuantity ?? (product.inStock ? 25 : 0);
+    const currentStock = product.stockQuantity !== undefined ? product.stockQuantity : (product.inStock ? 25 : 0);
     const newQty = Math.max(0, isAbsolute ? deltaOrAbsolute : currentStock + deltaOrAbsolute);
     const updated: Product = {
       ...product,
       stockQuantity: newQty,
       inStock: newQty > 0,
     };
+
+    // Phân loại trạng thái kho cũ và mới
+    const oldCat = !product.inStock || currentStock === 0 ? "outOfStock" : (currentStock <= 5 ? "lowStock" : "inStock");
+    const newCat = newQty === 0 ? "outOfStock" : (newQty <= 5 ? "lowStock" : "inStock");
+
+    // Cập nhật tức thì 0ms vào serverProdStats (Thẻ Sắp hết, Hết hàng, Còn hàng)
+    if (oldCat !== newCat) {
+      setServerProdStats((prev) => ({
+        ...prev,
+        [oldCat]: Math.max(0, prev[oldCat] - 1),
+        [newCat]: prev[newCat] + 1,
+      }));
+    }
+
+    // Xóa bộ nhớ đệm trang để bộ lọc Kho hàng luôn lấy dữ liệu mới nhất
+    productPageCacheRef.current.clear();
+
     setServerProducts((prev) => prev.map((p) => (p.id === product.id ? updated : p)));
     onUpdateProduct(updated);
   };
@@ -1637,6 +1673,16 @@ export default function AdminPanel({
   // Confirm delete (Xóa ngay khỏi serverProducts)
   const handleConfirmDelete = () => {
     if (deletingProductId) {
+      const prod = serverProducts.find((p) => p.id === deletingProductId) || products.find((p) => p.id === deletingProductId);
+      if (prod) {
+        const qty = prod.stockQuantity !== undefined ? prod.stockQuantity : (prod.inStock ? 25 : 0);
+        const cat = !prod.inStock || qty === 0 ? "outOfStock" : (qty <= 5 ? "lowStock" : "inStock");
+        setServerProdStats((prev) => ({
+          ...prev,
+          total: Math.max(0, prev.total - 1),
+          [cat]: Math.max(0, prev[cat] - 1),
+        }));
+      }
       productPageCacheRef.current.clear();
       setServerProducts((prev) => prev.filter((p) => p.id !== deletingProductId));
       setServerTotalProducts((prev) => Math.max(0, prev - 1));
@@ -1647,10 +1693,27 @@ export default function AdminPanel({
 
   // Quick toggle in-stock (Đổi trạng thái ngay trên giao diện)
   const handleToggleStock = (product: Product) => {
+    const newInStock = !product.inStock;
+    const currentStock = product.stockQuantity !== undefined ? product.stockQuantity : (product.inStock ? 25 : 0);
+    const newQty = newInStock ? (currentStock > 0 ? currentStock : 25) : 0;
     const updated: Product = {
       ...product,
-      inStock: !product.inStock,
+      inStock: newInStock,
+      stockQuantity: newQty,
     };
+
+    const oldCat = !product.inStock || currentStock === 0 ? "outOfStock" : (currentStock <= 5 ? "lowStock" : "inStock");
+    const newCat = !newInStock || newQty === 0 ? "outOfStock" : (newQty <= 5 ? "lowStock" : "inStock");
+
+    if (oldCat !== newCat) {
+      setServerProdStats((prev) => ({
+        ...prev,
+        [oldCat]: Math.max(0, prev[oldCat] - 1),
+        [newCat]: prev[newCat] + 1,
+      }));
+    }
+
+    productPageCacheRef.current.clear();
     setServerProducts((prev) => prev.map((p) => (p.id === product.id ? updated : p)));
     onUpdateProduct(updated);
   };

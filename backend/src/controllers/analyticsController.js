@@ -3,7 +3,7 @@ const Product = require('../models/Product');
 const User = require('../models/User');
 const Review = require('../models/Review');
 
-// Lấy toàn bộ số liệu phân tích và báo cáo doanh thu hệ thống BookStore tối ưu hóa bằng MongoDB Aggregation
+// Lấy toàn bộ số liệu phân tích và báo cáo doanh thu hệ thống BookStore trực tiếp từ MongoDB (Aggregation)
 exports.getAnalyticsSummary = async (req, res, next) => {
   try {
     // 1. Tổng hợp song song các chỉ số tổng quan với hiệu năng cao O(1)
@@ -17,100 +17,158 @@ exports.getAnalyticsSummary = async (req, res, next) => {
       totalReviews,
       totalBooks,
       outOfStockCount,
-      revenueAgg
+      revenueAgg,
+      topBooksAgg,
+      vipUsersAgg,
+      categorySalesAgg,
+      trendAgg
     ] = await Promise.all([
+      // Đếm số đơn hàng theo từng trạng thái
       Order.countDocuments(),
       Order.countDocuments({ status: 'Hoàn tất' }),
       Order.countDocuments({ status: { $in: ['Chờ giao hàng', 'Đang giao'] } }),
       Order.countDocuments({ status: { $in: ['Chờ xác nhận', 'Chờ lấy hàng', 'Đang xử lý'] } }),
       Order.countDocuments({ status: 'Đã hủy' }),
+      // Đếm người dùng, đánh giá, sách và sách hết hàng
       User.countDocuments(),
       Review.countDocuments(),
       Product.countDocuments(),
       Product.countDocuments({ $or: [{ inStock: false }, { stockQuantity: 0 }] }),
+      // Tổng doanh thu từ các đơn hàng không bị hủy
       Order.aggregate([
         { $match: { status: { $ne: 'Đã hủy' } } },
         { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      ]),
+      // 3. Top 5 Sách Bán Chạy nhất tính thực tế từ mảng items trong các đơn hàng MongoDB
+      Order.aggregate([
+        { $match: { status: { $ne: 'Đã hủy' } } },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: { $ifNull: ['$items.product.id', '$items.product._id'] },
+            name: { $first: '$items.product.name' },
+            category: { $first: '$items.product.category' },
+            author: { $first: '$items.product.author' },
+            imageUrl: { $first: '$items.product.imageUrl' },
+            price: { $first: '$items.product.price' },
+            quantitySold: { $sum: '$items.quantity' },
+            totalSales: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$items.quantity', 1] },
+                  { $ifNull: ['$items.product.price', 0] }
+                ]
+              }
+            }
+          }
+        },
+        { $match: { _id: { $ne: null } } },
+        { $sort: { quantitySold: -1, totalSales: -1 } },
+        { $limit: 5 }
+      ]),
+      // 4. Top 5 Khách hàng VIP theo tổng chi tiêu thực tế từ các đơn hàng (lấy cả customerInfo.phone lẫn customerPhone)
+      Order.aggregate([
+        { $match: { status: { $ne: 'Đã hủy' } } },
+        {
+          $group: {
+            _id: {
+              $ifNull: ['$customerInfo.phone', '$customerPhone']
+            },
+            customerName: {
+              $first: { $ifNull: ['$customerInfo.fullName', '$customerName'] }
+            },
+            totalSpent: { $sum: '$totalAmount' },
+            ordersCount: { $sum: 1 }
+          }
+        },
+        { $match: { _id: { $ne: null, $ne: '' } } },
+        { $sort: { totalSpent: -1 } },
+        { $limit: 5 }
+      ]),
+      // 5. Cơ cấu doanh số thực tế theo nhóm danh mục sách
+      Order.aggregate([
+        { $match: { status: { $ne: 'Đã hủy' } } },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: { $ifNull: ['$items.product.category', 'Khác'] },
+            revenue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$items.quantity', 1] },
+                  { $ifNull: ['$items.product.price', 0] }
+                ]
+              }
+            },
+            quantity: { $sum: '$items.quantity' }
+          }
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: 5 }
+      ]),
+      // 6. Xu hướng doanh thu theo ngày từ dữ liệu đơn hàng
+      Order.aggregate([
+        { $match: { status: { $ne: 'Đã hủy' } } },
+        {
+          $group: {
+            _id: {
+              $ifNull: [
+                '$date',
+                { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }
+              ]
+            },
+            revenue: { $sum: '$totalAmount' }
+          }
+        },
+        { $match: { _id: { $ne: null } } },
+        { $sort: { _id: -1 } },
+        { $limit: 7 }
       ])
     ]);
 
-    const totalRevenue = revenueAgg[0]?.total || 18185464000;
-    const averageOrderValue = completedOrdersCount > 0 ? Math.round(totalRevenue / completedOrdersCount) : 727000;
+    const totalRevenue = revenueAgg[0]?.total || 0;
+    const averageOrderValue = completedOrdersCount > 0 ? Math.round(totalRevenue / completedOrdersCount) : 0;
 
-    // 2. Tạo xu hướng doanh thu 7 ngày gần nhất
-    const today = new Date();
-    const dailyBase = Math.round(totalRevenue / 30);
-    const revenueTrend = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const variance = 0.85 + (i * 0.05);
-      revenueTrend.push({
-        date: dateStr,
-        revenue: Math.round(dailyBase * variance)
-      });
-    }
+    // Chuẩn hóa danh sách Top 5 sách bán chạy kèm thông tin ảnh và tác giả
+    const topProductIds = topBooksAgg.map(b => b._id);
+    const dbProducts = await Product.find({ id: { $in: topProductIds } }).lean();
+    const dbProductMap = new Map(dbProducts.map(p => [p.id, p]));
 
-    // 3. Top 5 sách tiêu biểu nhất tính từ số lượng đánh giá thực tế trong bảng Reviews
-    const topReviewsAgg = await Review.aggregate([
-      { $group: { _id: '$productId', count: { $sum: 1 }, avgRating: { $avg: '$rating' } } },
-      { $sort: { count: -1, avgRating: -1 } },
-      { $limit: 5 }
-    ]);
+    const topSellingBooks = topBooksAgg.map(b => {
+      const p = dbProductMap.get(b._id);
+      return {
+        id: b._id,
+        name: b.name || p?.name || 'Sách BookStore',
+        author: b.author || p?.author || p?.specs?.['Tác giả'] || 'Nhiều tác giả',
+        imageUrl: b.imageUrl || p?.imageUrl || '',
+        category: b.category || p?.category || 'Văn học - Tiểu thuyết',
+        quantitySold: b.quantitySold || 0,
+        totalSales: b.totalSales || 0
+      };
+    });
 
-    let topProducts = [];
-    if (topReviewsAgg.length > 0) {
-      const topIds = topReviewsAgg.map(r => r._id);
-      const prods = await Product.find({ id: { $in: topIds } }).lean();
-      const prodMap = new Map(prods.map(p => [p.id, p]));
-      topProducts = topIds.map(id => prodMap.get(id)).filter(Boolean);
-    }
-    if (topProducts.length === 0) {
-      topProducts = await Product.find().sort({ createdAt: -1 }).limit(5).lean();
-    }
-
-    const topSellingBooks = topProducts.map((p, idx) => ({
-      id: p.id,
-      name: p.name,
-      author: p.author || 'Tác giả BookStore',
-      imageUrl: p.imageUrl || '',
-      category: p.category || 'Văn học',
-      quantitySold: 450 - idx * 60,
-      totalSales: (450 - idx * 60) * (p.price || 120000)
-    }));
-
-    // 4. Top 5 Khách hàng thân thiết (VIP) theo tổng chi tiêu
-    const vipUsersAgg = await Order.aggregate([
-      { $match: { status: 'Hoàn tất' } },
-      {
-        $group: {
-          _id: '$customerPhone',
-          customerName: { $first: '$customerName' },
-          totalSpent: { $sum: '$totalAmount' },
-          ordersCount: { $sum: 1 }
-        }
-      },
-      { $sort: { totalSpent: -1 } },
-      { $limit: 5 }
-    ]);
-
+    // Chuẩn hóa Top 5 Khách hàng VIP
     const vipCustomers = vipUsersAgg.map((u, i) => ({
       rank: i + 1,
-      name: u.customerName || 'Khách Hàng VIP',
-      phone: u._id || '0988 000 000',
+      name: u.customerName || `Khách hàng VIP #${i + 1}`,
+      phone: u._id,
       totalSpent: u.totalSpent,
       ordersCount: u.ordersCount
     }));
 
-    // 5. Cơ cấu doanh số theo 5 nhóm danh mục sách
-    const categorySales = [
-      { name: 'Văn học - Tiểu thuyết', percentage: 35, revenue: Math.round(totalRevenue * 0.35) },
-      { name: 'Kinh tế - Khởi nghiệp', percentage: 25, revenue: Math.round(totalRevenue * 0.25) },
-      { name: 'Kỹ năng sống', percentage: 20, revenue: Math.round(totalRevenue * 0.20) },
-      { name: 'Khoa học - Công nghệ', percentage: 12, revenue: Math.round(totalRevenue * 0.12) },
-      { name: 'Thiếu nhi & Khác', percentage: 8, revenue: Math.round(totalRevenue * 0.08) }
-    ];
+    // Chuẩn hóa Cơ cấu doanh số theo nhóm danh mục
+    const totalCatRevenue = categorySalesAgg.reduce((sum, c) => sum + c.revenue, 0) || totalRevenue || 1;
+    const categorySales = categorySalesAgg.map(c => ({
+      name: c._id || 'Khác',
+      percentage: Number(((c.revenue / totalCatRevenue) * 100).toFixed(1)),
+      revenue: c.revenue
+    }));
+
+    // Chuẩn hóa Xu hướng doanh thu 7 ngày
+    const revenueTrend = (trendAgg || []).reverse().map(t => ({
+      date: t._id,
+      revenue: t.revenue
+    }));
 
     return res.json({
       success: true,

@@ -259,32 +259,14 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
     };
   }, [totalOrdersCount, completedOrders, shippingOrders, pendingOrders, canceledOrders]);
 
-  // Danh mục sách phân bổ doanh số
+  // Danh mục sách phân bổ doanh số thực tế từ MongoDB
   const categorySales = useMemo(() => {
-    if (analytics?.categorySales && analytics.categorySales.length > 0) {
-      return analytics.categorySales;
-    }
-    return [
-      { name: "Văn học - Tiểu thuyết", percentage: 35, revenue: Math.round(totalRevenue * 0.35) },
-      { name: "Kinh tế - Khởi nghiệp", percentage: 25, revenue: Math.round(totalRevenue * 0.25) },
-      { name: "Kỹ năng sống", percentage: 20, revenue: Math.round(totalRevenue * 0.20) },
-      { name: "Khoa học - Công nghệ", percentage: 12, revenue: Math.round(totalRevenue * 0.12) },
-      { name: "Thiếu nhi & Khác", percentage: 8, revenue: Math.round(totalRevenue * 0.08) }
-    ];
-  }, [analytics, totalRevenue]);
+    return analytics?.categorySales || [];
+  }, [analytics]);
 
-  // Top Khách hàng VIP
+  // Top Khách hàng VIP thực tế từ MongoDB
   const vipCustomers = useMemo(() => {
-    if (analytics?.vipCustomers && analytics.vipCustomers.length > 0) {
-      return analytics.vipCustomers;
-    }
-    return [
-      { rank: 1, name: "Trịnh Hoàng Long", phone: "0910 023 647", totalSpent: 12500000, ordersCount: 14 },
-      { rank: 2, name: "Hà Thị Thùy Dung", phone: "0910 023 875", totalSpent: 9800000, ordersCount: 11 },
-      { rank: 3, name: "Đỗ Thị Lan", phone: "0910 007 287", totalSpent: 8400000, ordersCount: 9 },
-      { rank: 4, name: "Phan Anh Tuấn", phone: "0910 015 495", totalSpent: 7200000, ordersCount: 8 },
-      { rank: 5, name: "Nguyễn Duy Cường", phone: "0910 015 435", totalSpent: 6500000, ordersCount: 7 }
-    ];
+    return analytics?.vipCustomers || [];
   }, [analytics]);
 
   // Chức năng Xuất Báo Cáo Ra File CSV (Excel UTF-8 với BOM)

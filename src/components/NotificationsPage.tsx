@@ -258,22 +258,22 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
       )}
 
-      {/* KHỐI HEADER TRUNG TÂM THÔNG BÁO GỌN GÀNG - THIẾT KẾ CHUẨN CARD HÌNH ẢNH 2 (ĐƠN MUA SHOPEE STYLE) */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-5 sm:p-6 transition-all">
+      {/* KHỐI HEADER TRUNG TÂM THÔNG BÁO GỌN GÀNG - THIẾT KẾ CHUẨN CARD HÌNH ẢNH 2 (NHỎ GỌN, TINH TẾ) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden p-3.5 sm:p-4.5 transition-all">
         {/* Header khối Thông Báo: Trái là Tiêu đề & Badge mới, Phải là các nút thao tác nhanh */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center space-x-2.5">
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+          <div className="flex items-center space-x-2">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center space-x-2">
               <span>Thông báo</span>
             </h2>
             {unreadCount > 0 && (
-              <span className="px-2 py-0.5 bg-rose-500 text-white text-[11px] font-black rounded-full shadow-sm animate-pulse">
+              <span className="px-1.5 py-0.5 bg-rose-500 text-white text-[10px] font-black rounded-full shadow-sm animate-pulse">
                 {unreadCount} mới
               </span>
             )}
           </div>
 
-          <div className="flex items-center space-x-3 text-xs sm:text-sm font-semibold">
+          <div className="flex items-center space-x-2.5 text-xs font-semibold">
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -281,7 +281,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                 className="text-blue-600 hover:text-blue-700 transition-colors flex items-center space-x-1 cursor-pointer"
                 title="Đánh dấu tất cả thông báo là đã đọc"
               >
-                <CheckCheck className="w-4 h-4" />
+                <CheckCheck className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Đã đọc tất cả</span>
               </button>
             )}
@@ -293,7 +293,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                 className="text-slate-400 hover:text-rose-600 transition-colors flex items-center space-x-1 cursor-pointer"
                 title="Xóa tất cả thông báo"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Xóa tất cả</span>
               </button>
             )}
@@ -306,20 +306,20 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
                 className="text-slate-400 hover:text-slate-700 transition-colors flex items-center space-x-1 cursor-pointer disabled:opacity-50"
                 title="Làm mới danh sách thông báo"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
                 <span className="hidden sm:inline">{isRefreshing ? "Đang tải..." : "Làm mới"}</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* 4 Ô trạng thái phân loại chuẩn hình ảnh 2: Tất cả | Chưa đọc | Đơn hàng | Khuyến mãi */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-4 pt-5">
+        {/* 4 Ô trạng thái phân loại chuẩn hình ảnh 2: Tất cả | Chưa đọc | Đơn hàng | Khuyến mãi (Giao diện nhỏ gọn) */}
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-3 pt-3 sm:pt-3.5">
           {/* Ô 1: Tất cả */}
           <button
             type="button"
             onClick={() => setActiveFilter("all")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               activeFilter === "all"
                 ? "bg-blue-50/70 ring-2 ring-blue-400/70"
                 : "hover:bg-slate-50"
@@ -327,18 +327,18 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           >
             <div className="relative">
               <Bell
-                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   activeFilter === "all" ? "text-blue-600" : "text-slate-800"
                 }`}
               />
               {stats.total > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-slate-600 text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-slate-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {stats.total}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 activeFilter === "all" ? "text-blue-700" : "text-slate-800"
               }`}
             >
@@ -350,7 +350,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           <button
             type="button"
             onClick={() => setActiveFilter("unread")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               activeFilter === "unread"
                 ? "bg-rose-50/70 ring-2 ring-rose-400/70"
                 : "hover:bg-slate-50"
@@ -358,18 +358,18 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           >
             <div className="relative">
               <Inbox
-                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   activeFilter === "unread" ? "text-rose-600" : "text-slate-800"
                 }`}
               />
               {stats.unread > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
                   {stats.unread}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 activeFilter === "unread" ? "text-rose-700" : "text-slate-800"
               }`}
             >
@@ -381,7 +381,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           <button
             type="button"
             onClick={() => setActiveFilter("order")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               activeFilter === "order"
                 ? "bg-emerald-50/70 ring-2 ring-emerald-400/70"
                 : "hover:bg-slate-50"
@@ -389,18 +389,18 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           >
             <div className="relative">
               <Package
-                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   activeFilter === "order" ? "text-emerald-600" : "text-slate-800"
                 }`}
               />
               {stats.order > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-emerald-600 text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-emerald-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {stats.order}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 activeFilter === "order" ? "text-emerald-700" : "text-slate-800"
               }`}
             >
@@ -412,7 +412,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           <button
             type="button"
             onClick={() => setActiveFilter("coupon")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               activeFilter === "coupon"
                 ? "bg-amber-50/70 ring-2 ring-amber-400/70"
                 : "hover:bg-slate-50"
@@ -420,18 +420,18 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           >
             <div className="relative">
               <Tag
-                className={`w-8 h-8 sm:w-9 sm:h-9 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   activeFilter === "coupon" ? "text-amber-600" : "text-slate-800"
                 }`}
               />
               {stats.coupon > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {stats.coupon}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 activeFilter === "coupon" ? "text-amber-700" : "text-slate-800"
               }`}
             >
@@ -441,19 +441,19 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </div>
 
         {/* Hàng dưới cùng: Hiển thị số lượng thông báo bên trái và ô tìm kiếm bên phải (giống hệt hàng dưới của hình ảnh 2) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-5 mt-5 border-t border-slate-100">
-          <div className="text-xs sm:text-sm font-semibold text-slate-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3.5 mt-3.5 border-t border-slate-100">
+          <div className="text-[11px] sm:text-xs font-semibold text-slate-500">
             Hiển thị tất cả thông báo ({filteredNotifications.length} / {notifications.length} thông báo)
           </div>
 
-          <div className="relative w-full sm:w-80">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo mã đơn, tiêu đề, nội dung..."
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
         </div>

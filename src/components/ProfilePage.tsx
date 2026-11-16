@@ -474,40 +474,40 @@ export default function ProfilePage({
         </div>
       </div>
 
-      {/* KHỐI ĐƠN MUA GỘP 4 Ô CHUẨN GIAO DIỆN HÌNH ẢNH 2 (SHOPEE STYLE) */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-6 transition-all">
+      {/* KHỐI ĐƠN MUA GỘP 4 Ô CHUẨN GIAO DIỆN HÌNH ẢNH 2 (GIAO DIỆN NHỎ GỌN, TINH TẾ) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3.5 sm:p-4.5 transition-all">
         {/* Header khối Đơn mua */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+          <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
             Đơn mua
           </h3>
           <button
             type="button"
             onClick={() => onNavigateToOrders("all")}
-            className="text-xs sm:text-sm font-semibold text-slate-500 hover:text-blue-600 transition-colors flex items-center space-x-1 cursor-pointer group"
+            className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors flex items-center space-x-1 cursor-pointer group"
           >
             <span>Xem lịch sử mua hàng</span>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
 
-        {/* 4 Ô trạng thái chuẩn hình ảnh 2 */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-4 pt-5">
+        {/* 4 Ô trạng thái chuẩn hình ảnh 2 (Thu nhỏ icon và padding thanh thoát) */}
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-3 pt-3 sm:pt-3.5">
           {/* Ô 1: Chờ xác nhận */}
           <button
             type="button"
             onClick={() => onNavigateToOrders("Chờ xác nhận")}
-            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
           >
             <div className="relative">
-              <ConfirmIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              <ConfirmIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
               {pendingConfirmCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
                   {pendingConfirmCount}
                 </span>
               )}
             </div>
-            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
               Chờ xác nhận
             </span>
           </button>
@@ -516,17 +516,17 @@ export default function ProfilePage({
           <button
             type="button"
             onClick={() => onNavigateToOrders("Chờ lấy hàng")}
-            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
           >
             <div className="relative">
-              <PickupBoxIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              <PickupBoxIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
               {pendingPickupCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {pendingPickupCount}
                 </span>
               )}
             </div>
-            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
               Chờ lấy hàng
             </span>
           </button>
@@ -535,17 +535,17 @@ export default function ProfilePage({
           <button
             type="button"
             onClick={() => onNavigateToOrders("Chờ giao hàng")}
-            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
           >
             <div className="relative">
-              <ShippingTruckIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              <ShippingTruckIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
               {pendingShippingCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {pendingShippingCount}
                 </span>
               )}
             </div>
-            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
               Chờ giao hàng
             </span>
           </button>
@@ -554,17 +554,17 @@ export default function ProfilePage({
           <button
             type="button"
             onClick={() => onNavigateToOrders("Đánh giá")}
-            className="group relative flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
+            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
           >
             <div className="relative">
-              <ReviewStarIcon className="w-8 h-8 sm:w-9 sm:h-9 text-slate-800 transition-transform group-hover:scale-105" />
+              <ReviewStarIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
               {pendingReviewCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
                   {pendingReviewCount}
                 </span>
               )}
             </div>
-            <span className="mt-2 text-xs sm:text-sm font-bold text-slate-800 text-center leading-tight">
+            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
               Đánh giá
             </span>
           </button>

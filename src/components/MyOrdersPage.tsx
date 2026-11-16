@@ -403,35 +403,35 @@ export default function MyOrdersPage({
         </button>
       </div>
 
-      {/* KHỐI "ĐƠN MUA" GỘP THÀNH 1 Ô DUY NHẤT VỚI 4 Ô CHỨC NĂNG (GIỐNG HÌNH ẢNH THỨ 2) */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-5 sm:p-6 transition-all">
+      {/* KHỐI "ĐƠN MUA" GỘP THÀNH 1 Ô DUY NHẤT VỚI 4 Ô CHỨC NĂNG (GIAO DIỆN NHỎ GỌN, TINH TẾ) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden p-3.5 sm:p-4.5 transition-all">
         {/* Header khối Đơn mua: Trái là 'Đơn mua', Phải là 'Xem lịch sử mua hàng >' */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center space-x-2">
             <span>Đơn mua</span>
           </h2>
 
           <button
             type="button"
             onClick={() => setSelectedTab("all")}
-            className={`text-xs sm:text-sm font-semibold transition-colors flex items-center space-x-1 cursor-pointer group ${
+            className={`text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer group ${
               selectedTab === "all"
                 ? "text-blue-600 font-bold"
                 : "text-slate-500 hover:text-blue-600"
             }`}
           >
             <span>Xem lịch sử mua hàng</span>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
 
-        {/* 4 Ô trạng thái chuẩn hình ảnh 2: Chờ xác nhận | Chờ lấy hàng | Chờ giao hàng | Đánh giá */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-4 pt-5">
+        {/* 4 Ô trạng thái: Chờ xác nhận | Chờ lấy hàng | Chờ giao hàng | Đánh giá (Thu nhỏ icon và padding thanh thoát) */}
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-3 pt-3 sm:pt-3.5">
           {/* Ô 1: Chờ xác nhận */}
           <button
             type="button"
             onClick={() => setSelectedTab("Chờ xác nhận")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               selectedTab === "Chờ xác nhận"
                 ? "bg-amber-50/70 ring-2 ring-amber-400/70"
                 : "hover:bg-slate-50"
@@ -439,19 +439,19 @@ export default function MyOrdersPage({
           >
             <div className="relative">
               <ConfirmIcon
-                className={`w-9 h-9 sm:w-10 sm:h-10 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   selectedTab === "Chờ xác nhận" ? "text-amber-600" : "text-slate-800"
                 }`}
               />
               {/* Badge số trên đầu ô Chờ xác nhận (nếu > 0) */}
               {pendingConfirmCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
                   {pendingConfirmCount}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 selectedTab === "Chờ xác nhận" ? "text-amber-700" : "text-slate-800"
               }`}
             >
@@ -463,7 +463,7 @@ export default function MyOrdersPage({
           <button
             type="button"
             onClick={() => setSelectedTab("Chờ lấy hàng")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               selectedTab === "Chờ lấy hàng"
                 ? "bg-purple-50/70 ring-2 ring-purple-400/70"
                 : "hover:bg-slate-50"
@@ -471,19 +471,19 @@ export default function MyOrdersPage({
           >
             <div className="relative">
               <PickupBoxIcon
-                className={`w-9 h-9 sm:w-10 sm:h-10 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   selectedTab === "Chờ lấy hàng" ? "text-purple-600" : "text-slate-800"
                 }`}
               />
               {/* Badge số trên đầu ô Chờ lấy hàng (nếu > 0) */}
               {pendingPickupCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {pendingPickupCount}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 selectedTab === "Chờ lấy hàng" ? "text-purple-700" : "text-slate-800"
               }`}
             >
@@ -495,7 +495,7 @@ export default function MyOrdersPage({
           <button
             type="button"
             onClick={() => setSelectedTab("Chờ giao hàng")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               selectedTab === "Chờ giao hàng"
                 ? "bg-blue-50/70 ring-2 ring-blue-400/70"
                 : "hover:bg-slate-50"
@@ -503,19 +503,19 @@ export default function MyOrdersPage({
           >
             <div className="relative">
               <ShippingTruckIcon
-                className={`w-9 h-9 sm:w-10 sm:h-10 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   selectedTab === "Chờ giao hàng" ? "text-blue-600" : "text-slate-800"
                 }`}
               />
-              {/* Badge số trên đầu ô Chờ giao hàng (nếu > 0) - Đúng chuẩn như số 1 đỏ trong Hình 2 */}
+              {/* Badge số trên đầu ô Chờ giao hàng (nếu > 0) */}
               {pendingShippingCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                   {pendingShippingCount}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 selectedTab === "Chờ giao hàng" ? "text-blue-700" : "text-slate-800"
               }`}
             >
@@ -527,7 +527,7 @@ export default function MyOrdersPage({
           <button
             type="button"
             onClick={() => setSelectedTab("Đánh giá")}
-            className={`group relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl transition-all cursor-pointer ${
+            className={`group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl transition-all cursor-pointer ${
               selectedTab === "Đánh giá"
                 ? "bg-amber-50/70 ring-2 ring-amber-400/70"
                 : "hover:bg-slate-50"
@@ -535,19 +535,19 @@ export default function MyOrdersPage({
           >
             <div className="relative">
               <ReviewStarIcon
-                className={`w-9 h-9 sm:w-10 sm:h-10 transition-transform group-hover:scale-105 ${
+                className={`w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105 ${
                   selectedTab === "Đánh giá" ? "text-amber-600" : "text-slate-800"
                 }`}
               />
-              {/* Badge số trên đầu ô Đánh giá: CHỈ HIỆN KHI CHƯA ĐÁNH GIÁ, ĐÁNH GIÁ RỒI THÌ KO HIỆN NỮA */}
+              {/* Badge số trên đầu ô Đánh giá */}
               {pendingReviewCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[20px] h-5 px-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
                   {pendingReviewCount}
                 </span>
               )}
             </div>
             <span
-              className={`mt-2 text-xs sm:text-sm font-bold text-center leading-tight ${
+              className={`mt-1.5 text-[11px] sm:text-xs font-bold text-center leading-tight ${
                 selectedTab === "Đánh giá" ? "text-amber-700" : "text-slate-800"
               }`}
             >
@@ -556,9 +556,9 @@ export default function MyOrdersPage({
           </button>
         </div>
 
-        {/* Thanh trạng thái chọn và ô tìm kiếm */}
-        <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="text-xs font-semibold text-slate-500">
+        {/* Thanh trạng thái chọn và ô tìm kiếm (Tối ưu chiều cao gọn nhẹ) */}
+        <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="text-[11px] sm:text-xs font-semibold text-slate-500">
             {selectedTab === "all" ? (
               <span>Hiển thị tất cả lịch sử mua hàng ({orders.length} đơn)</span>
             ) : selectedTab === "Chờ xác nhận" ? (
@@ -574,14 +574,14 @@ export default function MyOrdersPage({
             )}
           </div>
 
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo mã đơn, tên sách, SĐT..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>

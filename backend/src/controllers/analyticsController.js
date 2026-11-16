@@ -62,7 +62,7 @@ exports.getAnalyticsSummary = async (req, res, next) => {
             }
           }
         },
-        { $match: { _id: { $ne: null } } },
+        { $match: { _id: { $ne: null, $nin: ['prod-book-gen'], $not: /^prod-bulk-item-/ } } },
         { $sort: { quantitySold: -1, totalSales: -1 } },
         { $limit: 5 }
       ]),
@@ -138,10 +138,10 @@ exports.getAnalyticsSummary = async (req, res, next) => {
       const p = dbProductMap.get(b._id);
       return {
         id: b._id,
-        name: b.name || p?.name || 'Sách BookStore',
-        author: b.author || p?.author || p?.specs?.['Tác giả'] || 'Nhiều tác giả',
-        imageUrl: b.imageUrl || p?.imageUrl || '',
-        category: b.category || p?.category || 'Văn học - Tiểu thuyết',
+        name: p?.name || b.name || 'Sách BookStore',
+        author: p?.author || p?.specs?.['Tác giả'] || b.author || 'Nhiều tác giả',
+        imageUrl: p?.imageUrl || b.imageUrl || '',
+        category: p?.category || b.category || 'Văn học - Tiểu thuyết',
         quantitySold: b.quantitySold || 0,
         totalSales: b.totalSales || 0
       };

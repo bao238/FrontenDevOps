@@ -26,7 +26,8 @@ import {
   Camera,
   Image,
   X,
-  Filter
+  Filter,
+  CornerDownRight
 } from "lucide-react";
 
 interface ProductDetailPageProps {
@@ -142,23 +143,24 @@ export default function ProductDetailPage({
     );
   };
 
-  // Tính toán số sao trung bình thực tế từ danh sách nhận xét (đồng bộ tuyệt đối với dữ liệu thật MongoDB)
-  const hasReviews = reviews.length > 0;
+  // Lọc các nhận xét hợp lệ hiển thị cho khách hàng (loại bỏ nhận xét bị Quản trị viên ẩn)
+  const visibleReviews = reviews.filter((r) => r.moderationStatus !== "hidden");
+  const hasReviews = visibleReviews.length > 0;
 
   const currentReviewsCount = isReviewsLoaded
-    ? (hasReviews ? reviews.length : (typeof product.reviewsCount === "number" && product.reviewsCount > 0 ? product.reviewsCount : 0))
+    ? (hasReviews ? visibleReviews.length : (typeof product.reviewsCount === "number" && product.reviewsCount > 0 ? product.reviewsCount : 0))
     : (hasReviews
-        ? reviews.length
+        ? visibleReviews.length
         : (typeof product.reviewsCount === "number" && product.reviewsCount > 0 ? product.reviewsCount : 0));
 
   const currentRating = hasReviews
-    ? Number((reviews.reduce((acc, r) => acc + (r.rating || 5), 0) / reviews.length).toFixed(1))
+    ? Number((visibleReviews.reduce((acc, r) => acc + (r.rating || 5), 0) / visibleReviews.length).toFixed(1))
     : (currentReviewsCount > 0 && typeof product.rating === "number" && product.rating > 0
         ? Number(product.rating.toFixed(1))
         : 0);
 
-  // Lọc danh sách nhận xét theo tiêu chí
-  const filteredReviewsList = reviews.filter((r) => {
+  // Lọc danh sách nhận xét theo tiêu chí người dùng chọn
+  const filteredReviewsList = visibleReviews.filter((r) => {
     if (reviewFilter === "all") return true;
     if (reviewFilter === 5) return r.rating === 5;
     if (reviewFilter === 4) return r.rating === 4;
@@ -679,7 +681,7 @@ export default function ProductDetailPage({
                           />
                         ))}
                       </div>
-                      <p className="text-xs text-slate-400">Dựa trên {reviews.length} đánh giá thực tế</p>
+                      <p className="text-xs text-slate-400">Dựa trên {visibleReviews.length} đánh giá thực tế</p>
                     </div>
                   </div>
                 </div>
@@ -713,7 +715,7 @@ export default function ProductDetailPage({
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <h4 className="font-bold text-slate-900 text-sm">
-                  Tất cả nhận xét ({reviews.length})
+                  Tất cả nhận xét ({visibleReviews.length})
                 </h4>
 
                 {/* Thanh lọc nhận xét theo tiêu chí */}
@@ -741,7 +743,7 @@ export default function ProductDetailPage({
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    5 ⭐ ({reviews.filter((r) => r.rating === 5).length})
+                    5 ⭐ ({visibleReviews.filter((r) => r.rating === 5).length})
                   </button>
                   <button
                     type="button"
@@ -752,7 +754,7 @@ export default function ProductDetailPage({
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    4 ⭐ ({reviews.filter((r) => r.rating === 4).length})
+                    4 ⭐ ({visibleReviews.filter((r) => r.rating === 4).length})
                   </button>
                   <button
                     type="button"
@@ -763,7 +765,7 @@ export default function ProductDetailPage({
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    ≤ 3 ⭐ ({reviews.filter((r) => r.rating <= 3).length})
+                    ≤ 3 ⭐ ({visibleReviews.filter((r) => r.rating <= 3).length})
                   </button>
                   <button
                     type="button"
@@ -775,7 +777,7 @@ export default function ProductDetailPage({
                     }`}
                   >
                     <Camera className="w-3 h-3" />
-                    <span>Có ảnh ({reviews.filter((r) => Boolean(r.imageUrl)).length})</span>
+                    <span>Có ảnh ({visibleReviews.filter((r) => Boolean(r.imageUrl)).length})</span>
                   </button>
                 </div>
               </div>
@@ -845,6 +847,27 @@ export default function ProductDetailPage({
                         />
                         <p className="text-[10px] text-slate-400 mt-1 italic">
                           (Ảnh chụp sản phẩm thực tế từ người mua)
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Hiển thị Phản hồi từ Ban Quản Trị Nhà Sách nếu có */}
+                    {rev.adminReply && (
+                      <div className="mt-2.5 p-3 bg-purple-50/90 rounded-2xl border border-purple-200/80 text-xs space-y-1 animate-in fade-in">
+                        <div className="font-bold text-purple-800 flex items-center space-x-1.5">
+                          <CornerDownRight className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                          <span>Phản hồi từ Nhà Sách BookStore</span>
+                          <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">
+                            Quản trị viên
+                          </span>
+                          {rev.repliedAt && (
+                            <span className="text-[10px] text-slate-400 font-normal ml-auto">
+                              {new Date(rev.repliedAt).toLocaleDateString("vi-VN")}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-slate-700 italic pl-5 leading-relaxed">
+                          "{rev.adminReply}"
                         </p>
                       </div>
                     )}

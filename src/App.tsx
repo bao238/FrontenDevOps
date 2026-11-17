@@ -499,8 +499,7 @@ export default function App() {
         const updatedUsers = prevUsers.map((u) => {
           if (
             u.id === oldId ||
-            (oldEmail && u.email && u.email.toLowerCase() === oldEmail.toLowerCase()) ||
-            (newProf.phone && u.phone && u.phone.trim() === newProf.phone.trim())
+            (oldEmail && u.email && u.email.toLowerCase() === oldEmail.toLowerCase())
           ) {
             return {
               ...u,
@@ -877,6 +876,50 @@ export default function App() {
   // Tự động tải thông báo khi khởi động ứng dụng hoặc khi người dùng đăng nhập/đăng xuất
   useEffect(() => {
     fetchNotifications();
+  }, [currentUser]);
+
+  // Đồng bộ Real-time thông báo đa tab và cùng tab không cần tải lại trang
+  useEffect(() => {
+    // 1. Kênh BroadcastChannel giữa các tab trình duyệt
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("bookstore_notifications_sync");
+      channel.onmessage = (event) => {
+        const { type, data } = event.data || {};
+        fetchNotifications();
+        if (type === "NOTIFICATION_CREATED" && data) {
+          showToast(`🔔 [Thông báo mới] ${data.title}: ${data.message}`);
+        }
+      };
+    } catch {
+      // Trình duyệt không hỗ trợ BroadcastChannel
+    }
+
+    // 2. Lắng nghe CustomEvent trong cùng cửa sổ / tab hiện tại
+    const handleLocalNotificationSync = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { type, data } = customEvent.detail || {};
+      fetchNotifications();
+      if (type === "NOTIFICATION_CREATED" && data) {
+        showToast(`🔔 [Thông báo mới] ${data.title}: ${data.message}`);
+      }
+    };
+    window.addEventListener("bookstore_notifications_sync", handleLocalNotificationSync);
+
+    // 3. Polling ngầm mỗi 8 giây khi tab đang hiển thị để cập nhật tự động không cần F5
+    const pollTimer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications();
+      }
+    }, 8000);
+
+    return () => {
+      if (channel) {
+        channel.close();
+      }
+      window.removeEventListener("bookstore_notifications_sync", handleLocalNotificationSync);
+      clearInterval(pollTimer);
+    };
   }, [currentUser]);
 
   // Tự động nạp danh mục thể loại sách động từ MongoDB API (/api/categories)
@@ -3847,10 +3890,10 @@ export default function App() {
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>
-                  <div className="relative w-full h-64 sm:h-72 bg-slate-100">
+                  <div className="relative w-full h-64 sm:h-72 bg-slate-100 overflow-hidden">
                     <iframe
                       title="Bản đồ chỉ đường BookStore - Đại học Đông Á"
-                      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3834.646549052063!2d108.21980307583688!3d16.031917639598287!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x314219ecc3a0980d%3A0xc3b84f33668a8f1e!2zxJDhuqFpIGjhu41jIMSQw7RuZyDDgQ!5e0!3m2!1svi!2svn!4v1710000000000!5m2!1svi!2svn"
+                      src="https://maps.google.com/maps?q=33+X%C3%B4+Vi%E1%BA%BFt+Ngh%E1%BB%87+T%C4%A9nh,+H%C3%B2a+C%C6%B0%E1%BB%9Dng+Nam,+H%E1%BA%A3i+Ch%C3%A2u,+%C4%90%C3%A0+N%E1%BA%B5ng&t=&z=16&ie=UTF8&iwloc=&output=embed"
                       width="100%"
                       height="100%"
                       style={{ border: 0 }}
@@ -3859,6 +3902,30 @@ export default function App() {
                       referrerPolicy="no-referrer-when-downgrade"
                       className="w-full h-full"
                     />
+
+                    {/* Mũi tên đỏ và ghim định vị nổi bật chỉ thẳng vào vị trí địa chỉ */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10 flex flex-col items-center">
+                      <div className="bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-xl flex items-center space-x-1 whitespace-nowrap animate-bounce border-2 border-white">
+                        <MapPin className="w-3.5 h-3.5 fill-white text-red-600" />
+                        <span>BookStore Tại Đây</span>
+                      </div>
+                      <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-red-600 -mt-0.5 shadow-sm"></div>
+                    </div>
+
+                    {/* Thẻ chú thích địa chỉ cửa hàng góc bản đồ */}
+                    <div className="absolute bottom-3 left-3 right-3 sm:right-auto bg-white/95 backdrop-blur-xs px-3.5 py-2 rounded-2xl shadow-lg border border-red-200/90 flex items-center space-x-2.5 pointer-events-none z-10">
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <MapPin className="w-4 h-4 text-red-600 fill-red-500 relative z-10" />
+                      </div>
+                      <div className="leading-tight">
+                        <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                          <span>33 Xô Viết Nghệ Tĩnh</span>
+                          <span className="text-[10px] text-red-600 bg-red-50 font-bold px-1.5 py-0.5 rounded-md border border-red-100">Điểm Đến</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium">Đại học Đông Á, Q. Hải Châu, Đà Nẵng</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

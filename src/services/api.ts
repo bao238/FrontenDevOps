@@ -575,7 +575,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(user)
     });
-    return await parseJsonSafe(res);
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+      throw new Error(data.message || data.error || "Cập nhật thông tin tài khoản thất bại");
+    }
+    return data;
   },
 
   // 14. Khóa / Mở khóa người dùng (Admin)

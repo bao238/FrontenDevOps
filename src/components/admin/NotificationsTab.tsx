@@ -242,12 +242,22 @@ export default function NotificationsTab() {
     }
   }, [actionSuccess]);
 
-  // Phát tín hiệu Real-time qua BroadcastChannel
-  const broadcastSync = (type: string) => {
+  // Phát tín hiệu Real-time qua BroadcastChannel và CustomEvent cùng cửa sổ
+  const broadcastSync = (type: string, data?: any) => {
     try {
       const channel = new BroadcastChannel("bookstore_notifications_sync");
-      channel.postMessage({ type });
+      channel.postMessage({ type, data });
       channel.close();
+    } catch {
+      // ignore
+    }
+    // Kích hoạt sự kiện nội bộ ngay trong cùng cửa sổ đang mở
+    try {
+      window.dispatchEvent(
+        new CustomEvent("bookstore_notifications_sync", {
+          detail: { type, data }
+        })
+      );
     } catch {
       // ignore
     }
@@ -333,7 +343,7 @@ export default function NotificationsTab() {
         setActionSuccess("Đã phát hành thông báo thành công đến toàn hệ thống!");
         fetchNotifications();
         fetchStats();
-        broadcastSync("NOTIFICATION_CREATED");
+        broadcastSync("NOTIFICATION_CREATED", result);
       } else {
         setCreateError("Không thể tạo thông báo. Vui lòng kiểm tra lại kết nối API.");
       }

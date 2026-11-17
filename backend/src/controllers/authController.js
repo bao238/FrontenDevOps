@@ -377,23 +377,30 @@ exports.updateUser = async (req, res, next) => {
       updateData.password = await hashPassword(cleanPass);
     }
 
-    const targetId = req.params.id;
-    const queryConditions = [
-      { id: targetId },
-      { email: (targetId || '').toLowerCase() }
-    ];
-    if (req.body.oldEmail) {
-      queryConditions.push({ email: req.body.oldEmail.toLowerCase() });
+    const targetId = String(req.params.id || '').trim();
+    let existingUser = null;
+
+    // 1. Định vị tài khoản chính xác theo ID (UUID / mã định danh)
+    if (targetId) {
+      existingUser = await User.findOne({ id: targetId });
     }
-    if (req.body.id) {
-      queryConditions.push({ id: req.body.id });
+    // 2. Định vị dự phòng theo id truyền trong body
+    if (!existingUser && req.body.id) {
+      existingUser = await User.findOne({ id: String(req.body.id).trim() });
     }
-    if (req.body.phone) {
-      queryConditions.push({ phone: req.body.phone });
+    // 3. Định vị theo oldEmail hoặc targetId dạng email
+    if (!existingUser && req.body.oldEmail) {
+      existingUser = await User.findOne({ email: String(req.body.oldEmail).trim().toLowerCase() });
+    }
+    if (!existingUser && targetId.includes('@')) {
+      existingUser = await User.findOne({ email: targetId.toLowerCase() });
+    }
+    // 4. Nếu là người dùng đang đăng nhập sửa thông tin chính mình
+    if (!existingUser && req.user?.id) {
+      existingUser = await User.findOne({ id: req.user.id });
     }
 
     // Kiểm tra tài khoản tồn tại trước khi cập nhật
-    const existingUser = await User.findOne({ $or: queryConditions });
     if (!existingUser) {
       return res.status(404).json({ message: 'Không tìm thấy tài khoản trong cơ sở dữ liệu' });
     }
@@ -409,8 +416,8 @@ exports.updateUser = async (req, res, next) => {
       }
     }
 
-    // Nếu có đổi số điện thoại, kiểm tra tính hợp lệ và không trùng lặp
-    if (updateData.phone && updateData.phone !== existingUser.phone) {
+    // Nếu có đổi số điện thoại, kiểm tra tính hợp lệ và không trùng lặp (trừ khi là chính tài khoản đó)
+    if (updateData.phone && updateData.phone.replace(/\s+/g, '') !== (existingUser.phone || '').replace(/\s+/g, '')) {
       const phoneNoSpace = updateData.phone.replace(/\s+/g, '');
       const duplicatePhoneUser = await User.findOne({
         $or: [

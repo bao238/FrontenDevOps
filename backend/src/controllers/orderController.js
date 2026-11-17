@@ -19,9 +19,46 @@ function isOrderOwner(order, user) {
   return false;
 }
 
+// Tự động chuyển các đơn hàng "Chờ lấy hàng" sang "Chờ giao hàng" khi thời gian hiện tại >= pickupTime
+async function autoTransitionPickupOrders() {
+  try {
+    const nowIso = new Date().toISOString();
+    const dueOrders = await Order.find({
+      status: 'Chờ lấy hàng',
+      pickupTime: { $ne: null, $lte: nowIso }
+    }).lean();
+
+    if (dueOrders && dueOrders.length > 0) {
+      for (const ord of dueOrders) {
+        await Order.updateOne(
+          { id: ord.id },
+          { $set: { status: 'Chờ giao hàng' } }
+        );
+        try {
+          const carrier = ord.shippingCarrier || 'Giao Hàng Nhanh (GHN)';
+          createInternalNotification({
+            userId: ord.userId || null,
+            title: `Đơn hàng #${ord.id} đang trên đường giao`,
+            message: `Shipper (${carrier}) đã lấy kiện hàng #${ord.id} từ kho và đang trên đường giao đến bạn.`,
+            type: 'order',
+            link: '/orders',
+            metadata: { orderId: ord.id, newStatus: 'Chờ giao hàng', oldStatus: 'Chờ lấy hàng' }
+          });
+        } catch (e) {}
+      }
+    }
+  } catch (err) {
+    // Bỏ qua lỗi ngầm
+  }
+}
+
+// Chạy kiểm tra tự động nền mỗi 10 giây
+setInterval(autoTransitionPickupOrders, 10000);
+
 // GET /api/orders (Lay danh sach don hang, ho tro phan trang Server-Side khi du lieu lon)
 exports.getOrders = async (req, res, next) => {
   try {
+    await autoTransitionPickupOrders();
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
     const skip = (page - 1) * limit;
@@ -144,7 +181,7 @@ exports.getAllOrderItems = async (req, res, next) => {
 
 // POST /api/orders (Tạo đơn hàng mới)
 exports.createOrder = async (req, res, next) => {
-  const { customerInfo, items, totalAmount, paymentMethod, userId, status, pickupTime, shippingCarrier, couponCode, discountAmount } = req.body;
+  const { customerInfo, items, totalAmount, paymentMethod, userId, status, pickupTime, deliveryTime, shippingCarrier, couponCode, discountAmount } = req.body;
   const orderId = req.body.id ? String(req.body.id).trim() : `ORD-${Date.now().toString().slice(-6)}`;
 
   const newOrder = {
@@ -165,6 +202,7 @@ exports.createOrder = async (req, res, next) => {
     status: status || 'Chờ xác nhận',
     isPaid: Boolean(req.body.isPaid),
     pickupTime: pickupTime || null,
+    deliveryTime: deliveryTime || null,
     shippingCarrier: shippingCarrier || 'Giao Hàng Nhanh (GHN)',
     isReviewed: false,
     reviewRating: 0,
@@ -315,6 +353,7 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (req.body.paymentMethod !== undefined) updateData.paymentMethod = String(req.body.paymentMethod);
     if (req.body.isPaid !== undefined) updateData.isPaid = Boolean(req.body.isPaid);
     if (isAdminOrStaff && req.body.pickupTime !== undefined) updateData.pickupTime = req.body.pickupTime;
+    if (isAdminOrStaff && req.body.deliveryTime !== undefined) updateData.deliveryTime = req.body.deliveryTime;
     if (isAdminOrStaff && req.body.shippingCarrier !== undefined) updateData.shippingCarrier = req.body.shippingCarrier;
     if (req.body.isReviewed !== undefined) updateData.isReviewed = req.body.isReviewed;
     if (req.body.reviewRating !== undefined) updateData.reviewRating = req.body.reviewRating;

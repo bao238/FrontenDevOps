@@ -67,6 +67,7 @@ import AnalyticsTab from "./admin/AnalyticsTab";
 import CategoriesTab from "./admin/CategoriesTab";
 import AdminPagination from "./admin/AdminPagination";
 import InvoiceModal from "./InvoiceModal";
+import OrderScheduleModal from "./OrderScheduleModal";
 import { SearchableSelect } from "./SearchableSelect";
 
 interface CartItem {
@@ -98,6 +99,7 @@ export interface OrderRecord {
   };
   isPaid?: boolean;
   pickupTime?: string;
+  deliveryTime?: string;
   shippingCarrier?: string;
   isReviewed?: boolean;
   reviewRating?: number;
@@ -407,6 +409,8 @@ export default function AdminPanel({
   const [debouncedOrderSearch, setDebouncedOrderSearch] = useState("");
   const [orderViewMode, setOrderViewMode] = useState<"table" | "card">("table");
   const [viewingOrderDetail, setViewingOrderDetail] = useState<OrderRecord | null>(null);
+  // Modal Hẹn lịch lấy hàng & giao hàng khi xác nhận đơn
+  const [schedulingOrder, setSchedulingOrder] = useState<OrderRecord | null>(null);
 
   // Debounce tìm kiếm đơn hàng 300ms
   useEffect(() => {
@@ -622,6 +626,15 @@ export default function AdminPanel({
       prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, ...extraData } : o))
     );
     onUpdateOrderStatus(orderId, newStatus, extraData);
+  };
+
+  // Xác nhận lên lịch lấy và giao hàng cho đơn
+  const handleConfirmSchedule = (
+    orderId: string,
+    scheduleData: { pickupTime: string; deliveryTime: string; shippingCarrier: string }
+  ) => {
+    handleUpdateOrderStatusRealtime(orderId, "Chờ lấy hàng", scheduleData);
+    setSchedulingOrder(null);
   };
 
   const handleDeleteOrderRealtime = (orderId: string) => {
@@ -2615,15 +2628,17 @@ export default function AdminPanel({
 
                           {/* Cột 5: Trạng Thái - Căn giữa chuẩn mực, chữ vừa khít không bị che khuất */}
                           <td className="py-3.5 px-4 text-xs align-middle">
-                            <div className="flex justify-center">
+                            <div className="flex flex-col items-center justify-center">
                               <select
                                 value={ord.status}
-                                onChange={(e) =>
-                                  handleUpdateOrderStatusRealtime(
-                                    ord.id,
-                                    e.target.value as AdminOrderStatus
-                                  )
-                                }
+                                onChange={(e) => {
+                                  const val = e.target.value as AdminOrderStatus;
+                                  if (val === "Chờ lấy hàng") {
+                                    setSchedulingOrder(ord);
+                                  } else {
+                                    handleUpdateOrderStatusRealtime(ord.id, val);
+                                  }
+                                }}
                                 className={`font-bold px-3 py-1.5 rounded-xl border text-xs focus:outline-none cursor-pointer w-full max-w-[150px] transition-colors shadow-2xs ${
                                   isDone
                                     ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100/70"
@@ -2642,6 +2657,32 @@ export default function AdminPanel({
                                 <option value="Hoàn tất">Hoàn tất</option>
                                 <option value="Đã hủy">Đã hủy</option>
                               </select>
+
+                              {isPendingConfirm && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSchedulingOrder(ord)}
+                                  className="w-full max-w-[150px] mt-1.5 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10.5px] font-bold flex items-center justify-center space-x-1 shadow-xs cursor-pointer transition-all"
+                                  title="Chọn thời gian lấy hàng và thời gian giao hàng rồi xác nhận đơn"
+                                >
+                                  <Calendar className="w-3 h-3" />
+                                  <span>Hẹn Lịch & Xác Nhận</span>
+                                </button>
+                              )}
+
+                              {(ord.pickupTime || ord.deliveryTime) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSchedulingOrder(ord)}
+                                  className="mt-1 text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold hover:underline flex items-center justify-center space-x-1 w-full text-center cursor-pointer max-w-[150px]"
+                                  title="Bấm để xem hoặc chỉnh sửa lịch lấy/giao hàng"
+                                >
+                                  <Clock className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">
+                                    {ord.pickupTime ? new Date(ord.pickupTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--:--"} → {ord.deliveryTime ? new Date(ord.deliveryTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
+                                  </span>
+                                </button>
+                              )}
                             </div>
                           </td>
 
@@ -2723,12 +2764,12 @@ export default function AdminPanel({
                           {isPendingConfirm && (
                             <button
                               type="button"
-                              onClick={() => handleUpdateOrderStatusRealtime(ord.id, "Chờ lấy hàng")}
+                              onClick={() => setSchedulingOrder(ord)}
                               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer transform hover:-translate-y-0.5"
-                              title="Xác nhận đơn hàng và chuyển sang Chờ lấy hàng"
+                              title="Xác nhận đơn hàng và chọn lịch lấy/giao hàng"
                             >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Xác Nhận Đơn</span>
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>Xác Nhận & Hẹn Lịch Vận Chuyển</span>
                             </button>
                           )}
 
@@ -2832,16 +2873,33 @@ export default function AdminPanel({
                         </div>
                       </div>
 
-                      {/* Banner hiển thị chi tiết lịch hẹn lấy hàng nếu có */}
-                      {isPickup && ord.pickupTime && (
-                        <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-900 flex items-center justify-between text-xs">
-                          <span className="flex items-center space-x-1.5 font-bold">
-                            <Clock className="w-4 h-4 text-indigo-600" />
-                            <span>Lịch shipper lấy hàng: {new Date(ord.pickupTime).toLocaleString("vi-VN")} ({ord.shippingCarrier || "Giao Hàng Nhanh"})</span>
-                          </span>
-                          <span className="text-xs text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
-                            Tự động chuyển sang Chờ giao khi đến giờ
-                          </span>
+                      {/* Banner hiển thị chi tiết lịch hẹn lấy & giao hàng nếu có */}
+                      {isPickup && (
+                        <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+                            <span className="flex items-center space-x-1.5 font-bold">
+                              <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                              <span>Lấy: {ord.pickupTime ? new Date(ord.pickupTime).toLocaleString("vi-VN") : "Chưa hẹn"} ({ord.shippingCarrier || "GHN"})</span>
+                            </span>
+                            {ord.deliveryTime && (
+                              <span className="flex items-center space-x-1.5 text-indigo-800 font-semibold">
+                                <Truck className="w-4 h-4 text-indigo-600 shrink-0" />
+                                <span>Dự kiến giao: {new Date(ord.deliveryTime).toLocaleString("vi-VN")}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[11px] text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                              Tự chuyển Chờ giao khi đến giờ lấy
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSchedulingOrder(ord)}
+                              className="text-xs text-indigo-700 hover:text-indigo-900 underline font-bold cursor-pointer"
+                            >
+                              Sửa lịch
+                            </button>
+                          </div>
                         </div>
                       )}
 
@@ -4525,7 +4583,7 @@ export default function AdminPanel({
                   </div>
                   <div className="font-bold text-slate-800 mt-1 text-xs">Đang giao</div>
                   <div className="text-xs text-slate-500 truncate max-w-[80px] mx-auto">
-                    {viewingOrderDetail.shippingCarrier ? viewingOrderDetail.shippingCarrier.slice(0, 8) : "GHN"}
+                    {viewingOrderDetail.deliveryTime ? new Date(viewingOrderDetail.deliveryTime).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' }) : (viewingOrderDetail.shippingCarrier ? viewingOrderDetail.shippingCarrier.slice(0, 8) : "GHN")}
                   </div>
                 </div>
                 <div className={`w-6 sm:w-10 h-0.5 ${
@@ -4876,6 +4934,14 @@ export default function AdminPanel({
         isOpen={Boolean(selectedInvoiceOrder)}
         order={selectedInvoiceOrder}
         onClose={() => setSelectedInvoiceOrder(null)}
+      />
+
+      {/* MODAL HẸN LỊCH VẬN CHUYỂN & XÁC NHẬN ĐƠN */}
+      <OrderScheduleModal
+        isOpen={Boolean(schedulingOrder)}
+        order={schedulingOrder}
+        onClose={() => setSchedulingOrder(null)}
+        onConfirmSchedule={handleConfirmSchedule}
       />
     </div>
   );

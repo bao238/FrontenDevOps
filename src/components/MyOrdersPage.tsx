@@ -173,6 +173,13 @@ export default function MyOrdersPage({
   const [reviewImage, setReviewImage] = useState<string>("");
   const [isEditingReview, setIsEditingReview] = useState<boolean>(false);
 
+  // Ticker thời gian thực để tự động mở khóa nút nhận hàng khi đến giờ giao
+  const [nowTime, setNowTime] = useState<number>(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTime(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, []);
+
   // Xử lý tải ảnh chụp sách thực tế từ máy tính
   const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -737,24 +744,61 @@ export default function MyOrdersPage({
                 {/* Banner Thông Báo Vận Chuyển / Hẹn Giờ Riêng Biệt Cho Từng Bước */}
                 {isPickup && ord.pickupTime && (
                   <div className="px-4 sm:px-6 py-2.5 bg-indigo-50/80 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-indigo-950">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
-                      <span>
-                        <strong>Lịch lấy hàng shipper:</strong> {new Date(ord.pickupTime).toLocaleString("vi-VN")} (Đơn vị: {ord.shippingCarrier || "Giao Hàng Nhanh (GHN)"})
-                      </span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>
+                          <strong>Lịch lấy hàng shipper:</strong> {new Date(ord.pickupTime).toLocaleString("vi-VN")} ({ord.shippingCarrier || "GHN"})
+                        </span>
+                      </div>
+                      {ord.deliveryTime && (
+                        <div className="flex items-center space-x-1.5 text-indigo-900 font-medium">
+                          <Truck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span>
+                            Dự kiến giao: <strong className="font-bold">{new Date(ord.deliveryTime).toLocaleString("vi-VN")}</strong>
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Nút test chuyển nhanh sang chờ giao hàng nếu không muốn chờ timer */}
-                    {onTriggerPickup && (
-                      <button
-                        type="button"
-                        onClick={() => onTriggerPickup(ord.id)}
-                        className="text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-100 border border-indigo-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer self-start sm:self-auto"
-                        title="Chuyển ngay sang trạng thái Chờ Giao Hàng để kiểm tra"
-                      >
-                        ⚡ Shipper Lấy Sớm (Test Ngay)
-                      </button>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[11px] text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                        Tự chuyển Chờ giao khi đến giờ lấy
+                      </span>
+                      {/* Nút test chuyển nhanh sang chờ giao hàng nếu không muốn chờ timer */}
+                      {onTriggerPickup && (
+                        <button
+                          type="button"
+                          onClick={() => onTriggerPickup(ord.id)}
+                          className="text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-100 border border-indigo-300 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                          title="Chuyển ngay sang trạng thái Chờ Giao Hàng để kiểm tra"
+                        >
+                          ⚡ Lấy Ngay
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Banner Đang giao hàng */}
+                {isShipping && (
+                  <div className="px-4 sm:px-6 py-2.5 bg-blue-50/80 border-b border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-blue-950">
+                    <div className="flex items-center space-x-2">
+                      <Truck className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>
+                        <strong>Đang giao bởi {ord.shippingCarrier || "Giao Hàng Nhanh (GHN)"}</strong> &bull;{" "}
+                        {ord.deliveryTime ? (
+                          <>
+                            Thời gian giao hàng dự kiến:{" "}
+                            <strong className="text-blue-700 font-bold">
+                              {new Date(ord.deliveryTime).toLocaleString("vi-VN")}
+                            </strong>
+                          </>
+                        ) : (
+                          "Kiện hàng đang trên đường giao tận nơi tới bạn"
+                        )}
+                      </span>
+                    </div>
                   </div>
                 )}
 
@@ -856,17 +900,28 @@ export default function MyOrdersPage({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* 1. NÚT XÁC NHẬN ĐÃ NHẬN HÀNG (Ở PHẦN CHỜ GIAO HÀNG) */}
+                      {/* 1. NÚT XÁC NHẬN ĐÃ NHẬN HÀNG (Ở PHẦN CHỜ GIAO HÀNG - Chỉ hiển thị khi đã đến thời gian giao hàng) */}
                       {isShipping && onConfirmReceived && (
-                        <button
-                          type="button"
-                          onClick={() => onConfirmReceived(ord.id)}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center space-x-1.5 cursor-pointer transform hover:-translate-y-0.5"
-                          title="Bấm để xác nhận bạn đã nhận được gói sách thành công"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Đã Nhận Được Hàng</span>
-                        </button>
+                        <>
+                          {(!ord.deliveryTime || nowTime >= new Date(ord.deliveryTime).getTime()) ? (
+                            <button
+                              type="button"
+                              onClick={() => onConfirmReceived(ord.id)}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center space-x-1.5 cursor-pointer transform hover:-translate-y-0.5"
+                              title="Bấm để xác nhận bạn đã nhận được gói sách thành công"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>Đã Nhận Được Hàng</span>
+                            </button>
+                          ) : (
+                            <div className="flex items-center space-x-1.5 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs font-medium">
+                              <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span>
+                                Dự kiến giao: <strong className="text-blue-800 font-bold">{new Date(ord.deliveryTime).toLocaleString("vi-VN")}</strong> (Mở nút nhận hàng khi đến giờ)
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {/* 2. NÚT ĐÁNH GIÁ (Ở PHẦN HOÀN TẤT / ĐÃ NHẬN HÀNG) */}

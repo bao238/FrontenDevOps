@@ -135,6 +135,8 @@ export interface OrderRecord {
   isPaid?: boolean;
   // Thời gian hẹn shipper đến lấy hàng (chuỗi ISO)
   pickupTime?: string;
+  // Thời gian dự kiến giao hàng tới tay khách (chuỗi ISO)
+  deliveryTime?: string;
   // Đơn vị vận chuyển được chọn
   shippingCarrier?: string;
   // Trạng thái đánh giá
@@ -2068,6 +2070,25 @@ export default function App() {
 
     showToast(`Đã đổi trạng thái đơn #${orderId} thành "${newStatus}"!`);
   };
+
+  // Tự động kiểm tra và chuyển đơn từ "Chờ lấy hàng" sang "Chờ giao hàng" khi đến giờ lấy hàng
+  useEffect(() => {
+    const checkPickupSchedule = () => {
+      const now = Date.now();
+      orders.forEach((ord) => {
+        if (ord.status === "Chờ lấy hàng" && ord.pickupTime) {
+          const pickupMs = new Date(ord.pickupTime).getTime();
+          if (!isNaN(pickupMs) && now >= pickupMs) {
+            handleUpdateOrderStatus(ord.id, "Chờ giao hàng");
+          }
+        }
+      });
+    };
+
+    checkPickupSchedule();
+    const pickupTimer = setInterval(checkPickupSchedule, 5000);
+    return () => clearInterval(pickupTimer);
+  }, [orders]);
 
   // Xác nhận đã nhận hàng (Ở phần chờ giao hàng -> chuyển sang Đánh giá)
   const handleConfirmReceived = (orderId: string) => {

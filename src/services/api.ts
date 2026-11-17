@@ -119,6 +119,7 @@ export interface OrderPayload {
   status?: string;
   isPaid?: boolean;
   pickupTime?: string;
+  deliveryTime?: string;
   shippingCarrier?: string;
 }
 

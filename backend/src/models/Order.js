@@ -33,6 +33,8 @@ const orderSchema = new mongoose.Schema(
     isPaid: { type: Boolean, default: false },
     // Thời gian hẹn shipper đến lấy hàng (dạng chuỗi ISO hoặc ngày giờ)
     pickupTime: { type: String, default: null },
+    // Thời gian dự kiến giao hàng tới khách hàng (dạng chuỗi ISO hoặc ngày giờ)
+    deliveryTime: { type: String, default: null },
     // Đơn vị vận chuyển được chọn
     shippingCarrier: { type: String, default: 'Giao Hàng Nhanh (GHN)' },
     // Trạng thái đánh giá của khách hàng sau khi nhận hàng

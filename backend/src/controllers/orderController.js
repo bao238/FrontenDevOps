@@ -261,15 +261,26 @@ exports.createOrder = async (req, res, next) => {
       );
     }
 
-    // Tự động gửi thông báo hệ thống đến người dùng về đơn hàng vừa tạo
+    // Tự động gửi thông báo hệ thống đến khách hàng và Quản trị viên về đơn hàng vừa tạo
     try {
+      // 1. Thông báo xác nhận đặt hàng thành công gửi tới khách hàng
       createInternalNotification({
         userId: created.userId || (req.user ? req.user.id : null),
         title: `Đặt hàng thành công #${created.id}`,
-        message: `Đơn hàng #${created.id} trị giá ${Number(created.totalAmount || 0).toLocaleString('vi-VN')}đ đã được tiếp nhận và đang chờ xử lý.`,
+        message: `Đơn hàng #${created.id} trị giá ${Number(created.totalAmount || 0).toLocaleString('vi-VN')}đ đã được tiếp nhận và đang chờ shop xác nhận.`,
         type: 'order',
         link: '/orders',
         metadata: { orderId: created.id, totalAmount: created.totalAmount }
+      });
+
+      // 2. Thông báo tự động gửi tới Quản trị viên/Nhân viên thông báo có đơn hàng mới cần xử lý
+      createInternalNotification({
+        userId: null,
+        title: `Có đơn hàng mới #${created.id}`,
+        message: `Khách hàng ${created.customerInfo?.fullName || 'Khách vãng lai'} vừa đặt đơn hàng #${created.id} (${Number(created.totalAmount || 0).toLocaleString('vi-VN')}đ). Vui lòng kiểm tra và xác nhận đơn.`,
+        type: 'order',
+        link: '/admin',
+        metadata: { orderId: created.id, totalAmount: created.totalAmount, forAdmin: true }
       });
     } catch (e) {
       // Bỏ qua lỗi thông báo để không gián đoạn kết quả trả về của đơn hàng
@@ -325,16 +336,36 @@ exports.updateOrderStatus = async (req, res, next) => {
       );
     }
 
-    // Tự động gửi thông báo cập nhật tiến độ đơn hàng cho khách hàng
+    // Tự động gửi thông báo cập nhật tiến độ đơn hàng chuẩn hóa cho khách hàng
     if (req.body.status && req.body.status !== existingOrder.status) {
       try {
+        const newStatus = req.body.status;
+        let notifTitle = `Cập nhật tiến độ đơn hàng #${existingOrder.id}`;
+        let notifMsg = `Đơn hàng #${existingOrder.id} của bạn đã được chuyển sang trạng thái: "${newStatus}".`;
+
+        // Tùy biến thông điệp chi tiết, chuyên nghiệp theo từng mốc trạng thái
+        if (newStatus === 'Chờ lấy hàng') {
+          notifTitle = `Đơn hàng #${existingOrder.id} đã được xác nhận`;
+          notifMsg = `Shop đã xác nhận đơn hàng #${existingOrder.id}. Sách đang được đóng gói cẩn thận để bàn giao cho đơn vị vận chuyển.`;
+        } else if (newStatus === 'Chờ giao hàng' || newStatus === 'Đang giao') {
+          const carrier = req.body.shippingCarrier || existingOrder.shippingCarrier || 'Giao Hàng Nhanh (GHN)';
+          notifTitle = `Đơn hàng #${existingOrder.id} đang trên đường giao`;
+          notifMsg = `Kiện hàng #${existingOrder.id} đã bàn giao cho ${carrier} và đang trên đường giao đến bạn. Vui lòng để ý điện thoại nhé!`;
+        } else if (newStatus === 'Hoàn tất') {
+          notifTitle = `Đơn hàng #${existingOrder.id} đã giao thành công`;
+          notifMsg = `Kiện hàng #${existingOrder.id} đã giao thành công! Cảm ơn bạn đã mua sắm tại BookStore. Hãy để lại đánh giá để nhận thêm ưu đãi nhé.`;
+        } else if (newStatus === 'Đã hủy') {
+          notifTitle = `Đơn hàng #${existingOrder.id} đã bị hủy`;
+          notifMsg = `Đơn hàng #${existingOrder.id} đã được hủy thành công.${existingOrder.couponCode ? ` Mã giảm giá "${existingOrder.couponCode}" đã được hoàn trả lại cho bạn.` : ''}`;
+        }
+
         createInternalNotification({
           userId: existingOrder.userId || null,
-          title: `Cập nhật tiến độ đơn hàng #${existingOrder.id}`,
-          message: `Đơn hàng #${existingOrder.id} của bạn đã được chuyển sang trạng thái: "${req.body.status}".`,
+          title: notifTitle,
+          message: notifMsg,
           type: 'order',
           link: '/orders',
-          metadata: { orderId: existingOrder.id, newStatus: req.body.status, oldStatus: existingOrder.status }
+          metadata: { orderId: existingOrder.id, newStatus, oldStatus: existingOrder.status }
         });
       } catch (e) {
         // Bỏ qua lỗi thông báo để đảm bảo API phản hồi ổn định

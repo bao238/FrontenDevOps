@@ -29,78 +29,6 @@ import { UserProfile, OrderRecord } from "../App";
 import { OrderTabKey } from "./MyOrdersPage";
 import { api } from "../services/api";
 
-// 4 Icon chuẩn nét vẽ vector tương đồng 100% với Hình 2 (Shopee)
-const ConfirmIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
-  <svg
-    viewBox="0 0 48 48"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <rect x="8" y="16" width="32" height="24" rx="2" />
-    <path d="M14 16V10a1.5 1.5 0 0 1 1.5-1.5h15l5.5 5.5v2" />
-    <rect x="25" y="24" width="15" height="8" rx="1.5" />
-    <circle cx="28.5" cy="28" r="1" fill="currentColor" />
-  </svg>
-);
-
-const PickupBoxIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
-  <svg
-    viewBox="0 0 48 48"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M9 16h30v22H9z" />
-    <path d="M9 16l4-6h22l4 6" />
-    <path d="M24 10v28" />
-    <path d="M18 24h12" />
-  </svg>
-);
-
-const ShippingTruckIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
-  <svg
-    viewBox="0 0 48 48"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M6 14h24v20H6z" />
-    <path d="M30 20h8l4 6v8h-12z" />
-    <path d="M30 22h7l3 4h-10z" />
-    <circle cx="14" cy="35" r="3.5" />
-    <circle cx="36" cy="35" r="3.5" />
-    <path d="M6 34h4.5M17.5 34h15M39.5 34H42" />
-  </svg>
-);
-
-const ReviewStarIcon = ({ className = "w-8 h-8 sm:w-9 sm:h-9" }: { className?: string }) => (
-  <svg
-    viewBox="0 0 48 48"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <circle cx="24" cy="24" r="18" />
-    <path
-      d="M24 13l3.2 6.5 7.2 1-5.2 5.1 1.2 7.2-6.4-3.4-6.4 3.4 1.2-7.2-5.2-5.1 7.2-1z"
-      fill="none"
-    />
-  </svg>
-);
-
 interface ProfilePageProps {
   currentUser: UserProfile | null;
   onUpdateProfile: (updated: Partial<UserProfile>) => Promise<{ success: boolean; message?: string } | void> | void;
@@ -134,20 +62,6 @@ export default function ProfilePage({
   onLogout,
   onContinueShopping,
 }: ProfilePageProps) {
-  // Tính số lượng badge cho 4 ô theo đúng yêu cầu đề bài
-  const pendingConfirmCount = orders.filter(
-    (o) => o.status === "Chờ xác nhận" || (o.status === "Đang xử lý" && !o.pickupTime)
-  ).length;
-
-  const pendingPickupCount = orders.filter((o) => o.status === "Chờ lấy hàng").length;
-
-  const pendingShippingCount = orders.filter(
-    (o) => o.status === "Chờ giao hàng" || (o.status === "Đang giao" && !o.receivedAt)
-  ).length;
-
-  const pendingReviewCount = orders.filter(
-    (o) => (o.status === "Hoàn tất" || Boolean(o.receivedAt)) && !o.isReviewed
-  ).length;
   // Tab con trong trang hồ sơ
   const [activeSubTab, setActiveSubTab] = useState<"info" | "security" | "rewards">("info");
 
@@ -350,7 +264,7 @@ export default function ProfilePage({
           <button onClick={onContinueShopping} className="hover:text-blue-600 transition-colors">
             Trang chủ
           </button>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
           <span className="font-bold text-slate-900">Hồ sơ người dùng</span>
         </div>
 
@@ -371,7 +285,7 @@ export default function ProfilePage({
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={onOpenAuth}
-              className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-blue-500/25 transition-all transform hover:-translate-y-0.5"
+              className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg transition-all transform hover:-translate-y-0.5"
             >
               Đăng Nhập Ngay
             </button>
@@ -395,7 +309,7 @@ export default function ProfilePage({
           <button onClick={onContinueShopping} className="hover:text-blue-600 transition-colors font-medium">
             Trang chủ
           </button>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
           <span className="font-bold text-slate-900">Hồ sơ cá nhân</span>
         </div>
 
@@ -409,9 +323,9 @@ export default function ProfilePage({
       </div>
 
       {/* Hero Card: Tổng Quan Tài Khoản Độc Giả */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-6 sm:p-10 shadow-xl border border-blue-900/40">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-6 sm:p-10 shadow-md border border-blue-900/40">
         {/* Glow ambient */}
-        <div className="absolute -right-16 -top-16 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+        
 
         <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-5 text-center sm:text-left">
@@ -424,14 +338,14 @@ export default function ProfilePage({
               <img
                 src={avatarUrl || currentUser.avatarUrl || "/default-avatar.png"}
                 alt={currentUser.name}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-white/20 shadow-2xl transition-all group-hover:brightness-75"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-white/20 shadow-md transition-all"
               />
               {/* Lớp phủ đổi ảnh khi hover */}
               <div className="absolute inset-0 rounded-3xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white space-y-1">
-                <Camera className="w-6 h-6 animate-pulse" />
-                <span className="text-[10px] font-bold">Đổi ảnh</span>
+                <Camera className="w-6 h-6" />
+                <span className="text-xs font-bold">Đổi ảnh</span>
               </div>
-              <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-xl shadow-md border border-white/30 group-hover:scale-110 transition-transform">
+              <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-xl shadow-md border border-white/30 transition-colors">
                 <Camera className="w-4 h-4" />
               </div>
             </div>
@@ -452,7 +366,7 @@ export default function ProfilePage({
                 <span>{currentUser.email}</span>
               </p>
 
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs text-slate-400 pt-1">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs text-slate-500 pt-1">
                 <span className="flex items-center space-x-1">
                   <Calendar className="w-3.5 h-3.5 text-amber-400" />
                   <span>Thành viên từ: {currentUser.memberSince || "2026"}</span>
@@ -474,150 +388,67 @@ export default function ProfilePage({
         </div>
       </div>
 
-      {/* KHỐI ĐƠN MUA GỘP 4 Ô CHUẨN GIAO DIỆN HÌNH ẢNH 2 (GIAO DIỆN NHỎ GỌN, TINH TẾ) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3.5 sm:p-4.5 transition-all">
-        {/* Header khối Đơn mua */}
-        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-          <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-            Đơn mua
-          </h3>
-          <button
-            type="button"
-            onClick={() => onNavigateToOrders("all")}
-            className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors flex items-center space-x-1 cursor-pointer group"
-          >
-            <span>Xem lịch sử mua hàng</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
-
-        {/* 4 Ô trạng thái chuẩn hình ảnh 2 (Thu nhỏ icon và padding thanh thoát) */}
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-3 pt-3 sm:pt-3.5">
-          {/* Ô 1: Chờ xác nhận */}
-          <button
-            type="button"
-            onClick={() => onNavigateToOrders("Chờ xác nhận")}
-            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
-          >
-            <div className="relative">
-              <ConfirmIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
-              {pendingConfirmCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
-                  {pendingConfirmCount}
-                </span>
-              )}
-            </div>
-            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
-              Chờ xác nhận
-            </span>
-          </button>
-
-          {/* Ô 2: Chờ lấy hàng */}
-          <button
-            type="button"
-            onClick={() => onNavigateToOrders("Chờ lấy hàng")}
-            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
-          >
-            <div className="relative">
-              <PickupBoxIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
-              {pendingPickupCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
-                  {pendingPickupCount}
-                </span>
-              )}
-            </div>
-            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
-              Chờ lấy hàng
-            </span>
-          </button>
-
-          {/* Ô 3: Chờ giao hàng (hiện badge đỏ nếu > 0 như ảnh 2) */}
-          <button
-            type="button"
-            onClick={() => onNavigateToOrders("Chờ giao hàng")}
-            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
-          >
-            <div className="relative">
-              <ShippingTruckIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
-              {pendingShippingCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
-                  {pendingShippingCount}
-                </span>
-              )}
-            </div>
-            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
-              Chờ giao hàng
-            </span>
-          </button>
-
-          {/* Ô 4: Đánh giá (chỉ hiện số khi chưa đánh giá, đánh giá rồi thì ko hiện nữa) */}
-          <button
-            type="button"
-            onClick={() => onNavigateToOrders("Đánh giá")}
-            className="group relative flex flex-col items-center justify-center py-2 px-1.5 sm:py-2.5 sm:px-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
-          >
-            <div className="relative">
-              <ReviewStarIcon className="w-6 h-6 sm:w-7 sm:h-7 text-slate-800 transition-transform group-hover:scale-105" />
-              {pendingReviewCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-4.5 px-1 bg-[#ee4d2d] text-white text-[10px] font-black rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
-                  {pendingReviewCount}
-                </span>
-              )}
-            </div>
-            <span className="mt-1.5 text-[11px] sm:text-xs font-bold text-slate-800 text-center leading-tight">
-              Đánh giá
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2 Thẻ Chỉ Số Nhanh (Đơn hàng của tôi & Điểm thưởng) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Đơn hàng của tôi (thay thế cho Sách yêu thích) */}
-        <div
-          onClick={() => onNavigateToOrders("all")}
-          className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group flex items-center justify-between"
-        >
+      {/* 3 Thẻ Đặc Quyền & Trạng Thái Thành Viên Cao Cấp (Đã loại bỏ Đơn mua & Đơn hàng theo yêu cầu) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+        {/* Thẻ 1: Hạng thành viên & Điểm tích lũy */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
           <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <ShoppingBag className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="block text-xs text-slate-400 font-medium">Đơn hàng của tôi</span>
-              <span className="text-xl font-black text-slate-900">{ordersCount} đơn</span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
-        </div>
-
-
-        {/* Điểm thưởng & Hạng thẻ */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <Award className="w-6 h-6" />
             </div>
             <div>
-              <span className="block text-xs text-slate-400 font-medium">Điểm tích lũy</span>
-              <span className="text-xl font-black text-amber-600">180 Điểm (Thẻ Vàng)</span>
+              <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">Hạng Thành Viên</span>
+              <span className="text-base sm:text-lg font-black text-amber-600">Thẻ Vàng (180 Điểm)</span>
             </div>
           </div>
-          <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-amber-100 text-amber-900 font-black px-2.5 py-1 rounded-full shrink-0">
             Giảm 5%
+          </span>
+        </div>
+
+        {/* Thẻ 2: Trạng thái bảo mật */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">Bảo Mật Tài Khoản</span>
+              <span className="text-base sm:text-lg font-black text-emerald-700">Đã Xác Thực 100%</span>
+            </div>
+          </div>
+          <span className="text-xs bg-emerald-100 text-emerald-900 font-black px-2.5 py-1 rounded-full shrink-0">
+            An Toàn
+          </span>
+        </div>
+
+        {/* Thẻ 3: Quyền lợi độc giả */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">Đặc Quyền Độc Giả</span>
+              <span className="text-base sm:text-lg font-black text-blue-700">Freeship từ 250k</span>
+            </div>
+          </div>
+          <span className="text-xs bg-blue-100 text-blue-900 font-black px-2.5 py-1 rounded-full shrink-0">
+            Book Club
           </span>
         </div>
       </div>
 
       {/* Tabs Chức Năng Hồ Sơ */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-100 p-2 sm:p-3 bg-slate-50/70 gap-2 overflow-x-auto">
+        {/* Navigation Tabs - Giao diện phẳng loại bỏ lồng thẻ NESTED CARDS */}
+        <div className="flex border-b border-slate-200 px-6 pt-4 gap-4 sm:gap-6 overflow-x-auto">
           <button
             onClick={() => setActiveSubTab("info")}
-            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center space-x-2 whitespace-nowrap ${
+            className={`pb-3.5 text-xs sm:text-sm font-bold transition-all flex items-center space-x-2 whitespace-nowrap border-b-2 cursor-pointer ${
               activeSubTab === "info"
-                ? "bg-white text-blue-700 shadow-sm"
-                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-slate-600 hover:text-slate-900"
             }`}
           >
             <User className="w-4 h-4" />
@@ -626,10 +457,10 @@ export default function ProfilePage({
 
           <button
             onClick={() => setActiveSubTab("security")}
-            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center space-x-2 whitespace-nowrap ${
+            className={`pb-3.5 text-xs sm:text-sm font-bold transition-all flex items-center space-x-2 whitespace-nowrap border-b-2 cursor-pointer ${
               activeSubTab === "security"
-                ? "bg-white text-blue-700 shadow-sm"
-                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-slate-600 hover:text-slate-900"
             }`}
           >
             <Lock className="w-4 h-4" />
@@ -638,10 +469,10 @@ export default function ProfilePage({
 
           <button
             onClick={() => setActiveSubTab("rewards")}
-            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center space-x-2 whitespace-nowrap ${
+            className={`pb-3.5 text-xs sm:text-sm font-bold transition-all flex items-center space-x-2 whitespace-nowrap border-b-2 cursor-pointer ${
               activeSubTab === "rewards"
-                ? "bg-white text-blue-700 shadow-sm"
-                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-slate-600 hover:text-slate-900"
             }`}
           >
             <Gift className="w-4 h-4" />
@@ -682,7 +513,7 @@ export default function ProfilePage({
                   <label className="block font-bold text-slate-700">
                     Ảnh đại diện hồ sơ độc giả:
                   </label>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-xs text-slate-600 font-medium">
                     Hỗ trợ tải ảnh từ máy tính (PNG, JPG, WEBP) hoặc chọn mẫu có sẵn
                   </span>
                 </div>
@@ -697,7 +528,7 @@ export default function ProfilePage({
                 />
 
                 {avatarUploadError && (
-                  <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-[11px] flex items-center space-x-1.5">
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center space-x-1.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>{avatarUploadError}</span>
                   </div>
@@ -708,11 +539,11 @@ export default function ProfilePage({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-12 h-12 rounded-2xl border-2 border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/60 hover:bg-blue-100/70 flex flex-col items-center justify-center text-blue-600 transition-all hover:scale-105 group cursor-pointer shadow-2xs shrink-0"
+                    className="w-12 h-12 rounded-2xl border-2 border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/60 hover:bg-blue-100/70 flex flex-col items-center justify-center text-blue-600 transition-all  group cursor-pointer shadow-2xs shrink-0"
                     title="Tải ảnh đại diện từ thiết bị của bạn"
                   >
                     <Upload className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-                    <span className="text-[9px] font-bold mt-0.5">Tải lên</span>
+                    <span className="text-xs font-bold mt-0.5">Tải lên</span>
                   </button>
 
                   {/* 4 Avatar mẫu chuẩn phong cách tri thức */}
@@ -725,7 +556,7 @@ export default function ProfilePage({
                         setAvatarUploadError(null);
                         setAvatarUrl(url);
                       }}
-                      className={`w-12 h-12 rounded-2xl object-cover cursor-pointer border-2 transition-all hover:scale-105 shrink-0 ${
+                      className={`w-12 h-12 rounded-2xl object-cover cursor-pointer border-2 transition-all  shrink-0 ${
                         avatarUrl === url
                           ? "border-blue-600 ring-2 ring-blue-500/30 scale-105"
                           : "border-slate-200 opacity-70 hover:opacity-100"
@@ -787,7 +618,7 @@ export default function ProfilePage({
                     <button
                       type="button"
                       onClick={() => setShowUrlInput(false)}
-                      className="px-3 py-2 text-slate-400 hover:text-slate-600 text-xs font-semibold"
+                      className="px-3 py-2 text-slate-500 hover:text-slate-600 text-xs font-semibold"
                     >
                       Đóng
                     </button>
@@ -801,7 +632,7 @@ export default function ProfilePage({
                     Họ và tên độc giả *
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       required
@@ -818,7 +649,7 @@ export default function ProfilePage({
                     Số điện thoại nhận sách
                   </label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="tel"
                       value={phone}
@@ -835,7 +666,7 @@ export default function ProfilePage({
                   Địa chỉ email (Dùng để đăng nhập) *
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
                     required
@@ -845,7 +676,7 @@ export default function ProfilePage({
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-semibold"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Email dùng để nhận thông báo đơn hàng và đăng nhập vào BookStore.</p>
+                <p className="text-xs text-slate-500 mt-1">Email dùng để nhận thông báo đơn hàng và đăng nhập vào BookStore.</p>
               </div>
 
               <div>
@@ -853,7 +684,7 @@ export default function ProfilePage({
                   Địa chỉ nhận hàng mặc định
                 </label>
                 <div className="relative">
-                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <MapPin className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <textarea
                     rows={2}
                     value={address}
@@ -868,7 +699,7 @@ export default function ProfilePage({
                 <button
                   type="submit"
                   disabled={isSavingInfo}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2 cursor-pointer"
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center space-x-2 cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingInfo ? "Đang lưu thay đổi..." : "Lưu Thay Đổi Hồ Sơ"}</span>
@@ -910,7 +741,7 @@ export default function ProfilePage({
                   Mật khẩu hiện tại *
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     required
@@ -927,7 +758,7 @@ export default function ProfilePage({
                   Mật khẩu mới *
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     required
@@ -944,7 +775,7 @@ export default function ProfilePage({
                   Xác nhận mật khẩu mới *
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     required

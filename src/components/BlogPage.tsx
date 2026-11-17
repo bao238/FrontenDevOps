@@ -113,13 +113,13 @@ export default function BlogPage({
               onClick={() => setSelectedCategory(cat)}
               className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 selectedCategory === cat
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25 scale-[1.02]"
+                  ? "bg-indigo-600 text-white shadow-md scale-[1.02]"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
               <span>{cat}</span>
               {cat === "Tất cả" ? (
-                <span className="text-[10px] bg-white/20 px-1.5 py-0.2 rounded-full font-black">
+                <span className="text-xs bg-white/20 px-1.5 py-0.2 rounded-full font-black">
                   {BLOG_POSTS.length}
                 </span>
               ) : null}
@@ -177,7 +177,7 @@ export default function BlogPage({
                     alt={post.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <span className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1 rounded-full border border-white/20">
+                  <span className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full border border-white/20">
                     {post.category}
                   </span>
                   <button
@@ -185,7 +185,7 @@ export default function BlogPage({
                     onClick={(e) => handleToggleLike(e, post.id)}
                     className={`absolute top-4 right-4 p-2 rounded-full backdrop-blur-md transition-all ${
                       isLiked
-                        ? "bg-red-500 text-white shadow-lg shadow-red-500/40"
+                        ? "bg-red-500 text-white shadow-lg"
                         : "bg-white/80 hover:bg-white text-slate-700"
                     }`}
                     title={isLiked ? "Bỏ thích" : "Yêu thích bài viết"}
@@ -198,7 +198,7 @@ export default function BlogPage({
                 <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2.5">
                     {/* Meta info: Ngày đăng & Thời gian đọc */}
-                    <div className="flex items-center space-x-3 text-[11px] text-slate-500 font-medium">
+                    <div className="flex items-center space-x-3 text-xs text-slate-500 font-medium">
                       <span className="flex items-center space-x-1">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         <span>{post.date}</span>
@@ -232,7 +232,7 @@ export default function BlogPage({
                       </div>
                       <div>
                         <p className="text-xs font-bold text-slate-900">{post.author}</p>
-                        <p className="text-[10px] text-slate-400">{post.authorRole}</p>
+                        <p className="text-xs text-slate-400">{post.authorRole}</p>
                       </div>
                     </div>
 
@@ -326,9 +326,9 @@ export default function BlogPage({
                 <div className="mt-8 pt-6 border-t border-slate-200 space-y-4 bg-slate-50 p-5 rounded-2xl">
                   <div className="flex items-center space-x-2">
                     <BookOpen className="w-5 h-5 text-indigo-600" />
-                    <h4 className="font-black text-sm text-slate-900 uppercase">
+                    <h2 className="font-black text-sm text-slate-900 uppercase">
                       Tác Phẩm Được Nhắc Tới Trong Bài Viết Này
-                    </h4>
+                    </h2>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -350,7 +350,7 @@ export default function BlogPage({
                               <p className="font-bold text-xs text-slate-900 truncate">
                                 {book.name}
                               </p>
-                              <p className="text-[11px] font-bold text-red-600">
+                              <p className="text-xs font-bold text-red-600">
                                 {book.price.toLocaleString("vi-VN")} đ
                               </p>
                             </div>
@@ -361,7 +361,7 @@ export default function BlogPage({
                               setReadingPost(null);
                               onSelectBook(book);
                             }}
-                            className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-lg text-[11px] font-bold transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+                            className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-1 cursor-pointer"
                           >
                             <span>Xem Sách</span>
                             <ChevronRight className="w-3.5 h-3.5" />

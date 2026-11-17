@@ -57,7 +57,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto animate-in zoom-in-95 duration-200">
+      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-lg border border-slate-200 overflow-hidden my-auto animate-in zoom-in-95 duration-200">
         {/* Thanh công cụ thao tác phía trên (Ẩn khi in ra giấy) */}
         <div className="no-print bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
           <div className="flex items-center space-x-2">
@@ -66,7 +66,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
             </div>
             <div>
               <h3 className="font-extrabold text-sm sm:text-base">Hóa Đơn Bán Lẻ BookStore</h3>
-              <p className="text-[11px] text-slate-400">Xem trước &amp; In hóa đơn mua sách hoặc lưu tệp PDF</p>
+              <p className="text-xs text-slate-500">Xem trước &amp; In hóa đơn mua sách hoặc lưu tệp PDF</p>
             </div>
           </div>
 
@@ -82,7 +82,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors text-slate-400 hover:text-white"
+              className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors text-slate-500 hover:text-white"
             >
               <X className="w-4 h-4" />
             </button>
@@ -104,16 +104,16 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
                 <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
                   Nhà Sách Trực Tuyến BookStore
                 </h1>
-                <p className="text-[11px] text-slate-500 font-medium">
+                <p className="text-xs text-slate-500 font-medium">
                   Tri thức nhân loại &bull; Nền tảng thương mại sách Bestseller
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   Địa chỉ: Tòa nhà BookStore Center, Hải Châu, Đà Nẵng
                 </p>
               </div>
             </div>
 
-            <div className="text-right sm:text-right space-y-0.5 text-slate-600 text-[11px]">
+            <div className="text-right sm:text-right space-y-0.5 text-slate-600 text-xs">
               <p><strong className="text-slate-900">MST:</strong> 0401899889-001</p>
               <p><strong className="text-slate-900">Hotline:</strong> 1900 6868 (24/7)</p>
               <p><strong className="text-slate-900">Email:</strong> cskh@bookstore.vn</p>
@@ -126,7 +126,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
             <h2 className="text-lg font-black text-slate-900 tracking-wide uppercase">
               HÓA ĐƠN BÁN LẺ KIÊM PHIẾU GIAO HÀNG
             </h2>
-            <p className="text-[11px] text-slate-500 italic">
+            <p className="text-xs text-slate-500 italic">
               (Lưu hành nội bộ &amp; Đối chiếu khi giao nhận hàng)
             </p>
           </div>
@@ -150,14 +150,14 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
               </div>
               <div className="flex items-center space-x-1.5">
                 <span className="text-slate-500 font-medium w-28">Trạng thái TT:</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center space-x-1">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center space-x-1">
                   <CheckCircle2 className="w-3 h-3 text-emerald-700" />
                   <span>ĐÃ THANH TOÁN (PAID)</span>
                 </span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <span className="text-slate-500 font-medium w-28">Trạng thái đơn:</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
                   {order.status}
                 </span>
               </div>
@@ -195,7 +195,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse border border-slate-200">
               <thead>
-                <tr className="bg-slate-100 text-slate-700 uppercase font-bold text-[11px]">
+                <tr className="bg-slate-100 text-slate-700 uppercase font-bold text-xs">
                   <th className="py-2.5 px-3 border border-slate-200 text-center w-10">STT</th>
                   <th className="py-2.5 px-3 border border-slate-200">Tên Tác Phẩm / Tựa Sách</th>
                   <th className="py-2.5 px-3 border border-slate-200 text-center w-20">SL</th>
@@ -215,7 +215,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
                       <td className="py-2.5 px-3 border border-slate-200">
                         <p className="font-bold text-slate-900">{item.product?.name || "Tác phẩm"}</p>
                         {item.product?.category && (
-                          <p className="text-[10px] text-slate-500">
+                          <p className="text-xs text-slate-500">
                             Thể loại: {item.product.category}
                           </p>
                         )}
@@ -238,7 +238,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
 
           {/* 5. Khối tổng tiền thanh toán */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pt-2">
-            <div className="space-y-1.5 text-slate-500 text-[11px] max-w-sm">
+            <div className="space-y-1.5 text-slate-500 text-xs max-w-sm">
               <p className="font-semibold text-slate-700">Quy định đổi trả &amp; Bảo hành:</p>
               <ul className="list-disc list-inside space-y-0.5">
                 <li>Đổi trả miễn phí trong 7 ngày nếu lỗi in ấn, thiếu trang hoặc rách bìa.</li>
@@ -279,7 +279,7 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
           <div className="grid grid-cols-2 text-center pt-6 pb-4">
             <div>
               <p className="font-bold text-slate-900 uppercase">Khách hàng nhận sách</p>
-              <p className="text-[10px] text-slate-400 italic">(Ký và ghi rõ họ tên)</p>
+              <p className="text-xs text-slate-500 italic">(Ký và ghi rõ họ tên)</p>
               <div className="h-16"></div>
               <p className="font-semibold text-slate-700">
                 {order.customerInfo?.fullName || "Khách hàng"}
@@ -288,9 +288,9 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
 
             <div>
               <p className="font-bold text-slate-900 uppercase">Đại diện Nhà Sách BookStore</p>
-              <p className="text-[10px] text-slate-400 italic">(Đã ký xác nhận điện tử)</p>
+              <p className="text-xs text-slate-500 italic">(Đã ký xác nhận điện tử)</p>
               <div className="h-16 flex items-center justify-center">
-                <span className="text-[11px] font-mono text-emerald-600 font-bold border border-emerald-300 bg-emerald-50 px-2 py-0.5 rounded">
+                <span className="text-xs font-mono text-emerald-600 font-bold border border-emerald-300 bg-emerald-50 px-2 py-0.5 rounded">
                   [VERIFIED E-INVOICE]
                 </span>
               </div>
@@ -301,8 +301,8 @@ export default function InvoiceModal({ isOpen, order, onClose }: InvoiceModalPro
 
         {/* Chân Modal thao tác */}
         <div className="no-print bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">
-            Nhấn <kbd className="px-1.5 py-0.5 bg-slate-200 rounded font-mono text-[10px]">Ctrl + P</kbd> hoặc nút In để xuất hóa đơn sang PDF
+          <span className="text-xs text-slate-500">
+            Nhấn <kbd className="px-1.5 py-0.5 bg-slate-200 rounded font-mono text-xs">Ctrl + P</kbd> hoặc nút In để xuất hóa đơn sang PDF
           </span>
           <button
             type="button"

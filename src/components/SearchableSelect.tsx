@@ -139,7 +139,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           {currentLabel || placeholder}
         </span>
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+          className={`w-4 h-4 text-slate-500 shrink-0 transition-transform duration-200 ${
             isOpen ? "rotate-180 text-blue-600" : ""
           }`}
         />
@@ -147,10 +147,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
       {/* Menu xổ xuống chứa ô tìm kiếm và danh sách lựa chọn */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl p-2 space-y-1.5 animate-in fade-in zoom-in-95 duration-150 min-w-[220px]">
+        <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-md p-2 space-y-1.5 animate-in fade-in zoom-in-95 duration-150 min-w-[220px]">
           {/* Ô nhập tìm kiếm theo tên NXB/Tác giả */}
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               ref={searchInputRef}
               type="text"
@@ -173,7 +173,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600 p-0.5 rounded-full"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -239,7 +239,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               })
             ) : (
               !isCustomNewValue && (
-                <div className="py-4 px-2 text-center text-xs text-slate-400 font-medium">
+                <div className="py-4 px-2 text-center text-xs text-slate-500 font-medium">
                   Không tìm thấy kết quả phù hợp
                 </div>
               )

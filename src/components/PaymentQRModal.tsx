@@ -65,7 +65,7 @@ export default function PaymentQRModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 flex flex-col max-h-[94vh] overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full shadow-lg border border-slate-200 flex flex-col max-h-[94vh] overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header Modal thu gọn, cố định ở trên */}
         <div className="px-4 sm:px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center space-x-2.5">
@@ -77,11 +77,11 @@ export default function PaymentQRModal({
                 <h3 className="font-bold text-slate-900 text-sm sm:text-base">
                   Thanh Toán VietQR
                 </h3>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[9px] font-bold tracking-wider uppercase whitespace-nowrap shrink-0">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold tracking-wider uppercase whitespace-nowrap shrink-0">
                   Napas 247
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-xs text-slate-500">
                 Quét mã QR bằng ứng dụng ngân hàng bất kỳ
               </p>
             </div>
@@ -89,7 +89,7 @@ export default function PaymentQRModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
             title="Đóng modal"
           >
             <X className="w-4 h-4" />
@@ -101,7 +101,7 @@ export default function PaymentQRModal({
           {/* Khung hiển thị Mã QR */}
           <div className="bg-slate-50/90 p-2.5 sm:p-3 rounded-2xl border border-slate-100 text-center flex flex-col items-center">
             {/* Bộ nút chuyển đổi tab xem: chia đều 50/50, chiều cao gọn */}
-            <div className="grid grid-cols-2 gap-1 p-0.5 bg-slate-200/80 rounded-lg w-full max-w-xs mx-auto mb-2 text-[11px]">
+            <div className="grid grid-cols-2 gap-1 p-0.5 bg-slate-200/80 rounded-lg w-full max-w-xs mx-auto mb-2 text-xs">
               <button
                 type="button"
                 onClick={() => setQrType("card")}
@@ -135,7 +135,7 @@ export default function PaymentQRModal({
                     alt="Mã QR MBBank CAO DINH BAO 0347934359"
                     className="w-36 h-36 sm:w-40 sm:h-40 object-contain mx-auto rounded-lg"
                   />
-                  <p className="mt-1 text-[10px] font-medium text-slate-500">
+                  <p className="mt-1 text-xs font-medium text-slate-500">
                     MBBank Napas247 - CAO DINH BAO
                   </p>
                 </div>
@@ -146,14 +146,14 @@ export default function PaymentQRModal({
                     alt="VietQR Tự động điền số tiền"
                     className="w-36 h-36 sm:w-40 sm:h-40 object-contain mx-auto"
                   />
-                  <p className="mt-1 text-[10px] font-medium text-slate-500">
+                  <p className="mt-1 text-xs font-medium text-slate-500">
                     Quét tự điền {formatVND(totalAmount)}
                   </p>
                 </div>
               )}
             </div>
             <div className="flex items-center space-x-1.5 text-slate-500 text-[10.5px]">
-              <Clock className="w-3 h-3 text-blue-600 animate-pulse" />
+              <Clock className="w-3 h-3 text-blue-600 " />
               <span>Hệ thống tự động nhận diện và cập nhật đơn hàng</span>
             </div>
           </div>
@@ -172,7 +172,7 @@ export default function PaymentQRModal({
                 <button
                   type="button"
                   onClick={() => handleCopy(ACCOUNT_NO, "accountNo")}
-                  className="p-0.5 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                  className="p-0.5 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
                   title="Sao chép số tài khoản"
                 >
                   {copiedField === "accountNo" ? (
@@ -198,7 +198,7 @@ export default function PaymentQRModal({
                 <button
                   type="button"
                   onClick={() => handleCopy(String(Math.round(totalAmount)), "amount")}
-                  className="p-0.5 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                  className="p-0.5 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
                   title="Sao chép số tiền"
                 >
                   {copiedField === "amount" ? (
@@ -213,13 +213,13 @@ export default function PaymentQRModal({
             <div className="flex items-center justify-between text-slate-600 py-0.5">
               <span className="text-slate-500">Nội dung CK:</span>
               <div className="flex items-center space-x-1.5">
-                <span className="font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 text-xs">
+                <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 text-xs">
                   {TRANSFER_CONTENT}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopy(TRANSFER_CONTENT, "content")}
-                  className="p-0.5 text-slate-400 hover:text-purple-600 transition-colors cursor-pointer"
+                  className="p-0.5 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                   title="Sao chép nội dung chuyển khoản"
                 >
                   {copiedField === "content" ? (

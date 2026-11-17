@@ -199,31 +199,31 @@ export default function CategoriesTab() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header & Công cụ */}
-      <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header & Công cụ - Thu nhỏ gọn gàng, tinh tế */}
+      <div className="bg-white rounded-xl p-3.5 sm:p-4 shadow-2xs border border-slate-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center space-x-2">
-            <Folder className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center space-x-2">
+            <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
             <span>Quản Lý Thể Loại Sách (Categories)</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-0.5">
             Định nghĩa các chuyên mục sách lưu trong MongoDB, tự động hiển thị ra bộ lọc trang chủ
           </p>
         </div>
 
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-2 shrink-0">
           <button
             onClick={fetchCategories}
             disabled={isLoading}
-            className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
             title="Làm mới từ MongoDB"
           >
             <RotateCcw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 shadow-md shadow-indigo-500/20 transition-all"
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-bold flex items-center space-x-2 shadow-xs transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>Thêm Thể Loại Sách</span>
@@ -231,19 +231,19 @@ export default function CategoriesTab() {
         </div>
       </div>
 
-      {/* Tìm kiếm */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
+      {/* Tìm kiếm - Thu nhỏ gọn */}
+      <div className="bg-white rounded-xl p-3 shadow-2xs border border-slate-200/90 flex items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Tìm theo tên thể loại hoặc mô tả..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
           />
         </div>
-        <span className="text-xs text-slate-500 font-medium">
+        <span className="text-xs text-slate-500 font-medium shrink-0">
           Tổng số: <strong className="text-indigo-600 font-bold">{categories.length} thể loại</strong>
         </span>
       </div>
@@ -258,7 +258,7 @@ export default function CategoriesTab() {
         <div className="p-12 text-center bg-white rounded-2xl border border-slate-100">
           <Folder className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-base font-bold text-slate-700">Chưa có thể loại nào</h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
             Không tìm thấy thể loại nào phù hợp. Bấm "Thêm Thể Loại Sách" để tạo danh mục đầu tiên.
           </p>
         </div>
@@ -294,7 +294,8 @@ export default function CategoriesTab() {
                 </div>
 
                 <div className="space-y-1">
-                  <h4 className="text-base font-bold text-slate-800">{cat.name}</h4>
+                  {/* Tiêu đề cấp h3 kế thừa trực tiếp từ h2 (tránh lỗi SKIPPED HEADING LEVEL) */}
+                  <h3 className="text-base font-bold text-slate-800">{cat.name}</h3>
                   <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                     {cat.description || "Chưa có mô tả cho thể loại này."}
                   </p>
@@ -305,7 +306,8 @@ export default function CategoriesTab() {
                 <span className="font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">
                   📚 {cat.bookCount ?? 0} cuốn sách
                 </span>
-                <span className="text-[11px] text-slate-400 font-medium">
+                {/* Thứ tự hiển thị: chuẩn text-xs tương phản cao (loại bỏ 11PX BODY TEXT) */}
+                <span className="text-xs text-slate-500 font-semibold">
                   Thứ tự: #{cat.displayOrder ?? 1}
                 </span>
               </div>
@@ -332,7 +334,7 @@ export default function CategoriesTab() {
       {/* MODAL THÊM / SỬA THỂ LOẠI (Render qua createPortal vào body) */}
       {isModalOpen && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)] overflow-y-auto p-5 sm:p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 custom-scrollbar">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)] overflow-y-auto p-5 sm:p-6 shadow-lg border border-slate-200 animate-in fade-in zoom-in-95 custom-scrollbar">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base flex items-center space-x-2">
                 <Folder className="w-5 h-5 text-indigo-600" />
@@ -340,7 +342,7 @@ export default function CategoriesTab() {
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                className="p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -422,7 +424,7 @@ export default function CategoriesTab() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center space-x-1.5 shadow-md shadow-indigo-500/20 disabled:opacity-50"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center space-x-1.5 shadow-md disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSubmitting ? "Đang lưu..." : "Lưu Thể Loại"}</span>
@@ -437,7 +439,7 @@ export default function CategoriesTab() {
       {/* MODAL XÁC NHẬN XÓA (Render qua createPortal vào body) */}
       {deletingCategory && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 my-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-lg border border-slate-200 text-center space-y-4 animate-in fade-in zoom-in-95 my-auto">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -463,7 +465,7 @@ export default function CategoriesTab() {
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md shadow-red-500/20"
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md"
               >
                 Xóa ngay
               </button>

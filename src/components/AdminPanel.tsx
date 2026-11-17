@@ -58,9 +58,11 @@ import {
   Check,
   CornerDownRight,
   EyeOff,
-  Send
+  Send,
+  Bell
 } from "lucide-react";
 import CouponsTab from "./admin/CouponsTab";
+import NotificationsTab from "./admin/NotificationsTab";
 import AnalyticsTab from "./admin/AnalyticsTab";
 import CategoriesTab from "./admin/CategoriesTab";
 import AdminPagination from "./admin/AdminPagination";
@@ -172,7 +174,7 @@ export default function AdminPanel({
   onResetDefaultUsers,
 }: AdminPanelProps) {
   const [adminTab, setAdminTab] = useState<
-    "products" | "orders" | "users" | "reviews" | "coupons" | "analytics" | "categories"
+    "products" | "orders" | "users" | "reviews" | "coupons" | "notifications" | "analytics" | "categories"
   >("products");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
@@ -264,9 +266,15 @@ export default function AdminPanel({
     if (!roleModalUser) return;
     setIsUpdatingUserRole(true);
     try {
+      // Bảo vệ phân quyền: Admin được thiết lập cố định trong MongoDB, không cho phép nâng cấp hoặc hạ cấp qua UI
+      const finalRole: "admin" | "staff" | "customer" =
+        roleModalUser.role === "admin"
+          ? "admin"
+          : (roleModalRole === "admin" ? "customer" : roleModalRole);
+
       const updatedUser: UserAccount = {
         ...roleModalUser,
-        role: roleModalRole,
+        role: finalRole,
         status: roleModalStatus
       };
 
@@ -284,7 +292,7 @@ export default function AdminPanel({
       setServerUserStats((prev: any) => {
         if (!prev) return prev;
         const oldRole = roleModalUser.role || "customer";
-        const newRole = roleModalRole;
+        const newRole = finalRole;
         const oldStatus = roleModalUser.status || "active";
         const newStatus = roleModalStatus;
 
@@ -324,7 +332,7 @@ export default function AdminPanel({
 
       // 5. Gửi request cập nhật lên MongoDB
       await api.updateUser(roleModalUser.id, {
-        role: roleModalRole,
+        role: finalRole,
         status: roleModalStatus
       });
 
@@ -390,10 +398,7 @@ export default function AdminPanel({
   // Modal In Hóa Đơn trong Admin
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<OrderRecord | null>(null);
 
-  // Quản lý Modal Hẹn Giờ Lấy Hàng Cho Shipper & Bộ Lọc Đơn Hàng trong Admin
-  const [pickupModalOrder, setPickupModalOrder] = useState<OrderRecord | null>(null);
-  const [pickupDateTime, setPickupDateTime] = useState<string>("");
-  const [pickupCarrier, setPickupCarrier] = useState<string>("Giao Hàng Nhanh (GHN)");
+  // Quản lý Bộ Lọc Đơn Hàng trong Admin
   const [adminOrderFilter, setAdminOrderFilter] = useState<
     "all" | "Chờ xác nhận" | "Chờ lấy hàng" | "Chờ giao hàng" | "Hoàn tất" | "Đã hủy"
   >("all");
@@ -863,6 +868,7 @@ export default function AdminPanel({
   const [userFormStatus, setUserFormStatus] = useState<"active" | "locked">("active");
   const [userFormAddress, setUserFormAddress] = useState("");
   const [userFormAvatar, setUserFormAvatar] = useState("");
+  const userAvatarFileInputRef = useRef<HTMLInputElement>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   // Modal State for Add / Edit
@@ -1041,6 +1047,16 @@ export default function AdminPanel({
       style: "currency",
       currency: "VND",
     }).format(isNaN(validAmount) ? 0 : validAmount);
+  };
+
+  // Chuẩn hóa tên hình thức thanh toán tiếng Việt, loại bỏ in hoa toàn bộ (ALL-CAPS BODY TEXT)
+  const formatPaymentMethodName = (method?: string) => {
+    if (!method) return "Chuyển khoản QR";
+    const m = method.toLowerCase();
+    if (m.includes("qr") || m.includes("banking") || m.includes("khoản")) return "Chuyển khoản QR";
+    if (m.includes("cod") || m.includes("nhận hàng") || m.includes("tiền mặt")) return "Tiền mặt (COD)";
+    if (m.includes("thẻ") || m.includes("card")) return "Thẻ ngân hàng";
+    return method;
   };
 
   // Filtered Products for Admin Table (Đã kết hợp Bộ lọc Kho hàng)
@@ -1412,6 +1428,28 @@ export default function AdminPanel({
     setIsUserModalOpen(true);
   };
 
+  // Xử lý tải ảnh đại diện từ máy tính cho tài khoản người dùng
+  const handleUserAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, WEBP)!");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Dung lượng ảnh vượt quá 5MB, vui lòng chọn file nhỏ hơn!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (loadEvt) => {
+      const dataUrl = loadEvt.target?.result as string;
+      if (dataUrl) {
+        setUserFormAvatar(dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Submit User Form (Create or Edit)
   const handleSubmitUserForm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1461,14 +1499,22 @@ export default function AdminPanel({
       return;
     }
 
+    // Bảo vệ: Admin chỉ thiết lập qua MongoDB, không cho tạo mới hoặc nâng cấp lên Admin từ giao diện
     if (editingUser) {
+      const targetRole: "admin" | "staff" | "customer" =
+        editingUser.role === "admin"
+          ? "admin"
+          : userFormRole === "admin"
+          ? "customer"
+          : userFormRole;
+
       const updatedUser: UserAccount = {
         ...editingUser,
         name: cleanName,
         email: cleanEmail,
         phone: cleanPhone,
         password: userFormPassword.trim() || editingUser.password,
-        role: userFormRole,
+        role: targetRole,
         status: userFormStatus,
         address: userFormAddress.trim(),
         avatarUrl: cleanAvatar,
@@ -1480,13 +1526,16 @@ export default function AdminPanel({
         fetchServerUsers(adminUserPage, adminUsersPerPage);
       }).catch(console.error);
     } else {
+      const targetRole: "staff" | "customer" =
+        userFormRole === "admin" ? "customer" : (userFormRole as "staff" | "customer");
+
       const newUser: UserAccount = {
         id: "usr-" + Date.now(),
         name: cleanName,
         email: cleanEmail,
         phone: cleanPhone,
         password: userFormPassword.trim() || "123456",
-        role: userFormRole,
+        role: targetRole,
         status: userFormStatus,
         address: userFormAddress.trim(),
         avatarUrl: cleanAvatar,
@@ -1783,108 +1832,151 @@ export default function AdminPanel({
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* Top Banner & Return to Storefront */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
-        <div>
-          <div className="inline-flex items-center space-x-2 text-xs font-bold text-blue-400 bg-blue-950/80 px-3 py-1 rounded-full border border-blue-800 mb-2">
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>Hệ Thống Quản Trị Cửa Hàng (Admin Panel)</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Quản Lý Sách &amp; Đơn Hàng BookStore
+      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
+        <div className="max-w-3xl space-y-1">
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center space-x-2.5">
+            <SlidersHorizontal className="w-6 h-6 text-blue-400 shrink-0" />
+            <span>Quản Lý Sách &amp; Đơn Hàng BookStore</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-300 font-medium max-w-2xl leading-relaxed">
             CRUD sản phẩm, thay đổi trạng thái tồn kho, xử lý đơn hàng và lưu dữ liệu trên MongoDB.
           </p>
         </div>
 
-        <div className="hidden sm:flex items-center space-x-2 bg-slate-800/80 border border-slate-700/80 px-4 py-2.5 rounded-2xl text-xs text-slate-300">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Hệ thống hoạt động bình thường</span>
+        {/* Trạng thái hệ thống: dạng phẳng hoàn toàn, loại bỏ viền lồng nhau (NESTED CARDS) */}
+        <div className="hidden sm:inline-flex items-center space-x-2 text-xs font-semibold text-emerald-400 shrink-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+          <span>Hệ thống hoạt động ổn định</span>
         </div>
       </div>
 
-      {/* Statistics Cards (Bổ sung Cảnh báo Kho sách sắp hết hàng) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Package className="w-5 h-5" />
+      {/* Statistics Cards - Thiết kế thu nhỏ tinh tế, gọn gàng, tiết kiệm không gian màn hình */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+        {/* Thẻ 1: Tổng đầu sách */}
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-w-0">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tổng đầu sách</p>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
+              <Package className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] text-slate-500 font-medium">Tổng đầu sách</p>
-            <h3 className="text-xl font-black text-slate-900">{displayTotalBooks.toLocaleString('vi-VN')}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] text-slate-500 font-medium">Còn hàng (&gt;5)</p>
-            <h3 className="text-xl font-black text-emerald-600">{displayInStockCount.toLocaleString('vi-VN')}</h3>
+          <div className="mt-1.5">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              {displayTotalBooks.toLocaleString('vi-VN')}
+            </h3>
           </div>
         </div>
 
-        {/* THẺ CẢNH BÁO SẮP HẾT HÀNG */}
-        <div className="bg-white p-4.5 rounded-2xl border border-amber-200 shadow-sm flex items-center space-x-3.5 bg-gradient-to-br from-white to-amber-50/40">
-          <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-            <AlertTriangle className="w-5 h-5" />
+        {/* Thẻ 2: Còn hàng - Độ tương phản cao chuẩn WCAG AAA */}
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-w-0">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Còn hàng</p>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] text-amber-800 font-bold">Sắp hết (≤ 5)</p>
-            <h3 className="text-xl font-black text-amber-600">{displayLowStockCount.toLocaleString('vi-VN')}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-            <AlertCircle className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] text-slate-500 font-medium">Hết hàng (0)</p>
-            <h3 className="text-xl font-black text-red-600">{displayOutOfStockCount.toLocaleString('vi-VN')}</h3>
+          <div className="mt-1.5">
+            <h3 className="text-base sm:text-lg font-black text-emerald-800 tracking-tight">
+              {displayInStockCount.toLocaleString('vi-VN')}
+            </h3>
           </div>
         </div>
 
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5 col-span-2 sm:col-span-1">
-          <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-            <DollarSign className="w-5 h-5" />
+        {/* Thẻ 3: Sắp hết - Độ tương phản cao chuẩn WCAG AAA */}
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-amber-300 shadow-2xs flex flex-col justify-between min-w-0">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">Sắp hết</p>
+            <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold shrink-0">
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] text-slate-500 font-medium">Doanh thu đơn</p>
-            <h3 className="text-base sm:text-lg font-black text-purple-600 truncate">
+          <div className="mt-1.5">
+            <h3 className="text-base sm:text-lg font-black text-amber-900 tracking-tight">
+              {displayLowStockCount.toLocaleString('vi-VN')}
+            </h3>
+          </div>
+        </div>
+
+        {/* Thẻ 4: Hết hàng */}
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-w-0">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Hết hàng</p>
+            <div className="w-7 h-7 rounded-lg bg-red-50 text-rose-700 flex items-center justify-center font-bold shrink-0">
+              <AlertCircle className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div className="mt-1.5">
+            <h3 className="text-base sm:text-lg font-black text-rose-800 tracking-tight">
+              {displayOutOfStockCount.toLocaleString('vi-VN')}
+            </h3>
+          </div>
+        </div>
+
+        {/* Thẻ 5: Doanh thu đơn */}
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between col-span-2 sm:col-span-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Doanh thu đơn</p>
+            <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold shrink-0">
+              <DollarSign className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div className="mt-1.5">
+            <h3 className="text-xs sm:text-sm xl:text-base font-black text-slate-900 tracking-tight leading-snug whitespace-nowrap overflow-visible" title={formatVND(totalRevenue)}>
               {formatVND(totalRevenue)}
             </h3>
           </div>
         </div>
       </div>
 
-      {/* Admin Tab Switcher - Thanh chuyển tab chuyên dụng, tinh gọn, không rớt dòng */}
-      <div className="border-b border-slate-200 pb-3">
-        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-0.5">
+      {/* Admin Tab Switcher - Thanh chuyển tab thu gọn tối ưu, hiển thị vừa khít không tràn mép */}
+      <div className="bg-slate-100/90 p-1 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-0.5">
           <button
+            type="button"
             onClick={() => setAdminTab("products")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
               adminTab === "products"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
-            <Package className="w-4 h-4" />
-            <span>Sản Phẩm ({displayTotalProdCount.toLocaleString('vi-VN')})</span>
+            <Package className="w-3.5 h-3.5 shrink-0" />
+            <span>Sản Phẩm</span>
+            <span
+              className={`px-2 py-0.5 text-xs rounded-full font-bold leading-none ${
+                adminTab === "products"
+                  ? "bg-white/25 text-white"
+                  : "bg-slate-200 text-slate-800"
+              }`}
+            >
+              {displayTotalProdCount.toLocaleString("vi-VN")}
+            </span>
           </button>
+
           <button
+            type="button"
             onClick={() => setAdminTab("orders")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
               adminTab === "orders"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
-            <ShoppingBag className="w-4 h-4" />
-            <span>Đơn Hàng ({displayTotalOrderCount.toLocaleString('vi-VN')})</span>
+            <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+            <span>Đơn Hàng</span>
+            <span
+              className={`px-2 py-0.5 text-xs rounded-full font-bold leading-none ${
+                adminTab === "orders"
+                  ? "bg-white/25 text-white"
+                  : "bg-slate-200 text-slate-800"
+              }`}
+            >
+              {displayTotalOrderCount.toLocaleString("vi-VN")}
+            </span>
           </button>
+
           <button
+            type="button"
             onClick={() => {
               setAdminTab("users");
               if (serverUsers.length === 0) {
@@ -1893,58 +1985,97 @@ export default function AdminPanel({
               }
               if (onResetDefaultUsers) onResetDefaultUsers();
             }}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
               adminTab === "users"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span>Người Dùng ({displayTotalUserCount.toLocaleString('vi-VN')})</span>
+            <Users className="w-3.5 h-3.5 shrink-0" />
+            <span>Người Dùng</span>
+            <span
+              className={`px-2 py-0.5 text-xs rounded-full font-bold leading-none ${
+                adminTab === "users"
+                  ? "bg-white/25 text-white"
+                  : "bg-slate-200 text-slate-800"
+              }`}
+            >
+              {displayTotalUserCount.toLocaleString("vi-VN")}
+            </span>
           </button>
+
           <button
+            type="button"
             onClick={() => setAdminTab("reviews")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
               adminTab === "reviews"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
-            <Star className="w-4 h-4" />
-            <span>Đánh Giá ({displayTotalReviewCount.toLocaleString('vi-VN')})</span>
+            <Star className="w-3.5 h-3.5 shrink-0" />
+            <span>Đánh Giá</span>
+            <span
+              className={`px-2 py-0.5 text-xs rounded-full font-bold leading-none ${
+                adminTab === "reviews"
+                  ? "bg-white/25 text-white"
+                  : "bg-slate-200 text-slate-800"
+              }`}
+            >
+              {displayTotalReviewCount.toLocaleString("vi-VN")}
+            </span>
           </button>
+
           <button
+            type="button"
             onClick={() => setAdminTab("coupons")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
               adminTab === "coupons"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
-            <Ticket className="w-4 h-4" />
+            <Ticket className="w-3.5 h-3.5 shrink-0" />
             <span>Mã Giảm Giá</span>
           </button>
+
           <button
-            onClick={() => setAdminTab("analytics")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
-              adminTab === "analytics"
-                ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            type="button"
+            onClick={() => setAdminTab("notifications")}
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
+              adminTab === "notifications"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
-            <BarChart3 className="w-4 h-4" />
-            <span>Báo Cáo Doanh Thu</span>
+            <Bell className="w-3.5 h-3.5 shrink-0" />
+            <span>Thông Báo</span>
           </button>
+
           <button
-            onClick={() => setAdminTab("categories")}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center space-x-1.5 shrink-0 ${
-              adminTab === "categories"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            type="button"
+            onClick={() => setAdminTab("analytics")}
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
+              adminTab === "analytics"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
-            <Folder className="w-4 h-4" />
-            <span>Thể Loại Sách</span>
+            <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+            <span>Báo Cáo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminTab("categories")}
+            className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
+              adminTab === "categories"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-700 hover:text-slate-900 hover:bg-white/70"
+            }`}
+          >
+            <Folder className="w-3.5 h-3.5 shrink-0" />
+            <span>Thể Loại</span>
           </button>
         </div>
       </div>
@@ -1957,7 +2088,7 @@ export default function AdminPanel({
             {/* Nhóm tìm kiếm và lọc dữ liệu sản phẩm */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
               <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -1989,10 +2120,10 @@ export default function AdminPanel({
                   onChange={(e) => setSelectedStockFilter(e.target.value as any)}
                   className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  <option value="all">Tất cả kho ({displayTotalBooks.toLocaleString('vi-VN')})</option>
-                  <option value="in_stock">Còn hàng &gt;5 ({displayInStockCount.toLocaleString('vi-VN')})</option>
-                  <option value="low_stock">⚠️ Sắp hết hàng ≤ 5 ({displayLowStockCount.toLocaleString('vi-VN')})</option>
-                  <option value="out_of_stock">❌ Hết hàng ({displayOutOfStockCount.toLocaleString('vi-VN')})</option>
+                  <option value="all">Tất cả ({displayTotalBooks.toLocaleString('vi-VN')})</option>
+                  <option value="in_stock">Còn hàng ({displayInStockCount.toLocaleString('vi-VN')})</option>
+                  <option value="low_stock">Sắp hết ({displayLowStockCount.toLocaleString('vi-VN')})</option>
+                  <option value="out_of_stock">Hết hàng ({displayOutOfStockCount.toLocaleString('vi-VN')})</option>
                 </select>
               </div>
             </div>
@@ -2002,7 +2133,7 @@ export default function AdminPanel({
               <button
                 type="button"
                 onClick={handleOpenCreate}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5 cursor-pointer"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Thêm Sản Phẩm</span>
@@ -2013,7 +2144,7 @@ export default function AdminPanel({
           {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-600">
-              <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[11px] border-y border-slate-200">
+              <thead className="border-b-2 border-slate-200 text-slate-700 font-bold uppercase text-xs tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Ảnh &amp; Tên sản phẩm</th>
                   <th className="py-3 px-4">Danh mục</th>
@@ -2026,7 +2157,7 @@ export default function AdminPanel({
               <tbody className="divide-y divide-slate-100">
                 {displayAdminProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-slate-400">
+                    <td colSpan={6} className="text-center py-8 text-slate-500">
                       Không tìm thấy sản phẩm nào phù hợp
                     </td>
                   </tr>
@@ -2034,61 +2165,61 @@ export default function AdminPanel({
                   displayAdminProducts.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Name & Thumbnail */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-3">
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center space-x-3.5">
                           <img
                             src={p.imageUrl}
                             alt={p.name}
                             className="w-12 h-12 rounded-xl object-cover bg-slate-100 shrink-0 border border-slate-200"
                           />
                           <div className="min-w-0 max-w-xs">
-                            <p className="font-bold text-slate-900 truncate">{p.name}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">ID: {p.id}</p>
+                            <p className="font-bold text-slate-900 text-sm truncate">{p.name}</p>
+                            <p className="text-xs text-slate-600 font-mono font-medium mt-0.5">ID: {p.id}</p>
                           </div>
                         </div>
                       </td>
 
                       {/* Category */}
-                      <td className="py-3 px-4">
-                        <span className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      <td className="py-3.5 px-4">
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
                           {p.category}
                         </span>
                       </td>
 
                       {/* Price */}
-                      <td className="py-3 px-4 font-bold text-red-600">
+                      <td className="py-3.5 px-4 font-bold text-red-600 text-sm">
                         {formatVND(p.price)}
                       </td>
 
                       {/* Original Price */}
-                      <td className="py-3 px-4 text-slate-400 line-through">
+                      <td className="py-3.5 px-4 text-slate-500 font-medium line-through text-xs">
                         {formatVND(p.originalPrice)}
                       </td>
 
-                      {/* In Stock toggle & Stock Quantity (Đã nâng cấp Bộ chỉnh tồn kho Inline & Cảnh báo) */}
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex flex-col items-center space-y-1.5">
-                          {/* Badge trạng thái tồn kho */}
+                      {/* In Stock toggle & Stock Quantity (Đã nâng cấp kích thước điều khiển và độ tương phản) */}
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="flex flex-col items-center space-y-2">
+                          {/* Badge trạng thái tồn kho (Chuẩn text-xs, không dùng animate-pulse) */}
                           {!p.inStock || (p.stockQuantity ?? 25) === 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                               ❌ Hết hàng
                             </span>
                           ) : (p.stockQuantity ?? 25) <= 5 ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
                               ⚠️ Sắp hết ({p.stockQuantity ?? 25})
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                               ✅ Còn ({p.stockQuantity ?? 25})
                             </span>
                           )}
 
-                          {/* Bộ điều khiển tăng / giảm số lượng tồn kho nhanh inline */}
-                          <div className="flex items-center space-x-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shadow-xs">
+                          {/* Bộ điều khiển tăng / giảm tồn kho đạt chuẩn touch target tối thiểu 28px */}
+                          <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-xs">
                             <button
                               type="button"
                               onClick={() => handleUpdateStockQuantity(p, -1)}
-                              className="w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:bg-slate-200 font-bold text-xs transition-colors"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-700 hover:bg-slate-200 font-black text-sm transition-colors cursor-pointer"
                               title="Giảm 1 cuốn"
                             >
                               -
@@ -2098,12 +2229,12 @@ export default function AdminPanel({
                               min={0}
                               value={p.stockQuantity !== undefined ? p.stockQuantity : (p.inStock ? 25 : 0)}
                               onChange={(e) => handleUpdateStockQuantity(p, Number(e.target.value), true)}
-                              className="w-10 text-center font-bold text-xs bg-white border border-slate-200 rounded py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-12 text-center font-bold text-xs bg-white border border-slate-200 rounded-lg py-1 px-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                             <button
                               type="button"
                               onClick={() => handleUpdateStockQuantity(p, 1)}
-                              className="w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:bg-slate-200 font-bold text-xs transition-colors"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-700 hover:bg-slate-200 font-black text-sm transition-colors cursor-pointer"
                               title="Tăng 1 cuốn"
                             >
                               +
@@ -2171,51 +2302,59 @@ export default function AdminPanel({
       {/* TAB 2: ORDERS MANAGEMENT (QUẢN LÝ ĐƠN HÀNG TOÀN DIỆN MONGODB) */}
       {adminTab === "orders" && (
         <div className="space-y-6">
-          {/* Cụm 4 Thẻ KPI Thống Kê Đơn Hàng Chuẩn Doanh Nghiệp */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                <DollarSign className="w-5 h-5" />
+          {/* Cụm 4 Thẻ KPI Thống Kê Đơn Hàng Thu Nhỏ Gọn Gàng */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Doanh thu tích lũy</p>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                  <DollarSign className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div>
-                <p className="text-[11px] text-slate-500 font-medium">Doanh thu tích lũy</p>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 truncate" title={formatVND(serverOrderStats?.totalRevenue || 18185464000)}>
+              <div className="mt-1.5">
+                <h3 className="text-xs sm:text-sm xl:text-base font-black text-slate-900 tracking-tight leading-snug whitespace-nowrap overflow-visible" title={formatVND(serverOrderStats?.totalRevenue || 18185464000)}>
                   {formatVND(serverOrderStats?.totalRevenue || 18185464000)}
                 </h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                <Package className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng đơn hàng</p>
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+                  <Package className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div>
-                <p className="text-[11px] text-slate-500 font-medium">Tổng đơn hàng</p>
-                <h3 className="text-xl sm:text-2xl font-black text-blue-600">
+              <div className="mt-1.5">
+                <h3 className="text-base sm:text-lg font-black text-blue-600 tracking-tight">
                   {(serverOrderStats?.total || displayTotalOrderCount).toLocaleString('vi-VN')}
                 </h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                <Clock className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Cần xử lý gấp</p>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
+                  <Clock className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div>
-                <p className="text-[11px] text-slate-500 font-medium">Cần xử lý gấp</p>
-                <h3 className="text-xl sm:text-2xl font-black text-amber-600">
+              <div className="mt-1.5">
+                <h3 className="text-base sm:text-lg font-black text-amber-600 tracking-tight">
                   {((serverOrderStats?.pending || 6258) + (serverOrderStats?.pickup || 6250)).toLocaleString('vi-VN')}
                 </h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                <CheckCircle2 className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Giao thành công</p>
+                <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center font-bold shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div>
-                <p className="text-[11px] text-slate-500 font-medium">Giao thành công</p>
-                <h3 className="text-xl sm:text-2xl font-black text-purple-600">
+              <div className="mt-1.5">
+                <h3 className="text-base sm:text-lg font-black text-teal-700 tracking-tight">
                   {(serverOrderStats?.completed || 6255).toLocaleString('vi-VN')}
                 </h3>
               </div>
@@ -2225,23 +2364,26 @@ export default function AdminPanel({
           {/* Khối quản trị đơn hàng chính */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-6 space-y-4">
             {/* Header tab */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
                   Quản Lý Đơn Hàng Mua Sách ({(serverOrderStats?.total || displayTotalOrderCount).toLocaleString('vi-VN')} đơn)
                 </h3>
-                <p className="text-xs text-slate-400">
-                  Xác nhận đơn, hẹn giờ shipper lấy hàng, in hóa đơn bán lẻ và cập nhật trạng thái vận chuyển thời gian thực
+                {/* Giới hạn độ dài dòng chữ phụ đề tối đa 55 ký tự (LINE LENGTH TOO LONG) */}
+                <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-md mt-1 leading-relaxed">
+                  Quản lý đơn hàng, in hóa đơn bán lẻ và cập nhật trạng thái vận chuyển thời gian thực.
                 </p>
               </div>
-              <span className="text-xs text-slate-400 font-mono">Dữ liệu lưu tự động MongoDB Container</span>
+              <span className="text-xs text-slate-600 font-semibold bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
+                Lưu trữ tự động MongoDB Container
+              </span>
             </div>
 
             {/* Thanh công cụ tìm kiếm, bộ lọc & chuyển đổi chế độ xem */}
             <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
               {/* Ô tìm kiếm đơn hàng */}
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Tìm theo mã đơn (#ord-...), họ tên khách hàng, số điện thoại..."
@@ -2253,43 +2395,41 @@ export default function AdminPanel({
                   <button
                     type="button"
                     onClick={() => setOrderSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Nút chuyển đổi View Mode: Bảng vs Thẻ */}
-              <div className="flex items-center space-x-2 self-end lg:self-auto">
-                <div className="bg-slate-100 p-1 rounded-xl flex items-center space-x-1 border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setOrderViewMode("table")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      orderViewMode === "table"
-                        ? "bg-white text-blue-600 shadow-sm"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                    title="Chế độ xem Bảng dữ liệu đối soát nhanh"
-                  >
-                    <LayoutList className="w-3.5 h-3.5" />
-                    <span>Dạng Bảng</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOrderViewMode("card")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                      orderViewMode === "card"
-                        ? "bg-white text-blue-600 shadow-sm"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                    title="Chế độ xem Thẻ khối chi tiết"
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    <span>Dạng Thẻ</span>
-                  </button>
-                </div>
+              {/* Nút chuyển đổi View Mode: Dạng phẳng loại bỏ hoàn toàn viền lồng (NESTED CARDS) */}
+              <div className="flex items-center space-x-1.5 self-end lg:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setOrderViewMode("table")}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    orderViewMode === "table"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  title="Chế độ xem Bảng dữ liệu đối soát nhanh"
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  <span>Dạng Bảng</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderViewMode("card")}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    orderViewMode === "card"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  title="Chế độ xem Thẻ khối chi tiết"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Dạng Thẻ</span>
+                </button>
 
                 <button
                   type="button"
@@ -2336,18 +2476,18 @@ export default function AdminPanel({
                   key={st.id}
                   type="button"
                   onClick={() => setAdminOrderFilter(st.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
                     adminOrderFilter === st.id
                       ? "bg-slate-900 text-white shadow-sm"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
                 >
                   <span>{st.label}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                    className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
                       adminOrderFilter === st.id
                         ? "bg-white/20 text-white"
-                        : "bg-slate-200 text-slate-700"
+                        : "bg-slate-200 text-slate-800"
                     }`}
                   >
                     {st.count}
@@ -2358,10 +2498,10 @@ export default function AdminPanel({
 
             {/* Danh sách đơn hàng theo chế độ xem (Bảng hoặc Thẻ) */}
             {displayAdminOrders.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 space-y-2">
+              <div className="text-center py-12 text-slate-500 space-y-2">
                 <ShoppingBag className="w-12 h-12 stroke-1 mx-auto text-slate-300" />
                 <p className="font-semibold text-slate-600 text-sm">Không tìm thấy đơn hàng nào</p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   Không có đơn hàng nào khớp với điều kiện lọc hoặc từ khóa tìm kiếm.
                 </p>
               </div>
@@ -2369,14 +2509,14 @@ export default function AdminPanel({
               /* CHẾ ĐỘ XEM BẢNG (TABLE VIEW) - Đối soát nhanh chuẩn công nghiệp */
               <div className="overflow-x-auto">
                 <table className="table-fixed w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                  <thead className="border-b-2 border-slate-200 text-slate-700 font-bold uppercase text-xs tracking-wider">
                     <tr>
-                      <th className="py-3 px-4 w-36">Mã &amp; Ngày</th>
-                      <th className="py-3 px-4 w-48">Khách Hàng</th>
-                      <th className="py-3 px-4 w-52">Sản Phẩm Đã Mua</th>
-                      <th className="py-3 px-4 w-36">Tổng Tiền</th>
-                      <th className="py-3 px-4 w-36">Trạng Thái</th>
-                      <th className="py-3 px-4 w-44 text-right">Thao Tác</th>
+                      <th className="py-3.5 px-4 w-[130px]">Mã &amp; Ngày</th>
+                      <th className="py-3.5 px-4 w-[200px]">Khách Hàng</th>
+                      <th className="py-3.5 px-4 w-[280px]">Sản Phẩm Đã Mua</th>
+                      <th className="py-3.5 px-4 w-[180px]">Tổng Tiền</th>
+                      <th className="py-3.5 px-4 w-[160px] text-center">Trạng Thái</th>
+                      <th className="py-3.5 px-4 w-[130px] text-center">Thao Tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -2391,7 +2531,7 @@ export default function AdminPanel({
                       return (
                         <tr key={ord.id} className="hover:bg-slate-50/80 transition-colors">
                           {/* Cột 1: Mã & Ngày */}
-                          <td className="py-3.5 px-4 font-mono text-xs">
+                          <td className="py-3.5 px-4 font-mono text-xs align-middle">
                             <div
                               onClick={() => setViewingOrderDetail(ord)}
                               className="font-bold text-blue-600 cursor-pointer hover:underline flex items-center space-x-1"
@@ -2399,149 +2539,118 @@ export default function AdminPanel({
                             >
                               <span>#{ord.id}</span>
                             </div>
-                            <div className="text-[11px] text-slate-400">{ord.date}</div>
+                            <div className="text-xs text-slate-600 font-medium mt-0.5">{ord.date}</div>
                           </td>
 
                           {/* Cột 2: Khách Hàng */}
-                          <td className="py-3.5 px-4 text-xs">
-                            <div className="font-bold text-slate-800 line-clamp-1">
+                          <td className="py-3.5 px-4 text-xs align-middle">
+                            <div className="font-bold text-slate-900 text-sm line-clamp-1">
                               {ord.customerInfo?.fullName || (ord as any).customerName || "Khách Hàng"}
                             </div>
-                            <div className="text-slate-500 font-mono text-[11px]">
+                            <div className="text-slate-600 font-mono text-xs font-medium mt-0.5">
                               {ord.customerInfo?.phone || (ord as any).customerPhone || "0988 000 000"}
                             </div>
                             <div
-                              className="text-slate-400 text-[11px] truncate max-w-[180px]"
+                              className="text-slate-600 text-xs truncate max-w-[180px] mt-0.5"
                               title={ord.customerInfo?.address || (ord as any).shippingAddress}
                             >
                               {ord.customerInfo?.address || (ord as any).shippingAddress || "Toàn quốc"}
                             </div>
                           </td>
 
-                          {/* Cột 3: Sản Phẩm */}
-                          <td className="py-3.5 px-4 text-xs">
+                          {/* Cột 3: Sản Phẩm Đã Mua - Danh sách tên sản phẩm kèm số lượng, không hiển thị ảnh */}
+                          <td className="py-3.5 px-4 text-xs align-middle">
                             {Array.isArray(ord.items) && ord.items.length > 0 ? (
-                              <div className="flex items-center space-x-2">
-                                <img
-                                  src={ord.items[0]?.product?.imageUrl || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=800&q=80"}
-                                  alt=""
-                                  className="w-8 h-8 rounded-lg object-cover shadow-xs border border-slate-200 shrink-0"
-                                />
-                                <div className="min-w-0">
-                                  <div className="font-medium text-slate-800 truncate" title={ord.items[0]?.product?.name}>
-                                    {ord.items[0]?.product?.name || "Ấn Phẩm Sách"}
+                              <div className="space-y-1">
+                                {ord.items.slice(0, 3).map((it: any, idx: number) => (
+                                  <div key={it.product?.id || idx} className="flex items-center justify-between gap-2">
+                                    <span
+                                      className="font-semibold text-slate-800 truncate text-xs leading-tight"
+                                      title={it.product?.name || "Ấn Phẩm Sách"}
+                                    >
+                                      {it.product?.name || "Ấn Phẩm Sách"}
+                                    </span>
+                                    <span className="font-bold text-slate-900 font-mono text-xs shrink-0">
+                                      x{it.quantity || 1}
+                                    </span>
                                   </div>
-                                  <div className="text-[11px] text-slate-400">
-                                    x{ord.items[0]?.quantity || 1} {ord.items.length > 1 && `(+ ${ord.items.length - 1} món khác)`}
+                                ))}
+                                {ord.items.length > 3 && (
+                                  <div
+                                    onClick={() => setViewingOrderDetail(ord)}
+                                    className="text-[11px] text-blue-600 font-medium hover:underline cursor-pointer pt-0.5"
+                                    title="Nhấn để xem đầy đủ tất cả sản phẩm trong đơn"
+                                  >
+                                    ... (+{ord.items.length - 3} món khác)
                                   </div>
-                                </div>
+                                )}
                               </div>
                             ) : (
-                              <span className="text-slate-500 font-medium">
+                              <span className="text-slate-700 font-semibold text-xs">
                                 {(ord as any).itemCount || 1} sản phẩm
                               </span>
                             )}
                           </td>
 
-                          {/* Cột 4: Tổng Tiền & Thanh Toán */}
-                          <td className="py-3.5 px-4 text-xs">
-                            <div className="font-black text-red-600 text-sm">
-                              {formatVND(ord.totalAmount)}
-                            </div>
-                            <div className="flex items-center space-x-1 mt-0.5">
-                              <span className="text-[10px] uppercase font-bold text-slate-500">
-                                {ord.paymentMethod}
+                          {/* Cột 4: Tổng Tiền & Thanh Toán - Cân bằng tuyệt đối, không rớt dòng */}
+                          <td className="py-3.5 px-4 text-xs align-middle">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-black text-red-600 text-sm whitespace-nowrap">
+                                {formatVND(ord.totalAmount)}
                               </span>
-                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                              <span className={`text-xs px-2 py-0.5 rounded-md font-bold whitespace-nowrap ${
                                 ord.isPaid || isDone
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-amber-100 text-amber-800"
+                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  : "bg-amber-50 text-amber-800 border border-amber-200"
                               }`}>
                                 {ord.isPaid || isDone ? "Đã TT" : "Chưa TT"}
                               </span>
                             </div>
+                            <div className="text-xs text-slate-600 font-medium mt-1 whitespace-nowrap">
+                              {formatPaymentMethodName(ord.paymentMethod)}
+                            </div>
                           </td>
 
-                          {/* Cột 5: Trạng Thái */}
-                          <td className="py-3.5 px-4 text-xs">
-                            <select
-                              value={ord.status}
-                              onChange={(e) =>
-                                handleUpdateOrderStatusRealtime(
-                                  ord.id,
-                                  e.target.value as AdminOrderStatus
-                                )
-                              }
-                              className={`font-bold px-2 py-1 rounded-lg border text-xs focus:outline-none cursor-pointer w-full ${
-                                isDone
-                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                  : isShipping
-                                  ? "bg-blue-100 text-blue-800 border-blue-300"
-                                  : isPickup
-                                  ? "bg-purple-100 text-purple-800 border-purple-300"
-                                  : ord.status === "Đã hủy"
-                                  ? "bg-red-100 text-red-800 border-red-300"
-                                  : "bg-amber-100 text-amber-800 border-amber-300"
-                              }`}
-                            >
-                              <option value="Chờ xác nhận">Chờ xác nhận</option>
-                              <option value="Chờ lấy hàng">Chờ lấy hàng</option>
-                              <option value="Chờ giao hàng">Chờ giao hàng</option>
-                              <option value="Hoàn tất">Hoàn tất / Đã giao</option>
-                              <option value="Đã hủy">Đã hủy</option>
-                            </select>
+                          {/* Cột 5: Trạng Thái - Căn giữa chuẩn mực, chữ vừa khít không bị che khuất */}
+                          <td className="py-3.5 px-4 text-xs align-middle">
+                            <div className="flex justify-center">
+                              <select
+                                value={ord.status}
+                                onChange={(e) =>
+                                  handleUpdateOrderStatusRealtime(
+                                    ord.id,
+                                    e.target.value as AdminOrderStatus
+                                  )
+                                }
+                                className={`font-bold px-3 py-1.5 rounded-xl border text-xs focus:outline-none cursor-pointer w-full max-w-[150px] transition-colors shadow-2xs ${
+                                  isDone
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100/70"
+                                    : isShipping
+                                    ? "bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100/70"
+                                    : isPickup
+                                    ? "bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100/70"
+                                    : ord.status === "Đã hủy"
+                                    ? "bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100/70"
+                                    : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100/70"
+                                }`}
+                              >
+                                <option value="Chờ xác nhận">Chờ xác nhận</option>
+                                <option value="Chờ lấy hàng">Chờ lấy hàng</option>
+                                <option value="Chờ giao hàng">Chờ giao hàng</option>
+                                <option value="Hoàn tất">Hoàn tất</option>
+                                <option value="Đã hủy">Đã hủy</option>
+                              </select>
+                            </div>
                           </td>
 
-                          {/* Cột 6: Thao Tác Nhanh */}
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="flex items-center justify-end space-x-1.5">
-                              {isPendingConfirm && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setPickupModalOrder(ord);
-                                    const defaultTime = new Date(Date.now() + 15 * 60000);
-                                    setPickupDateTime(defaultTime.toISOString().slice(0, 16));
-                                    setPickupCarrier(ord.shippingCarrier || "Giao Hàng Nhanh (GHN)");
-                                  }}
-                                  className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
-                                  title="Xác nhận & Hẹn giờ shipper lấy hàng"
-                                >
-                                  <Clock className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {isPickup && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateOrderStatusRealtime(ord.id, "Chờ giao hàng")}
-                                  className="p-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer"
-                                  title="Shipper đã nhận hàng, chuyển sang Đang Giao"
-                                >
-                                  <Truck className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {isShipping && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateOrderStatusRealtime(ord.id, "Hoàn tất", {
-                                      receivedAt: new Date().toISOString(),
-                                    })
-                                  }
-                                  className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
-                                  title="Xác nhận đã giao thành công"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
+                          {/* Cột 6: Thao Tác - Chuẩn mực 3 nút cố định (Xem chi tiết, In hóa đơn, Xóa) cân đối hoàn hảo */}
+                          <td className="py-3.5 px-4 text-center align-middle">
+                            <div className="flex items-center justify-center space-x-1.5">
                               {/* Xem chi tiết */}
                               <button
                                 type="button"
                                 onClick={() => setViewingOrderDetail(ord)}
-                                className="p-1.5 border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                className="w-8 h-8 border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer flex items-center justify-center shrink-0"
                                 title="Xem chi tiết đơn hàng & hành trình"
                               >
                                 <Eye className="w-3.5 h-3.5" />
@@ -2551,7 +2660,7 @@ export default function AdminPanel({
                               <button
                                 type="button"
                                 onClick={() => setSelectedInvoiceOrder(ord)}
-                                className="p-1.5 border border-slate-200 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                className="w-8 h-8 border border-slate-200 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer flex items-center justify-center shrink-0"
                                 title="In hóa đơn bán lẻ"
                               >
                                 <Printer className="w-3.5 h-3.5" />
@@ -2565,7 +2674,7 @@ export default function AdminPanel({
                                     handleDeleteOrderRealtime(ord.id);
                                   }
                                 }}
-                                className="p-1.5 border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                className="w-8 h-8 border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer flex items-center justify-center shrink-0"
                                 title="Xóa đơn hàng"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -2612,17 +2721,12 @@ export default function AdminPanel({
                           {isPendingConfirm && (
                             <button
                               type="button"
-                              onClick={() => {
-                                setPickupModalOrder(ord);
-                                const defaultTime = new Date(Date.now() + 15 * 60000);
-                                setPickupDateTime(defaultTime.toISOString().slice(0, 16));
-                                setPickupCarrier(ord.shippingCarrier || "Giao Hàng Nhanh (GHN)");
-                              }}
+                              onClick={() => handleUpdateOrderStatusRealtime(ord.id, "Chờ lấy hàng")}
                               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer transform hover:-translate-y-0.5"
-                              title="Xác nhận đơn và chọn thời gian shipper lấy hàng"
+                              title="Xác nhận đơn hàng và chuyển sang Chờ lấy hàng"
                             >
-                              <Clock className="w-3.5 h-3.5" />
-                              <span>Xác Nhận &amp; Hẹn Giờ Lấy Hàng</span>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Xác Nhận Đơn</span>
                             </button>
                           )}
 
@@ -2630,7 +2734,7 @@ export default function AdminPanel({
                             <button
                               type="button"
                               onClick={() => handleUpdateOrderStatusRealtime(ord.id, "Chờ giao hàng")}
-                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer"
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer"
                               title="Shipper đã nhận gói hàng, chuyển sang Đang Giao"
                             >
                               <Truck className="w-3.5 h-3.5" />
@@ -2669,7 +2773,7 @@ export default function AdminPanel({
                                 : isShipping
                                 ? "bg-blue-100 text-blue-800 border-blue-300"
                                 : isPickup
-                                ? "bg-purple-100 text-purple-800 border-purple-300"
+                                ? "bg-indigo-100 text-indigo-800 border-indigo-300"
                                 : ord.status === "Đã hủy"
                                 ? "bg-red-100 text-red-800 border-red-300"
                                 : "bg-amber-100 text-amber-800 border-amber-300"
@@ -2698,7 +2802,7 @@ export default function AdminPanel({
                             className={`px-2.5 py-1 border rounded-lg text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer ${
                               ord.isPaid || isDone
                                 ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
-                                : "bg-slate-100 text-slate-400 border-slate-200"
+                                : "bg-slate-100 text-slate-500 border-slate-200"
                             }`}
                             title={
                               ord.isPaid || isDone
@@ -2728,12 +2832,12 @@ export default function AdminPanel({
 
                       {/* Banner hiển thị chi tiết lịch hẹn lấy hàng nếu có */}
                       {isPickup && ord.pickupTime && (
-                        <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 flex items-center justify-between text-xs">
+                        <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-900 flex items-center justify-between text-xs">
                           <span className="flex items-center space-x-1.5 font-bold">
-                            <Clock className="w-4 h-4 text-purple-600" />
+                            <Clock className="w-4 h-4 text-indigo-600" />
                             <span>Lịch shipper lấy hàng: {new Date(ord.pickupTime).toLocaleString("vi-VN")} ({ord.shippingCarrier || "Giao Hàng Nhanh"})</span>
                           </span>
-                          <span className="text-[11px] text-purple-600 bg-white px-2 py-0.5 rounded border border-purple-200">
+                          <span className="text-xs text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
                             Tự động chuyển sang Chờ giao khi đến giờ
                           </span>
                         </div>
@@ -2742,19 +2846,19 @@ export default function AdminPanel({
                       {/* Customer Information */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-3 rounded-xl border border-slate-200/80">
                         <div>
-                          <span className="text-slate-400 block text-[11px]">Khách hàng:</span>
+                          <span className="text-slate-500 block text-xs">Khách hàng:</span>
                           <strong className="text-slate-800 font-bold">
                             {ord.customerInfo?.fullName || (ord as any).customerName || "Khách hàng"}
                           </strong>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[11px]">Số điện thoại:</span>
+                          <span className="text-slate-500 block text-xs">Số điện thoại:</span>
                           <strong className="text-slate-800 font-bold">
                             {ord.customerInfo?.phone || (ord as any).customerPhone || "0988 000 000"}
                           </strong>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[11px]">Địa chỉ giao:</span>
+                          <span className="text-slate-500 block text-xs">Địa chỉ giao:</span>
                           <span className="text-slate-700">
                             {ord.customerInfo?.address || (ord as any).shippingAddress || "Toàn quốc"}
                           </span>
@@ -2791,8 +2895,8 @@ export default function AdminPanel({
 
                       {/* Total & Payment method */}
                       <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
-                        <span className="text-slate-500">
-                          Hình thức: <strong className="text-slate-800 uppercase">{ord.paymentMethod}</strong>
+                        <span className="text-slate-600">
+                          Hình thức: <strong className="text-slate-800 font-semibold">{formatPaymentMethodName(ord.paymentMethod)}</strong>
                           {ord.isReviewed && (
                             <span className="ml-2 text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded">
                               ⭐ Khách đã đánh giá ({ord.reviewRating || 5}/5 sao)
@@ -2832,47 +2936,47 @@ export default function AdminPanel({
       {/* TAB 3: USER MANAGEMENT (QUẢN LÝ NGƯỜI DÙNG) */}
       {adminTab === "users" && (
         <div className="space-y-6">
-          {/* User Quick Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                <Users className="w-5 h-5" />
+          {/* User Quick Stats - Thu nhỏ gọn gàng, tinh tế */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                <Users className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Tổng người dùng</p>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900">{userStats.total}</h3>
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng người dùng</p>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{userStats.total}</h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                <Shield className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
+                <Shield className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Quản trị & Nhân viên</p>
-                <h3 className="text-xl sm:text-2xl font-black text-purple-600">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Quản trị &amp; Nhân viên</p>
+                <h3 className="text-base sm:text-lg font-black text-blue-700 mt-0.5">
                   {userStats.adminCount + userStats.staffCount}
                 </h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                <UserCheck className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                <UserCheck className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Khách hàng</p>
-                <h3 className="text-xl sm:text-2xl font-black text-emerald-600">{userStats.customerCount}</h3>
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Khách hàng</p>
+                <h3 className="text-base sm:text-lg font-black text-emerald-600 mt-0.5">{userStats.customerCount}</h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-                <UserX className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold shrink-0">
+                <UserX className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Tài khoản bị khóa</p>
-                <h3 className="text-xl sm:text-2xl font-black text-red-600">{userStats.lockedCount}</h3>
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Tài khoản bị khóa</p>
+                <h3 className="text-base sm:text-lg font-black text-red-600 mt-0.5">{userStats.lockedCount}</h3>
               </div>
             </div>
           </div>
@@ -2883,7 +2987,7 @@ export default function AdminPanel({
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5 flex-1">
                 <div className="relative w-full sm:w-72">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Tìm theo tên, email, SĐT..."
@@ -2893,8 +2997,9 @@ export default function AdminPanel({
                   />
                 </div>
 
-                <div className="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs shrink-0">
-                  <span className="text-slate-400 font-medium">Vai trò:</span>
+                {/* Bộ lọc vai trò: phẳng, không tạo viền lồng nhau (NESTED CARDS) */}
+                <div className="flex items-center space-x-1.5 bg-slate-100/80 px-3 py-1.5 rounded-xl text-xs shrink-0">
+                  <span className="text-slate-500 font-medium">Vai trò:</span>
                   <select
                     value={userRoleFilter}
                     onChange={(e) => setUserRoleFilter(e.target.value as any)}
@@ -2907,8 +3012,9 @@ export default function AdminPanel({
                   </select>
                 </div>
 
-                <div className="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs shrink-0">
-                  <span className="text-slate-400 font-medium">Trạng thái:</span>
+                {/* Bộ lọc trạng thái: phẳng, không tạo viền lồng nhau (NESTED CARDS) */}
+                <div className="flex items-center space-x-1.5 bg-slate-100/80 px-3 py-1.5 rounded-xl text-xs shrink-0">
+                  <span className="text-slate-500 font-medium">Trạng thái:</span>
                   <select
                     value={userStatusFilter}
                     onChange={(e) => setUserStatusFilter(e.target.value as any)}
@@ -2952,7 +3058,7 @@ export default function AdminPanel({
                 <button
                   type="button"
                   onClick={handleOpenCreateUser}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
                 >
                   <UserPlus className="w-4 h-4" />
                   <span>Thêm Người Dùng</span>
@@ -2965,14 +3071,14 @@ export default function AdminPanel({
               <div className="text-center py-12 space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                 <Users className="w-10 h-10 text-slate-300 mx-auto" />
                 <h4 className="text-sm font-bold text-slate-700">Không tìm thấy người dùng nào</h4>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   Thử thay đổi từ khóa tìm kiếm hoặc bỏ bớt các bộ lọc phân loại.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="table-fixed w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                  <thead className="border-b-2 border-slate-200 text-slate-700 font-bold uppercase text-xs tracking-wider">
                     <tr>
                       <th className="py-3 px-3 w-56">Người Dùng</th>
                       <th className="py-3 px-3 w-52">Liên Hệ</th>
@@ -2994,69 +3100,69 @@ export default function AdminPanel({
                               className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
                             />
                             <div>
-                              <div className="font-bold text-slate-900 flex items-center space-x-1.5">
+                              <div className="font-bold text-slate-900 text-sm flex items-center space-x-1.5">
                                 <span>{user.name}</span>
                                 {user.role === "admin" && (
-                                  <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                  <Shield className="w-3.5 h-3.5 text-blue-700 shrink-0" />
                                 )}
                               </div>
-                              <span className="text-[10px] text-slate-400 font-mono">ID: {user.id}</span>
+                              <span className="text-xs text-slate-600 font-mono font-medium">ID: {user.id}</span>
                             </div>
                           </div>
                         </td>
 
                         {/* Email & Phone */}
                         <td className="py-3 px-3">
-                          <div className="space-y-0.5">
-                            <div className="flex items-center space-x-1 text-slate-700">
-                              <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span className="font-medium">{user.email}</span>
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-1.5 text-slate-800 text-xs font-semibold">
+                              <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                              <span>{user.email}</span>
                             </div>
-                            <div className="flex items-center space-x-1 text-slate-500 text-[11px]">
-                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span>{user.phone}</span>
+                            <div className="flex items-center space-x-1.5 text-slate-600 text-xs font-medium">
+                              <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                              <span>{user.phone || "Chưa cập nhật SĐT"}</span>
                             </div>
                             {user.address && (
-                              <div className="flex items-center space-x-1 text-slate-400 text-[10px] truncate max-w-xs">
-                                <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <div className="flex items-center space-x-1.5 text-slate-600 text-xs truncate max-w-xs font-medium">
+                                <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                                 <span className="truncate">{user.address}</span>
                               </div>
                             )}
                           </div>
                         </td>
 
-                        {/* Role Badge */}
+                        {/* Role Badge - Cỡ chữ chuẩn text-xs, loại bỏ màu tím AI Palette */}
                         <td className="py-3 px-3">
                           {user.role === "admin" && (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
-                              <Shield className="w-3 h-3" />
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                              <Shield className="w-3.5 h-3.5" />
                               <span>Quản trị viên</span>
                             </span>
                           )}
                           {user.role === "staff" && (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                              <UserCheck className="w-3 h-3" />
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              <UserCheck className="w-3.5 h-3.5" />
                               <span>Nhân viên</span>
                             </span>
                           )}
                           {user.role === "customer" && (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                              <User className="w-3 h-3" />
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              <User className="w-3.5 h-3.5" />
                               <span>Khách hàng</span>
                             </span>
                           )}
                         </td>
 
-                        {/* Status Badge */}
+                        {/* Status Badge - Loại bỏ chấm nhấp nháy animate-pulse (PULSING STATUS DOT) */}
                         <td className="py-3 px-3">
                           {user.status === "active" ? (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                               <span>Đang hoạt động</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
-                              <Lock className="w-3 h-3" />
+                            <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+                              <Lock className="w-3.5 h-3.5" />
                               <span>Đã bị khóa</span>
                             </span>
                           )}
@@ -3078,7 +3184,7 @@ export default function AdminPanel({
                                 setRoleModalRole(user.role || "customer");
                                 setRoleModalStatus(user.status || "active");
                               }}
-                              className="p-1.5 rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                               title="Phân quyền & Khóa/Mở khóa tài khoản"
                             >
                               <Shield className="w-3.5 h-3.5" />
@@ -3133,51 +3239,51 @@ export default function AdminPanel({
       {/* TAB 4: REVIEWS MANAGEMENT (QUẢN LÝ ĐÁNH GIÁ SẢN PHẨM MONGODB) */}
       {adminTab === "reviews" && (
         <div className="space-y-6">
-          {/* Review Quick Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
-                <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+          {/* Review Quick Stats - Thu nhỏ gọn gàng, tinh tế */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center font-bold shrink-0">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Tổng số đánh giá</p>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng số đánh giá</p>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 mt-0.5">
                   {(serverReviewStats?.total || displayTotalReviewCount).toLocaleString('vi-VN')}
                 </h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                <ThumbsUp className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                <ThumbsUp className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Đánh giá 5 sao</p>
-                <h3 className="text-xl sm:text-2xl font-black text-emerald-600">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Đánh giá 5 sao</p>
+                <h3 className="text-base sm:text-lg font-black text-emerald-600 mt-0.5">
                   {(serverReviewStats?.fiveStar || Math.round(displayTotalReviewCount * 0.8)).toLocaleString('vi-VN')}
                 </h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                <MessageSquare className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+                <MessageSquare className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Điểm trung bình</p>
-                <h3 className="text-xl sm:text-2xl font-black text-blue-600">
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Điểm trung bình</p>
+                <h3 className="text-base sm:text-lg font-black text-blue-600 mt-0.5">
                   {serverReviewStats?.avg || "4.8"} / 5
                 </h3>
               </div>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                <Layers className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0">
+                <Layers className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 font-medium">Cơ sở dữ liệu</p>
-                <h3 className="text-base sm:text-lg font-black text-purple-600">MongoDB Reviews</h3>
+                <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Lưu trữ dữ liệu</p>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 mt-0.5">MongoDB Reviews</h3>
               </div>
             </div>
           </div>
@@ -3187,7 +3293,7 @@ export default function AdminPanel({
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Tìm theo người đánh giá, nội dung hoặc mã sản phẩm..."
@@ -3256,7 +3362,7 @@ export default function AdminPanel({
                     />
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
+                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">
                           {currentProd.id}
                         </span>
                         <span className="text-xs text-slate-500">{currentProd.category}</span>
@@ -3267,7 +3373,7 @@ export default function AdminPanel({
                   </div>
                   <div className="flex items-center space-x-3">
                     <div className="text-right">
-                      <div className="text-[11px] text-slate-500 font-medium">Đánh giá sản phẩm này:</div>
+                      <div className="text-xs text-slate-500 font-medium">Đánh giá sản phẩm này:</div>
                       <div className="font-black text-amber-500 text-sm flex items-center justify-end space-x-1">
                         <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                         <span>{currentProd.rating} / 5 ({filteredReviews.length} nhận xét)</span>
@@ -3287,21 +3393,21 @@ export default function AdminPanel({
 
             {/* Reviews List - Giữ nguyên bảng cũ khi chuyển trang để chống chớp giật (Keep Previous Data) */}
             {isLoadingReviews && displayAdminReviews.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 text-sm">
+              <div className="text-center py-12 text-slate-500 text-sm">
                 Đang tải đánh giá từ MongoDB...
               </div>
             ) : displayAdminReviews.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 space-y-2">
+              <div className="text-center py-12 text-slate-500 space-y-2">
                 <MessageSquare className="w-12 h-12 stroke-1 mx-auto text-slate-300" />
                 <p className="font-semibold text-slate-600 text-sm">Không có đánh giá nào phù hợp</p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   Các đánh giá của khách hàng trên trang chi tiết sản phẩm sẽ xuất hiện ở đây.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="table-fixed w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                  <thead className="border-b-2 border-slate-200 text-slate-700 font-bold uppercase text-xs tracking-wider">
                     <tr>
                       <th className="py-3 px-4 w-36">Mã &amp; Ngày</th>
                       <th className="py-3 px-4 w-44">Sản Phẩm (Mã FK)</th>
@@ -3318,22 +3424,22 @@ export default function AdminPanel({
                         <tr key={rev.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3.5 px-4 font-mono text-xs">
                             <span className="font-bold text-slate-900">{rev.id}</span>
-                            <div className="text-[11px] text-slate-400">{rev.date}</div>
+                            <div className="text-xs text-slate-600 font-medium mt-0.5">{rev.date}</div>
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <div className="font-semibold text-slate-900 line-clamp-1">
+                            <div className="font-semibold text-slate-900 text-sm line-clamp-1">
                               {relatedProduct ? relatedProduct.name : rev.productId || "Chưa gắn mã"}
                             </div>
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="inline-block mt-0.5 text-xs font-mono px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-medium">
                               FK: {rev.productId || "None"}
                             </span>
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-800">{rev.author}</div>
+                            <div className="font-bold text-slate-900 text-sm">{rev.author}</div>
                             {rev.userId && (
-                              <div className="text-[10px] font-mono text-slate-400">
+                              <div className="text-xs font-mono text-slate-600 font-medium mt-0.5">
                                 FK: {rev.userId}
                               </div>
                             )}
@@ -3344,14 +3450,14 @@ export default function AdminPanel({
                               {[1, 2, 3, 4, 5].map((star) => (
                                 <Star
                                   key={star}
-                                  className={`w-3.5 h-3.5 ${
+                                  className={`w-4 h-4 ${
                                     star <= rev.rating
                                       ? "fill-amber-400 text-amber-400"
                                       : "text-slate-200"
                                   }`}
                                 />
                               ))}
-                              <span className="font-bold text-xs ml-1 text-slate-700">
+                              <span className="font-bold text-xs ml-1 text-slate-800">
                                 {rev.rating}/5
                               </span>
                             </div>
@@ -3359,28 +3465,28 @@ export default function AdminPanel({
 
                           <td className="py-3.5 px-4">
                             {/* Bọc chống tràn văn bản đánh giá kèm phản hồi Admin */}
-                            <div className="max-w-md space-y-1.5">
+                            <div className="max-w-md space-y-2">
                               <p
-                                className="text-xs text-slate-700 leading-relaxed italic line-clamp-3 break-words"
+                                className="text-xs text-slate-800 leading-relaxed italic line-clamp-3 break-words"
                                 title={rev.content}
                               >
                                 "{rev.content}"
                               </p>
 
-                              {/* Hiển thị Phản hồi của Ban Quản Trị nếu có */}
+                              {/* Hiển thị Phản hồi của Ban Quản Trị: Chuẩn flat quote, loại bỏ viền dày accent border (SIDE TAB ACCENT BORDER, NESTED CARDS) */}
                               {rev.adminReply && (
-                                <div className="p-2 bg-purple-50 rounded-xl border border-purple-200/80 text-[11px] space-y-0.5 animate-in fade-in">
-                                  <div className="font-bold text-purple-700 flex items-center space-x-1">
-                                    <CornerDownRight className="w-3 h-3 text-purple-600 shrink-0" />
-                                    <span>Phản hồi từ Nhà Sách BookStore:</span>
+                                <div className="mt-2 text-xs text-slate-700 flex items-start space-x-2 bg-slate-100/70 p-2.5 rounded-xl">
+                                  <CornerDownRight className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                  <div className="space-y-0.5">
+                                    <span className="font-bold text-slate-800">Phản hồi từ Nhà Sách: </span>
+                                    <span className="text-slate-600 italic">"{rev.adminReply}"</span>
                                   </div>
-                                  <p className="text-slate-600 italic">"{rev.adminReply}"</p>
                                 </div>
                               )}
 
                               {rev.moderationStatus === "hidden" && (
-                                <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-red-50 text-red-600 text-[10px] font-bold border border-red-200">
-                                  <EyeOff className="w-3 h-3" />
+                                <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-xs font-bold border border-red-200">
+                                  <EyeOff className="w-3.5 h-3.5" />
                                   <span>Đã ẩn khỏi trang khách hàng</span>
                                 </span>
                               )}
@@ -3389,17 +3495,17 @@ export default function AdminPanel({
 
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end space-x-1.5">
-                              {/* Nút Phản hồi khách hàng */}
+                              {/* Nút Phản hồi khách hàng: Cỡ chữ text-xs chuẩn WCAG, dùng màu xanh doanh nghiệp thay vì màu tím AI Palette */}
                               <button
                                 type="button"
                                 onClick={() => {
                                   setReplyingReview(rev);
                                   setAdminReplyText(rev.adminReply || "");
                                 }}
-                                className="h-7 px-2 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-semibold text-[11px] inline-flex items-center space-x-1 transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+                                className="h-7 px-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold text-xs inline-flex items-center space-x-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                                 title="Soạn phản hồi gửi khách hàng"
                               >
-                                <CornerDownRight className="w-3 h-3 shrink-0" />
+                                <CornerDownRight className="w-3.5 h-3.5 shrink-0" />
                                 <span className="whitespace-nowrap">Phản hồi</span>
                               </button>
 
@@ -3465,6 +3571,9 @@ export default function AdminPanel({
       {/* 5. TAB QUẢN LÝ MÃ GIẢM GIÁ (COUPONS) */}
       {adminTab === "coupons" && <CouponsTab />}
 
+      {/* 5.1 TAB QUẢN TRỊ THÔNG BÁO (NOTIFICATIONS) */}
+      {adminTab === "notifications" && <NotificationsTab />}
+
       {/* 6. TAB BÁO CÁO & THỐNG KÊ DOANH THU (ANALYTICS) */}
       {adminTab === "analytics" && <AnalyticsTab orders={serverOrders.length > 0 ? serverOrders : orders} />}
 
@@ -3474,7 +3583,7 @@ export default function AdminPanel({
       {/* CONFIRM DELETE REVIEW MODAL (Sử dụng createPortal gắn trực tiếp vào body để che phủ toàn màn hình, không bị cắt ngang header) */}
       {deletingReviewId && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-lg border border-slate-200 text-center space-y-4 animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -3495,7 +3604,7 @@ export default function AdminPanel({
               <button
                 type="button"
                 onClick={() => handleDeleteReview(deletingReviewId)}
-                className="flex-1 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-md shadow-red-500/20"
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors shadow-md"
               >
                 Xóa ngay
               </button>
@@ -3508,7 +3617,7 @@ export default function AdminPanel({
       {/* EDIT REVIEW MODAL (Sử dụng createPortal gắn vào body để backdrop mờ trọn vẹn màn hình) */}
       {isEditReviewModalOpen && editingReview && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)]">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-lg border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)]">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-3 sm:py-3.5 bg-white shrink-0">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -3519,7 +3628,7 @@ export default function AdminPanel({
               <button
                 type="button"
                 onClick={() => setIsEditReviewModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
+                className="text-slate-500 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3564,7 +3673,7 @@ export default function AdminPanel({
                       key={star}
                       type="button"
                       onClick={() => setEditReviewRating(star)}
-                      className="p-1 hover:scale-110 transition-transform"
+                      className="p-1 transition-colors"
                     >
                       <Star
                         className={`w-6 h-6 ${
@@ -3606,7 +3715,7 @@ export default function AdminPanel({
               <button
                 type="submit"
                 disabled={isSavingReview}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-1.5"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center space-x-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{isSavingReview ? "Đang lưu lên MongoDB..." : "Lưu Thay Đổi"}</span>
@@ -3621,21 +3730,21 @@ export default function AdminPanel({
       {/* CREATE / EDIT PRODUCT MODAL (Render qua createPortal vào body, giải quyết triệt để lỗi vệt cắt mờ trên header) */}
       {isModalOpen && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)]">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full shadow-lg border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)]">
             {/* Header cố định */}
             <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-2.5 sm:py-3 bg-white shrink-0">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
                   {editingProduct ? "Chỉnh Sửa Sách / Sản Phẩm" : "Thêm Sách Mới Vào Kho"}
                 </h3>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-xs text-slate-500">
                   {editingProduct ? "Cập nhật thông tin chi tiết và giá bán của đầu sách" : "Điền thông tin và tải ảnh sách lên hệ thống"}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
+                className="text-slate-500 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3670,7 +3779,7 @@ export default function AdminPanel({
                         <select
                           value={formCategory}
                           onChange={(e) => setFormCategory(e.target.value)}
-                          className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px]"
+                          className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                         >
                           {adminCategories.filter((c) => c !== "Tất cả").map((c) => (
                             <option key={c} value={c}>
@@ -3700,7 +3809,7 @@ export default function AdminPanel({
                             setFormStockQuantity(val);
                             setFormInStock(val > 0);
                           }}
-                          className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px] font-bold"
+                          className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold"
                         />
                       </div>
 
@@ -3720,7 +3829,7 @@ export default function AdminPanel({
                               }}
                               className="text-blue-600"
                             />
-                            <span className="font-semibold text-emerald-600 text-[11px]">Còn</span>
+                            <span className="font-semibold text-emerald-600 text-xs">Còn</span>
                           </label>
                           <label className="flex items-center space-x-1 cursor-pointer">
                             <input
@@ -3733,7 +3842,7 @@ export default function AdminPanel({
                               }}
                               className="text-blue-600"
                             />
-                            <span className="font-semibold text-red-600 text-[11px]">Hết</span>
+                            <span className="font-semibold text-red-600 text-xs">Hết</span>
                           </label>
                         </div>
                       </div>
@@ -3754,7 +3863,7 @@ export default function AdminPanel({
                           onChange={(e) => setFormPrice(Number(e.target.value))}
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-[10px] text-slate-400 mt-0.5">{formatVND(formPrice)}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{formatVND(formPrice)}</p>
                       </div>
 
                       <div>
@@ -3769,7 +3878,7 @@ export default function AdminPanel({
                           onChange={(e) => setFormOriginalPrice(Number(e.target.value))}
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-[10px] text-slate-400 mt-0.5">{formatVND(formOriginalPrice)}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{formatVND(formOriginalPrice)}</p>
                       </div>
                     </div>
 
@@ -3783,7 +3892,7 @@ export default function AdminPanel({
                         value={formDescription}
                         onChange={(e) => setFormDescription(e.target.value)}
                         placeholder="Tác phẩm sách bản quyền chính thức, tóm tắt nội dung và thông điệp nổi bật..."
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px]"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                       />
                     </div>
                   </div>
@@ -3802,25 +3911,25 @@ export default function AdminPanel({
                           <button
                             type="button"
                             onClick={() => setImageInputMode("upload")}
-                            className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                            className={`flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
                               imageInputMode === "upload"
                                 ? "bg-white text-blue-600 shadow-xs"
-                                : "text-slate-500 hover:text-slate-800"
+                                : "text-slate-600 hover:text-slate-900"
                             }`}
                           >
-                            <Upload className="w-3 h-3" />
+                            <Upload className="w-3.5 h-3.5" />
                             <span>Từ máy</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => setImageInputMode("url")}
-                            className={`flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                            className={`flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
                               imageInputMode === "url"
                                 ? "bg-white text-blue-600 shadow-xs"
-                                : "text-slate-500 hover:text-slate-800"
+                                : "text-slate-600 hover:text-slate-900"
                             }`}
                           >
-                            <Link2 className="w-3 h-3" />
+                            <Link2 className="w-3.5 h-3.5" />
                             <span>Link URL</span>
                           </button>
                         </div>
@@ -3845,13 +3954,13 @@ export default function AdminPanel({
                               onDragOver={handleDragOverImage}
                               className="group border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40 rounded-xl p-3 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-1"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-blue-600 flex items-center justify-center">
                                 <Upload className="w-4 h-4" />
                               </div>
-                              <p className="text-[11px] font-bold text-slate-800">
+                              <p className="text-xs font-bold text-slate-800">
                                 Bấm chọn ảnh từ máy tính
                               </p>
-                              <p className="text-[10px] text-slate-400">
+                              <p className="text-xs text-slate-500">
                                 hoặc kéo thả ảnh vào đây (PNG, JPG, WEBP)
                               </p>
                             </div>
@@ -3866,24 +3975,24 @@ export default function AdminPanel({
                               </div>
                               <div className="flex-1 min-w-0 space-y-1">
                                 <div className="flex items-center space-x-1.5">
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
                                     <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
                                     Ảnh từ máy
                                   </span>
                                   {uploadedFileSize && (
-                                    <span className="text-[9px] text-slate-400">
+                                    <span className="text-xs text-slate-500">
                                       ({uploadedFileSize})
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] font-semibold text-slate-800 truncate">
+                                <p className="text-xs font-semibold text-slate-800 truncate">
                                   {uploadedFileName || "Đã chọn ảnh từ máy tính"}
                                 </p>
                                 <div className="flex items-center space-x-1.5 pt-0.5">
                                   <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="px-2 py-0.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[10px] font-semibold transition-colors flex items-center space-x-1"
+                                    className="px-2 py-0.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-xs font-semibold transition-colors flex items-center space-x-1"
                                   >
                                     <Upload className="w-2.5 h-2.5 text-blue-600" />
                                     <span>Đổi</span>
@@ -3891,7 +4000,7 @@ export default function AdminPanel({
                                   <button
                                     type="button"
                                     onClick={handleRemoveImage}
-                                    className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-semibold transition-colors flex items-center space-x-1"
+                                    className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs font-semibold transition-colors flex items-center space-x-1"
                                   >
                                     <Trash2 className="w-2.5 h-2.5" />
                                     <span>Xóa</span>
@@ -3901,7 +4010,7 @@ export default function AdminPanel({
                             </div>
                           )}
                           {isCompressingImage && (
-                            <p className="text-[10px] text-blue-600 font-medium mt-0.5 animate-pulse">
+                            <p className="text-xs text-blue-600 font-medium mt-0.5">
                               Đang tối ưu dung lượng ảnh...
                             </p>
                           )}
@@ -3913,7 +4022,7 @@ export default function AdminPanel({
                             placeholder="Dán link ảnh: https://..."
                             value={formImageUrl}
                             onChange={(e) => setFormImageUrl(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-[11px]"
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                           />
                           <div className="flex items-center gap-1 flex-wrap">
                             {SAMPLE_IMAGES.slice(0, 4).map((sample) => (
@@ -3925,7 +4034,7 @@ export default function AdminPanel({
                                   setUploadedFileName(sample.label);
                                   setUploadedFileSize("");
                                 }}
-                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[9px] font-medium text-slate-700 border"
+                                className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-xs font-medium text-slate-700 border"
                               >
                                 {sample.label}
                               </button>
@@ -3938,10 +4047,10 @@ export default function AdminPanel({
                     {/* Thông số xuất bản: Tên trường cố định (Tác giả, NXB...), cho phép sửa trực tiếp giá trị */}
                     <div className="space-y-1.5 border-t border-slate-100 pt-2.5">
                       <div className="flex items-center justify-between">
-                        <label className="block font-bold text-slate-800 text-[11px]">
+                        <label className="block font-bold text-slate-800 text-xs">
                           Thông số xuất bản:
                         </label>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-xs text-slate-500">
                           ({Object.keys(formSpecs).length} thông số)
                         </span>
                       </div>
@@ -3951,7 +4060,7 @@ export default function AdminPanel({
                           return (
                             <div
                               key={key}
-                              className="flex items-center space-x-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-[11px] hover:border-slate-300 transition-colors"
+                              className="flex items-center space-x-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-xs hover:border-slate-300 transition-colors"
                             >
                               {/* Tên trường được giữ cố định, không sửa trực tiếp tên trường */}
                               <span className="text-slate-700 font-bold shrink-0 min-w-[85px] max-w-[110px] truncate select-none text-[10.5px]">
@@ -3969,7 +4078,7 @@ export default function AdminPanel({
                                     searchPlaceholder="🔍 Tìm theo tên NXB..."
                                     hideAllOption={true}
                                     allowCustom={true}
-                                    triggerClassName="bg-white border border-slate-200 rounded-md px-2 py-0.5 text-[11px] text-slate-900 font-semibold hover:border-slate-300 shadow-2xs"
+                                    triggerClassName="bg-white border border-slate-200 rounded-md px-2 py-0.5 text-xs text-slate-900 font-semibold hover:border-slate-300 shadow-2xs"
                                   />
                                 </div>
                               ) : (
@@ -3978,7 +4087,7 @@ export default function AdminPanel({
                                   value={val}
                                   onChange={(e) => handleSpecValueChange(key, e.target.value)}
                                   placeholder={`Nhập ${key.toLowerCase()}...`}
-                                  className="flex-1 min-w-0 bg-white border border-slate-200 rounded-md px-2 py-0.5 text-[11px] text-slate-900 font-semibold focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
+                                  className="flex-1 min-w-0 bg-white border border-slate-200 rounded-md px-2 py-0.5 text-xs text-slate-900 font-semibold focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
                                 />
                               )}
 
@@ -3988,7 +4097,7 @@ export default function AdminPanel({
                                   type="button"
                                   onClick={() => handleRemoveSpec(key)}
                                   title={`Xóa ${key}`}
-                                  className="text-slate-400 hover:text-red-600 p-0.5 shrink-0 rounded transition-colors"
+                                  className="text-slate-500 hover:text-red-600 p-0.5 shrink-0 rounded transition-colors"
                                 >
                                   <X className="w-3.5 h-3.5" />
                                 </button>
@@ -4006,19 +4115,19 @@ export default function AdminPanel({
                           placeholder="Thông số (VD: Dịch giả)"
                           value={newSpecKey}
                           onChange={(e) => setNewSpecKey(e.target.value)}
-                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <input
                           type="text"
                           placeholder="Giá trị (VD: Nguyễn Văn A)"
                           value={newSpecVal}
                           onChange={(e) => setNewSpecVal(e.target.value)}
-                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <button
                           type="button"
                           onClick={handleAddSpec}
-                          className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-[11px] font-bold hover:bg-slate-700 shrink-0 transition-colors"
+                          className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 shrink-0 transition-colors"
                         >
                           Thêm
                         </button>
@@ -4039,7 +4148,7 @@ export default function AdminPanel({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 flex items-center space-x-1.5 transition-colors"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md flex items-center space-x-1.5 transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   <span>{editingProduct ? "Lưu Thay Đổi" : "Tạo Sản Phẩm Mới"}</span>
@@ -4054,7 +4163,7 @@ export default function AdminPanel({
       {/* DELETE CONFIRMATION MODAL (createPortal trực tiếp ra body) */}
       {deletingProductId && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-center animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-lg border border-slate-200 space-y-4 text-center animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -4071,7 +4180,7 @@ export default function AdminPanel({
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-500/20"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md"
               >
                 Xóa ngay
               </button>
@@ -4084,7 +4193,7 @@ export default function AdminPanel({
       {/* CREATE / EDIT USER MODAL (createPortal trực tiếp ra body) */}
       {isUserModalOpen && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)]">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-lg border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)]">
             {/* Header cố định */}
             <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-3 sm:py-3.5 bg-white shrink-0">
               <div className="flex items-center space-x-2">
@@ -4095,7 +4204,7 @@ export default function AdminPanel({
                   <h3 className="text-base sm:text-lg font-bold text-slate-900">
                     {editingUser ? "Chỉnh Sửa Thông Tin Người Dùng" : "Thêm Tài Khoản Người Dùng Mới"}
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {editingUser ? `Cập nhật dữ liệu tài khoản ID: ${editingUser.id}` : "Tạo tài khoản mới và cấp quyền đăng nhập"}
                   </p>
                 </div>
@@ -4103,7 +4212,7 @@ export default function AdminPanel({
               <button
                 type="button"
                 onClick={() => setIsUserModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
+                className="text-slate-500 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -4155,7 +4264,7 @@ export default function AdminPanel({
                     onChange={(e) => setUserFormPhone(e.target.value.replace(/\D/g, ""))}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Bắt buộc nhập đúng 10 chữ số.</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Bắt buộc nhập đúng 10 chữ số.</p>
                 </div>
               </div>
 
@@ -4171,7 +4280,7 @@ export default function AdminPanel({
                   onChange={(e) => setUserFormPassword(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-[10px] text-slate-400 mt-0.5">Để trống sẽ giữ nguyên mật khẩu cũ nếu đang sửa.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Để trống sẽ giữ nguyên mật khẩu cũ nếu đang sửa.</p>
               </div>
 
               {/* Role & Status */}
@@ -4180,15 +4289,21 @@ export default function AdminPanel({
                   <label className="block font-semibold text-slate-700 mb-1">
                     Vai trò (Phân quyền) *
                   </label>
-                  <select
-                    value={userFormRole}
-                    onChange={(e) => setUserFormRole(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
-                  >
-                    <option value="customer">Khách Hàng (Customer)</option>
-                    <option value="staff">Nhân Viên (Staff)</option>
-                    <option value="admin">Quản Trị Viên (Admin)</option>
-                  </select>
+                  {userFormRole === "admin" ? (
+                    <div className="px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center space-x-2">
+                      <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>Quản Trị Viên (Mặc định CSDL MongoDB)</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={userFormRole}
+                      onChange={(e) => setUserFormRole(e.target.value as any)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                    >
+                      <option value="customer">Khách Hàng (Customer)</option>
+                      <option value="staff">Nhân Viên (Staff)</option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
@@ -4220,31 +4335,55 @@ export default function AdminPanel({
                 />
               </div>
 
-              {/* Avatar URL */}
+              {/* Avatar URL & Upload ảnh từ máy tính */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Đường dẫn ảnh đại diện (Avatar URL)
+                  Ảnh đại diện (Avatar)
                 </label>
-                <div className="flex items-center space-x-3 mb-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="flex items-center space-x-3 mb-2 p-2.5 bg-slate-50 rounded-xl border border-slate-200">
                   <img
                     src={userFormAvatar || "/images/default-avatar.png"}
                     alt="Avatar Preview"
-                    className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-sm"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm bg-white shrink-0"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = "/images/default-avatar.png";
                     }}
                   />
-                  <div>
-                    <p className="text-[11px] font-medium text-slate-700">Ảnh đại diện xem trước</p>
-                    <p className="text-[10px] text-slate-400">Để trống sẽ tự động lưu Avatar mặc định (/images/default-avatar.png)</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-800">Ảnh đại diện xem trước</p>
+                    <div className="flex items-center space-x-2 mt-1.5 flex-wrap gap-y-1">
+                      <input
+                        ref={userAvatarFileInputRef}
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        onChange={handleUserAvatarFileChange}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => userAvatarFileInputRef.current?.click()}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer shadow-xs"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Tải ảnh từ máy</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUserFormAvatar("/images/default-avatar.png")}
+                        className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Đặt lại mặc định</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <input
                   type="text"
-                  placeholder="Để trống sẽ dùng /images/default-avatar.png hoặc dán link ảnh"
+                  placeholder="Hoặc dán link ảnh trực tiếp: https://..."
                   value={userFormAvatar}
                   onChange={(e) => setUserFormAvatar(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                 />
               </div>
             </div>
@@ -4260,7 +4399,7 @@ export default function AdminPanel({
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 flex items-center space-x-1.5 transition-colors"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md flex items-center space-x-1.5 transition-colors"
               >
                 <Save className="w-4 h-4" />
                 <span>{editingUser ? "Lưu Thông Tin" : "Tạo Tài Khoản"}</span>
@@ -4275,7 +4414,7 @@ export default function AdminPanel({
       {/* DELETE USER CONFIRMATION MODAL (createPortal trực tiếp ra body) */}
       {deletingUserId && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-center animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-lg border border-slate-200 space-y-4 text-center animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <UserX className="w-6 h-6" />
             </div>
@@ -4292,7 +4431,7 @@ export default function AdminPanel({
               </button>
               <button
                 onClick={handleConfirmDeleteUser}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-500/20"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md"
               >
                 Xóa ngay
               </button>
@@ -4302,169 +4441,12 @@ export default function AdminPanel({
         document.body
       )}
 
-      {/* MODAL HẸN GIỜ LẤY HÀNG CHO SHIPPER (ADMIN) */}
-      {pickupModalOrder && (
-        <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-900">
-                    Xác Nhận &amp; Hẹn Giờ Shipper
-                  </h3>
-                  <p className="text-xs text-slate-400">Đơn hàng #{pickupModalOrder.id}</p>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={() => setPickupModalOrder(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Thông tin tóm tắt đơn hàng */}
-            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Khách hàng:</span>
-                <strong className="text-slate-800">{pickupModalOrder.customerInfo.fullName}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Số điện thoại:</span>
-                <span className="text-slate-700">{pickupModalOrder.customerInfo.phone}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Địa chỉ:</span>
-                <span className="text-slate-700 truncate max-w-[200px]" title={pickupModalOrder.customerInfo.address}>
-                  {pickupModalOrder.customerInfo.address}
-                </span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-slate-200">
-                <span className="text-slate-500">Tổng thanh toán:</span>
-                <strong className="text-red-600 font-black">{formatVND(pickupModalOrder.totalAmount)}</strong>
-              </div>
-            </div>
-
-            {/* Chọn thời gian lấy hàng */}
-            <div className="space-y-2 text-xs">
-              <label className="block font-bold text-slate-800">
-                Thời gian shipper đến kho lấy sách:
-              </label>
-              <input
-                type="datetime-local"
-                value={pickupDateTime}
-                onChange={(e) => setPickupDateTime(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-
-              {/* Các nút chọn nhanh thời gian */}
-              <div className="space-y-1">
-                <span className="text-[11px] text-slate-400 block">Chọn nhanh lịch hẹn:</span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = new Date(Date.now() + 60000);
-                      setPickupDateTime(t.toISOString().slice(0, 16));
-                    }}
-                    className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold text-left transition-colors cursor-pointer"
-                  >
-                    ⚡ Lấy ngay (+1 phút)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = new Date(Date.now() + 15 * 60000);
-                      setPickupDateTime(t.toISOString().slice(0, 16));
-                    }}
-                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium text-left transition-colors cursor-pointer"
-                  >
-                    🕒 Sau 15 phút
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = new Date(Date.now() + 30 * 60000);
-                      setPickupDateTime(t.toISOString().slice(0, 16));
-                    }}
-                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium text-left transition-colors cursor-pointer"
-                  >
-                    🕒 Sau 30 phút
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = new Date(Date.now() + 60 * 60000);
-                      setPickupDateTime(t.toISOString().slice(0, 16));
-                    }}
-                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium text-left transition-colors cursor-pointer"
-                  >
-                    🕒 Sau 1 giờ
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Chọn đơn vị vận chuyển */}
-            <div className="space-y-1.5 text-xs">
-              <label className="block font-bold text-slate-800">
-                Đơn vị vận chuyển liên kết:
-              </label>
-              <select
-                value={pickupCarrier}
-                onChange={(e) => setPickupCarrier(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              >
-                <option value="Giao Hàng Nhanh (GHN)">Giao Hàng Nhanh (GHN)</option>
-                <option value="Viettel Post">Viettel Post</option>
-                <option value="Shopee Xpress">Shopee Xpress</option>
-                <option value="Giao Hàng Tiết Kiệm (GHTK)">Giao Hàng Tiết Kiệm (GHTK)</option>
-                <option value="J&T Express">J&amp;T Express</option>
-              </select>
-            </div>
-
-            {/* Nút hành động */}
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setPickupModalOrder(null)}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-100 text-xs transition-colors cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!pickupModalOrder) return;
-                  const finalPickupTime = pickupDateTime
-                    ? new Date(pickupDateTime).toISOString()
-                    : new Date(Date.now() + 15 * 60000).toISOString();
-
-                  handleUpdateOrderStatusRealtime(pickupModalOrder.id, "Chờ lấy hàng", {
-                    pickupTime: finalPickupTime,
-                    shippingCarrier: pickupCarrier,
-                  });
-                  setPickupModalOrder(null);
-                }}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 text-xs transition-all flex items-center space-x-1.5 cursor-pointer"
-              >
-                <Check className="w-4 h-4" />
-                <span>Xác Nhận &amp; Lưu Lịch Shipper</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL XEM CHI TIẾT ĐƠN HÀNG & HÀNH TRÌNH VẬN CHUYỂN */}
       {viewingOrderDetail && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 my-8">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-lg border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 my-8">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center space-x-2.5">
@@ -4474,13 +4456,13 @@ export default function AdminPanel({
                 <div>
                   <h3 className="font-bold text-slate-900 text-base flex items-center space-x-2">
                     <span>Đơn Hàng #{viewingOrderDetail.id}</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-black ${
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-black ${
                       viewingOrderDetail.status === "Hoàn tất"
                         ? "bg-emerald-100 text-emerald-800"
                         : viewingOrderDetail.status === "Chờ giao hàng"
                         ? "bg-blue-100 text-blue-800"
                         : viewingOrderDetail.status === "Chờ lấy hàng"
-                        ? "bg-purple-100 text-purple-800"
+                        ? "bg-indigo-100 text-indigo-800"
                         : viewingOrderDetail.status === "Đã hủy"
                         ? "bg-red-100 text-red-800"
                         : "bg-amber-100 text-amber-800"
@@ -4488,13 +4470,13 @@ export default function AdminPanel({
                       {viewingOrderDetail.status}
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-400">Ngày đặt: {viewingOrderDetail.date}</p>
+                  <p className="text-xs text-slate-500">Ngày đặt: {viewingOrderDetail.date}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setViewingOrderDetail(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -4509,8 +4491,8 @@ export default function AdminPanel({
               <div className="flex items-center justify-between relative text-center text-xs">
                 <div className="flex-1">
                   <div className="w-7 h-7 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">✓</div>
-                  <div className="font-bold text-slate-800 mt-1 text-[11px]">Đặt hàng</div>
-                  <div className="text-[10px] text-slate-400">{viewingOrderDetail.date}</div>
+                  <div className="font-bold text-slate-800 mt-1 text-xs">Đặt hàng</div>
+                  <div className="text-xs text-slate-500">{viewingOrderDetail.date}</div>
                 </div>
                 <div className="w-6 sm:w-10 h-0.5 bg-emerald-300" />
                 <div className="flex-1">
@@ -4521,8 +4503,8 @@ export default function AdminPanel({
                   }`}>
                     {viewingOrderDetail.pickupTime || viewingOrderDetail.status !== "Chờ xác nhận" ? "✓" : "2"}
                   </div>
-                  <div className="font-bold text-slate-800 mt-1 text-[11px]">Hẹn lấy hàng</div>
-                  <div className="text-[10px] text-slate-400 truncate max-w-[80px] mx-auto">
+                  <div className="font-bold text-slate-800 mt-1 text-xs">Hẹn lấy hàng</div>
+                  <div className="text-xs text-slate-500 truncate max-w-[80px] mx-auto">
                     {viewingOrderDetail.pickupTime ? new Date(viewingOrderDetail.pickupTime).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' }) : "Chờ xếp"}
                   </div>
                 </div>
@@ -4539,8 +4521,8 @@ export default function AdminPanel({
                   }`}>
                     {viewingOrderDetail.status === "Hoàn tất" ? "✓" : "3"}
                   </div>
-                  <div className="font-bold text-slate-800 mt-1 text-[11px]">Đang giao</div>
-                  <div className="text-[10px] text-slate-400 truncate max-w-[80px] mx-auto">
+                  <div className="font-bold text-slate-800 mt-1 text-xs">Đang giao</div>
+                  <div className="text-xs text-slate-500 truncate max-w-[80px] mx-auto">
                     {viewingOrderDetail.shippingCarrier ? viewingOrderDetail.shippingCarrier.slice(0, 8) : "GHN"}
                   </div>
                 </div>
@@ -4557,8 +4539,8 @@ export default function AdminPanel({
                   }`}>
                     {viewingOrderDetail.status === "Hoàn tất" ? "✓" : "4"}
                   </div>
-                  <div className="font-bold text-slate-800 mt-1 text-[11px]">Hoàn tất</div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="font-bold text-slate-800 mt-1 text-xs">Hoàn tất</div>
+                  <div className="text-xs text-slate-500">
                     {viewingOrderDetail.receivedAt ? new Date(viewingOrderDetail.receivedAt).toLocaleDateString("vi-VN") : "Chưa giao"}
                   </div>
                 </div>
@@ -4568,7 +4550,7 @@ export default function AdminPanel({
             {/* Thông tin khách hàng & Giao nhận */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 text-xs">
               <div>
-                <span className="text-slate-400 text-[11px] block">Người nhận hàng:</span>
+                <span className="text-slate-500 text-xs block">Người nhận hàng:</span>
                 <strong className="text-slate-900 font-bold text-sm block">
                   {viewingOrderDetail.customerInfo?.fullName || (viewingOrderDetail as any).customerName || "Khách Hàng"}
                 </strong>
@@ -4580,12 +4562,12 @@ export default function AdminPanel({
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 text-[11px] block">Thanh toán &amp; Vận chuyển:</span>
+                <span className="text-slate-500 text-xs block">Thanh toán &amp; Vận chuyển:</span>
                 <div className="mt-1 space-y-1">
                   <div className="flex items-center space-x-1.5">
                     <span className="text-slate-600">Hình thức:</span>
                     <strong className="text-slate-800 uppercase">{viewingOrderDetail.paymentMethod}</strong>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
                       viewingOrderDetail.isPaid || viewingOrderDetail.status === "Hoàn tất"
                         ? "bg-emerald-100 text-emerald-800"
                         : "bg-amber-100 text-amber-800"
@@ -4604,7 +4586,7 @@ export default function AdminPanel({
             <div>
               <h4 className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
                 <span>Chi Tiết Sản Phẩm ({Array.isArray(viewingOrderDetail.items) ? viewingOrderDetail.items.length : 1} ấn phẩm)</span>
-                <span className="text-slate-400 font-normal text-[11px]">Đơn vị: VNĐ</span>
+                <span className="text-slate-500 font-normal text-xs">Đơn vị: VNĐ</span>
               </h4>
               <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl p-2 bg-slate-50/50">
                 {Array.isArray(viewingOrderDetail.items) && viewingOrderDetail.items.length > 0 ? (
@@ -4618,7 +4600,7 @@ export default function AdminPanel({
                         />
                         <div>
                           <div className="font-bold text-slate-800 line-clamp-1 max-w-xs">{it.product?.name || "Ấn Phẩm Sách"}</div>
-                          <div className="text-[11px] text-slate-400 font-mono">Đơn giá: {formatVND(it.product?.price || 0)}</div>
+                          <div className="text-xs text-slate-500 font-mono">Đơn giá: {formatVND(it.product?.price || 0)}</div>
                         </div>
                       </div>
                       <div className="text-right">
@@ -4638,7 +4620,7 @@ export default function AdminPanel({
             {/* Tổng thanh toán & Thao tác */}
             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
               <div>
-                <span className="text-xs text-slate-400 block">Tổng thanh toán:</span>
+                <span className="text-xs text-slate-500 block">Tổng thanh toán:</span>
                 <span className="text-lg font-black text-red-600">{formatVND(viewingOrderDetail.totalAmount)}</span>
               </div>
               <div className="flex items-center space-x-2">
@@ -4656,7 +4638,7 @@ export default function AdminPanel({
                 <button
                   type="button"
                   onClick={() => setViewingOrderDetail(null)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer shadow-md shadow-blue-500/20"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer shadow-md"
                 >
                   Đóng
                 </button>
@@ -4670,15 +4652,15 @@ export default function AdminPanel({
       {/* MODAL PHÂN QUYỀN & KHÓA/MỞ KHÓA TÀI KHOẢN (ADMIN USERS) */}
       {roleModalUser && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-lg border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2.5">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Shield className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">Phân Quyền &amp; Quản Lý Tài Khoản</h3>
-                  <p className="text-xs text-slate-400">ID: #{roleModalUser.id}</p>
+                  <p className="text-xs text-slate-500">ID: #{roleModalUser.id}</p>
                 </div>
               </div>
               <button
@@ -4706,47 +4688,47 @@ export default function AdminPanel({
               </div>
             </div>
 
-            {/* Chọn vai trò */}
+            {/* Chọn vai trò: Chỉ cho phép chọn Khách Hàng hoặc Nhân Viên, Admin được quản lý trực tiếp trong MongoDB */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-700">Vai Trò Người Dùng (Role):</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRoleModalRole("customer")}
-                  className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
-                    roleModalRole === "customer"
-                      ? "bg-slate-800 text-white border-slate-800 shadow-sm"
-                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                  }`}
-                >
-                  <User className="w-4 h-4" />
-                  <span>Khách Hàng</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRoleModalRole("staff")}
-                  className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
-                    roleModalRole === "staff"
-                      ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                      : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                  }`}
-                >
-                  <UserCheck className="w-4 h-4" />
-                  <span>Nhân Viên</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRoleModalRole("admin")}
-                  className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
-                    roleModalRole === "admin"
-                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                      : "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  <span>Quản Trị</span>
-                </button>
-              </div>
+              {roleModalUser.role === "admin" ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start space-x-2.5">
+                  <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-bold">Tài khoản Quản Trị Viên (Admin):</span>
+                    <p className="mt-0.5 text-slate-600">
+                      Vai trò Quản trị viên được chỉ định trực tiếp trong MongoDB. Không cho phép nâng cấp hay hạ cấp tài khoản này trên giao diện.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRoleModalRole("customer")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
+                      roleModalRole === "customer"
+                        ? "bg-slate-800 text-white border-slate-800 shadow-sm"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Khách Hàng</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoleModalRole("staff")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center space-y-1 transition-all cursor-pointer ${
+                      roleModalRole === "staff"
+                        ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                        : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                    }`}
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>Nhân Viên</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Trạng thái tài khoản */}
@@ -4792,7 +4774,7 @@ export default function AdminPanel({
                 type="button"
                 onClick={handleSaveUserRoleStatus}
                 disabled={isUpdatingUserRole}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md shadow-purple-500/20 disabled:opacity-50"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md disabled:opacity-50"
               >
                 <Check className="w-4 h-4" />
                 <span>{isUpdatingUserRole ? "Đang lưu..." : "Xác Nhận & Cập Nhật"}</span>
@@ -4806,15 +4788,15 @@ export default function AdminPanel({
       {/* MODAL PHẢN HỒI ĐÁNH GIÁ ĐỘC GIẢ (ADMIN REVIEWS REPLY) */}
       {replyingReview && createPortal(
         <div className="fixed inset-0 !m-0 !top-0 !left-0 !right-0 !bottom-0 z-[100] bg-slate-900/70 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-lg border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2.5">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <CornerDownRight className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">Phản Hồi Đánh Giá Của Độc Giả</h3>
-                  <p className="text-xs text-slate-400">Gửi lời cảm ơn hoặc giải đáp thắc mắc của độc giả</p>
+                  <p className="text-xs text-slate-500">Gửi lời cảm ơn hoặc giải đáp thắc mắc của độc giả</p>
                 </div>
               </div>
               <button
@@ -4857,9 +4839,9 @@ export default function AdminPanel({
                 value={adminReplyText}
                 onChange={(e) => setAdminReplyText(e.target.value)}
                 placeholder="Ví dụ: Cảm ơn bạn đã ủng hộ nhà sách! BookStore rất vui vì bạn hài lòng với chất lượng sách..."
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all leading-relaxed"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all leading-relaxed"
               />
-              <p className="text-[11px] text-slate-400">
+              <p className="text-xs text-slate-500">
                 Nội dung này sẽ hiển thị công khai trên giao diện trang chi tiết sách với nhãn <strong>"Phản hồi từ Nhà Sách BookStore"</strong>.
               </p>
             </div>
@@ -4876,7 +4858,7 @@ export default function AdminPanel({
                 type="button"
                 onClick={handleSaveReviewReply}
                 disabled={isSubmittingReply}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md shadow-purple-500/20 disabled:opacity-50"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-all flex items-center space-x-1.5 cursor-pointer shadow-md disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>{isSubmittingReply ? "Đang gửi..." : "Gửi Phản Hồi"}</span>

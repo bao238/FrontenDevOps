@@ -98,7 +98,7 @@ export default function CartPage({
           >
             <span>Trang chủ</span>
           </button>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
           <span className="font-bold text-slate-900">Giỏ hàng của bạn</span>
         </div>
 
@@ -135,9 +135,9 @@ export default function CartPage({
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
               Giỏ sách của bạn hiện đang trống!
-            </h3>
+            </h2>
             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
               Bạn chưa chọn cuốn sách nào vào giỏ. Hãy khám phá hàng ngàn tựa sách hấp dẫn chuẩn Nhà xuất bản với ưu đãi đặc biệt tại BookStore.
             </p>
@@ -146,7 +146,7 @@ export default function CartPage({
           <div className="pt-2">
             <button
               onClick={onContinueShopping}
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-500/25 transition-all transform hover:-translate-y-0.5"
+              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg transition-all transform hover:-translate-y-0.5"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Khám Phá Tủ Sách Ngay</span>
@@ -165,8 +165,8 @@ export default function CartPage({
                   <div
                     className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
                       shippingProgress >= 100
-                        ? "bg-emerald-100 text-emerald-600 shadow-sm shadow-emerald-500/20"
-                        : "bg-blue-100 text-blue-600 shadow-sm shadow-blue-500/20"
+                        ? "bg-emerald-100 text-emerald-600 shadow-sm"
+                        : "bg-blue-100 text-blue-600 shadow-sm"
                     }`}
                   >
                     <Truck className="w-4 h-4" />
@@ -273,18 +273,18 @@ export default function CartPage({
                         </div>
 
                         <div className="space-y-1.5 min-w-0 flex-1">
-                          <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-bold">
                             {item.product.category}
                           </span>
-                          <h4
+                          <h3
                             onClick={() => onSelectProduct(item.product)}
                             className="font-bold text-sm text-slate-900 truncate hover:text-blue-600 cursor-pointer transition-colors"
                             title={item.product.name}
                           >
                             {item.product.name}
-                          </h4>
+                          </h3>
                           {item.product.author && (
-                            <p className="text-[11px] text-slate-500 font-medium truncate">
+                            <p className="text-xs text-slate-500 font-medium truncate">
                               Tác giả: <span className="text-slate-700 font-semibold">{item.product.author}</span>
                             </p>
                           )}
@@ -293,7 +293,7 @@ export default function CartPage({
                               {formatVND(item.product.price)}
                             </span>
                             {item.product.originalPrice && item.product.originalPrice > item.product.price && (
-                              <span className="line-through text-slate-400 text-[11px]">
+                              <span className="line-through text-slate-500 text-xs">
                                 {formatVND(item.product.originalPrice)}
                               </span>
                             )}
@@ -336,7 +336,7 @@ export default function CartPage({
                             </button>
                           </div>
                           {typeof item.product.stockQuantity === "number" && item.product.stockQuantity <= 5 && (
-                            <span className="text-[10px] text-amber-600 font-semibold">
+                            <span className="text-xs text-amber-600 font-semibold">
                               (Kho còn: {item.product.stockQuantity})
                             </span>
                           )}
@@ -344,7 +344,7 @@ export default function CartPage({
 
                         {/* Line Total */}
                         <div className="text-right min-w-[100px]">
-                          <span className="block text-[10px] text-slate-400">Thành tiền</span>
+                          <span className="block text-xs text-slate-500">Thành tiền</span>
                           <span className="font-black text-slate-900 text-sm sm:text-base">
                             {formatVND(lineTotal)}
                           </span>
@@ -354,7 +354,7 @@ export default function CartPage({
                         <button
                           type="button"
                           onClick={() => onRemoveFromCart(item.product.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
                           title="Xóa khỏi giỏ hàng"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -389,8 +389,8 @@ export default function CartPage({
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900">Giao Toàn Quốc Siêu Tốc</h5>
-                  <p className="text-[11px] text-slate-500">Đóng gói 3 lớp xốp chống móp</p>
+                  <p className="font-bold text-slate-900">Giao Toàn Quốc Siêu Tốc</p>
+                  <p className="text-xs text-slate-500">Đóng gói 3 lớp xốp chống móp</p>
                 </div>
               </div>
 
@@ -399,18 +399,18 @@ export default function CartPage({
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900">100% Sách Thật Chuẩn NXB</h5>
-                  <p className="text-[11px] text-slate-500">Tặng kèm bookmark độc quyền</p>
+                  <p className="font-bold text-slate-900">100% Sách Thật Chuẩn NXB</p>
+                  <p className="text-xs text-slate-500">Tặng kèm bookmark độc quyền</p>
                 </div>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center space-x-3 text-xs">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                   <RotateCcw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900">Đổi Trả Sách 7 Ngày</h5>
-                  <p className="text-[11px] text-slate-500">Lỗi in ấn đổi mới 100%</p>
+                  <p className="font-bold text-slate-900">Đổi Trả Sách 7 Ngày</p>
+                  <p className="text-xs text-slate-500">Lỗi in ấn đổi mới 100%</p>
                 </div>
               </div>
             </div>
@@ -418,7 +418,7 @@ export default function CartPage({
 
           {/* RIGHT: ORDER SUMMARY (4 COLS) */}
           <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-24">
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xl shadow-slate-200/50 space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-md shadow-slate-200/50 space-y-6">
               <h3 className="font-black text-lg text-slate-900 border-b border-slate-100 pb-3">
                 Tóm Tắt Đơn Hàng
               </h3>
@@ -446,25 +446,25 @@ export default function CartPage({
 
                 {/* Quick Coupon Hint Pills */}
                 <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                  <span className="text-[10px] text-slate-400">Mã gợi ý:</span>
+                  <span className="text-xs text-slate-500">Mã gợi ý:</span>
                   <button
                     type="button"
                     onClick={() => setPromoCode("BOOKWORM10")}
-                    className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-[10px] font-bold border border-blue-200 transition-colors"
+                    className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs font-bold border border-blue-200 transition-colors"
                   >
                     BOOKWORM10 (-10%)
                   </button>
                   <button
                     type="button"
                     onClick={() => setPromoCode("DEVOPS10")}
-                    className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[10px] font-bold border border-indigo-200 transition-colors"
+                    className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-xs font-bold border border-indigo-200 transition-colors"
                   >
                     DEVOPS10 (-10%)
                   </button>
                   <button
                     type="button"
                     onClick={() => setPromoCode("FREESHIP")}
-                    className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold border border-emerald-200 transition-colors"
+                    className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-xs font-bold border border-emerald-200 transition-colors"
                   >
                     FREESHIP
                   </button>
@@ -502,7 +502,7 @@ export default function CartPage({
                 <div className="border-t border-slate-200 pt-3 flex justify-between items-baseline">
                   <div>
                     <span className="block text-sm font-black text-slate-900">Tổng thanh toán</span>
-                    <span className="text-[10px] text-slate-400">Đã bao gồm thuế VAT (nếu có)</span>
+                    <span className="text-xs text-slate-500">Đã bao gồm thuế VAT (nếu có)</span>
                   </div>
                   <span className="text-xl sm:text-2xl font-black text-blue-600">
                     {formatVND(totalAmount)}
@@ -521,10 +521,10 @@ export default function CartPage({
                   onProceedToCheckout();
                 }}
                 disabled={activeSelectedIds.length === 0}
-                className={`w-full py-3.5 rounded-2xl text-xs sm:text-sm font-bold shadow-xl transition-all flex items-center justify-center space-x-2 ${
+                className={`w-full py-3.5 rounded-2xl text-xs sm:text-sm font-bold shadow-md transition-all flex items-center justify-center space-x-2 ${
                   activeSelectedIds.length === 0
                     ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
-                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 transform hover:-translate-y-0.5 cursor-pointer"
+                    : "bg-blue-600 hover:bg-blue-700 text-white transform hover:-translate-y-0.5 cursor-pointer"
                 }`}
               >
                 <CreditCard className="w-4 h-4" />
@@ -535,7 +535,7 @@ export default function CartPage({
                 </span>
               </button>
 
-              <p className="text-center text-[11px] text-slate-400 flex items-center justify-center space-x-1">
+              <p className="text-center text-xs text-slate-500 flex items-center justify-center space-x-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Giao dịch an toàn &amp; Bảo mật tuyệt đối</span>
               </p>
@@ -570,7 +570,7 @@ export default function CartPage({
               <div
                 key={p.id}
                 onClick={() => onSelectProduct(p)}
-                className="bg-white rounded-3xl p-3.5 border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between"
+                className="bg-white rounded-3xl p-3.5 border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between"
               >
                 <div className="space-y-2.5">
                   <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 shadow-inner">
@@ -582,20 +582,20 @@ export default function CartPage({
                     {/* Hiệu ứng gáy sách 3D */}
                     <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/25 via-black/5 to-transparent pointer-events-none" />
                     {p.discountPercent > 0 && (
-                      <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">
+                      <span className="absolute top-2 left-2 bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-md shadow-sm">
                         -{p.discountPercent}%
                       </span>
                     )}
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded block w-fit mb-1">
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded block w-fit mb-1">
                       {p.category}
                     </span>
                     <h4 className="font-bold text-xs text-slate-900 group-hover:text-blue-600 line-clamp-2 transition-colors leading-snug">
                       {p.name}
                     </h4>
                     {p.author && (
-                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                      <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
                         Tác giả: <span className="text-slate-700">{p.author}</span>
                       </p>
                     )}
@@ -606,7 +606,7 @@ export default function CartPage({
                   <span className="font-black text-xs text-red-600">
                     {formatVND(p.price)}
                   </span>
-                  <span className="text-[11px] font-bold text-slate-500 group-hover:text-blue-600 flex items-center space-x-0.5 transition-colors">
+                  <span className="text-xs font-bold text-slate-500 group-hover:text-blue-600 flex items-center space-x-0.5 transition-colors">
                     <span>Xem sách</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>

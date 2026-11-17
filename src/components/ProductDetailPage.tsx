@@ -257,9 +257,9 @@ export default function ProductDetailPage({
           >
             Trang chủ
           </button>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
           <span className="text-slate-500">{product.category}</span>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
           <span className="text-slate-900 font-bold truncate max-w-xs sm:max-w-sm">
             {product.name}
           </span>
@@ -278,17 +278,17 @@ export default function ProductDetailPage({
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         {/* Left Column: Big Product Image & Badges */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="relative aspect-[3/4] max-w-sm mx-auto rounded-3xl overflow-hidden bg-slate-50 border border-slate-200 shadow-xl shadow-slate-200/50 group">
+          <div className="relative aspect-[3/4] max-w-sm mx-auto rounded-3xl overflow-hidden bg-slate-100 shadow-sm group">
             <img
               src={product.imageUrl}
               alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover transition-colors duration-200"
             />
             {/* Hiệu ứng gáy sách chiều sâu 3D */}
             <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/30 via-black/10 to-transparent pointer-events-none z-10" />
 
             {product.discountPercent > 0 && (
-              <div className="absolute top-4 left-4 z-20 bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-lg shadow-red-600/30 flex items-center space-x-1">
+              <div className="absolute top-4 left-4 z-20 bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-lg flex items-center space-x-1">
                 <Tag className="w-3.5 h-3.5" />
                 <span>Tiết kiệm {product.discountPercent}%</span>
               </div>
@@ -301,7 +301,7 @@ export default function ProductDetailPage({
               >
                 <Share2 className="w-4 h-4" />
                 {copyNotification && (
-                  <span className="absolute -bottom-8 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap shadow-lg">
+                  <span className="absolute -bottom-8 right-0 bg-slate-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
                     Đã copy link!
                   </span>
                 )}
@@ -315,22 +315,22 @@ export default function ProductDetailPage({
             )}
           </div>
 
-          {/* Value Assurance Badges */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-center space-y-1">
+          {/* Value Assurance Badges - Dạng phẳng chuẩn Typography, không viền lồng (NESTED CARDS) */}
+          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100 text-center">
+            <div className="space-y-1 py-1">
               <ShieldCheck className="w-5 h-5 text-blue-600 mx-auto" />
-              <p className="text-[11px] font-bold text-slate-800">100% Sách Thật</p>
-              <p className="text-[10px] text-slate-400">Chuẩn NXB 100%</p>
+              <p className="text-xs font-bold text-slate-800">100% Sách Thật</p>
+              <p className="text-xs text-slate-500">Chuẩn NXB 100%</p>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-center space-y-1">
+            <div className="space-y-1 py-1 border-x border-slate-100">
               <RotateCcw className="w-5 h-5 text-emerald-600 mx-auto" />
-              <p className="text-[11px] font-bold text-slate-800">Đổi Trả 7 Ngày</p>
-              <p className="text-[10px] text-slate-400">Lỗi in ấn đổi ngay</p>
+              <p className="text-xs font-bold text-slate-800">Đổi Trả 7 Ngày</p>
+              <p className="text-xs text-slate-500">Lỗi in ấn đổi ngay</p>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-center space-y-1">
-              <Truck className="w-5 h-5 text-purple-600 mx-auto" />
-              <p className="text-[11px] font-bold text-slate-800">Giao Toàn Quốc</p>
-              <p className="text-[10px] text-slate-400">Đóng gói 3 lớp xốp</p>
+            <div className="space-y-1 py-1">
+              <Truck className="w-5 h-5 text-blue-600 mx-auto" />
+              <p className="text-xs font-bold text-slate-800">Giao Toàn Quốc</p>
+              <p className="text-xs text-slate-500">Đóng gói 3 lớp xốp</p>
             </div>
           </div>
         </div>
@@ -346,7 +346,7 @@ export default function ProductDetailPage({
               <div className="flex items-center space-x-1.5 text-xs">
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
-                    product.inStock ? "bg-emerald-500 animate-pulse" : "bg-red-500"
+                    product.inStock ? "bg-emerald-500" : "bg-red-500"
                   }`}
                 ></span>
                 <span className={`font-bold ${product.inStock ? "text-emerald-700" : "text-red-700"}`}>
@@ -364,17 +364,17 @@ export default function ProductDetailPage({
               {product.name}
             </h1>
 
-            {/* Author & Publication Information */}
-            <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-600 bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-100">
+            {/* Author & Publication Information - Dạng phẳng loại bỏ lồng thẻ NESTED CARDS */}
+            <div className="flex flex-wrap items-center gap-y-1.5 gap-x-3 text-xs text-slate-600 py-1.5 border-b border-slate-100">
               <span className="flex items-center space-x-1">
-                <span className="text-slate-400">Tác giả:</span>
+                <span className="text-slate-500">Tác giả:</span>
                 <span className="font-bold text-slate-900">{product.author || "Nhiều tác giả"}</span>
               </span>
               {product.publisher && (
                 <>
                   <span className="text-slate-300">•</span>
                   <span className="flex items-center space-x-1">
-                    <span className="text-slate-400">NXB:</span>
+                    <span className="text-slate-500">NXB:</span>
                     <span className="font-semibold text-slate-800">{product.publisher}</span>
                   </span>
                 </>
@@ -383,7 +383,7 @@ export default function ProductDetailPage({
                 <>
                   <span className="text-slate-300">•</span>
                   <span className="flex items-center space-x-1">
-                    <span className="text-slate-400">Năm XB:</span>
+                    <span className="text-slate-500">Năm XB:</span>
                     <span className="font-semibold text-slate-800">{product.publicationYear}</span>
                   </span>
                 </>
@@ -392,7 +392,7 @@ export default function ProductDetailPage({
                 <>
                   <span className="text-slate-300">•</span>
                   <span className="flex items-center space-x-1">
-                    <span className="text-slate-400">Số trang:</span>
+                    <span className="text-slate-500">Số trang:</span>
                     <span className="font-semibold text-slate-800">{product.pages} trang</span>
                   </span>
                 </>
@@ -407,7 +407,7 @@ export default function ProductDetailPage({
                   <span>{currentRating.toFixed(1)}</span>
                 </div>
               ) : (
-                <span className="text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md text-[11px]">
+                <span className="text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md text-xs">
                   Chưa có đánh giá
                 </span>
               )}
@@ -424,14 +424,14 @@ export default function ProductDetailPage({
               <span className="text-slate-500">Mã SP: <strong className="font-mono text-slate-700">{product.id}</strong></span>
             </div>
 
-            {/* Price Box */}
-            <div className="bg-gradient-to-r from-slate-50 via-blue-50/40 to-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-2">
+            {/* Price Box - Dạng phẳng loại bỏ hoàn toàn viền lồng NESTED CARDS */}
+            <div className="py-3 space-y-1.5 border-b border-slate-100">
               <div className="flex items-baseline space-x-3">
                 <span className="text-3xl sm:text-4xl font-black text-red-600">
                   {formatVND(product.price)}
                 </span>
                 {product.originalPrice > product.price && (
-                  <span className="text-sm sm:text-base text-slate-400 line-through">
+                  <span className="text-sm sm:text-base text-slate-500 line-through">
                     {formatVND(product.originalPrice)}
                   </span>
                 )}
@@ -443,8 +443,8 @@ export default function ProductDetailPage({
               )}
             </div>
 
-            {/* Short Highlights */}
-            <div className="text-xs text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100 space-y-1.5">
+            {/* Short Highlights - Dạng phẳng loại bỏ hoàn toàn viền lồng NESTED CARDS */}
+            <div className="text-xs text-slate-600 leading-relaxed py-3 space-y-2 border-b border-slate-100">
               <p className="font-bold text-slate-800 flex items-center space-x-1.5">
                 <Sparkles className="w-4 h-4 text-blue-600" />
                 <span>Đặc quyền độc giả tại BookStore:</span>
@@ -491,7 +491,7 @@ export default function ProductDetailPage({
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500">
                   {typeof product.stockQuantity === "number" && product.stockQuantity <= 10 && (
                     <span className="text-amber-600 font-bold mr-2">(Kho còn: {product.stockQuantity})</span>
                   )}
@@ -510,7 +510,7 @@ export default function ProductDetailPage({
                 className={`py-3.5 px-4 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2 ${
                   product.inStock
                     ? "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/20 hover:scale-[1.01]"
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed"
                 }`}
               >
                 <ShoppingCart className="w-4 h-4" />
@@ -522,8 +522,8 @@ export default function ProductDetailPage({
                 disabled={!product.inStock}
                 className={`py-3.5 px-4 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2 ${
                   product.inStock
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 hover:scale-[1.01]"
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    ? "bg-blue-600 hover:bg-blue-700 text-white hover:scale-[1.01]"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed"
                 }`}
               >
                 <CreditCard className="w-4 h-4" />
@@ -531,8 +531,8 @@ export default function ProductDetailPage({
               </button>
             </div>
 
-            <p className="text-[11px] text-center text-slate-400 flex items-center justify-center space-x-1">
-              <Clock className="w-3.5 h-3.5" />
+            <p className="text-sm text-center text-slate-600 font-medium flex items-center justify-center space-x-1.5 pt-1">
+              <Clock className="w-4 h-4 text-slate-500" />
               <span>Giao hàng toàn quốc &bull; Kiểm tra hàng trước khi thanh toán</span>
             </p>
           </div>
@@ -572,7 +572,7 @@ export default function ProductDetailPage({
             }`}
           >
             <span>Đánh Giá Khách Hàng</span>
-            <span className="bg-slate-100 text-slate-600 text-[11px] px-2 py-0.5 rounded-full font-bold">
+            <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">
               {currentReviewsCount}
             </span>
           </button>
@@ -580,19 +580,19 @@ export default function ProductDetailPage({
 
         {/* TAB 1: MÔ TẢ CHI TIẾT */}
         {activeTab === "desc" && (
-          <div className="space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed animate-in fade-in">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+          <div className="space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed animate-in fade-in max-w-prose">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">
               Giới thiệu về {product.name}
-            </h3>
-            <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+            </h2>
+            <p className="text-slate-700 leading-relaxed whitespace-pre-line max-w-prose">
               {product.description}
             </p>
-            <div className="bg-blue-50/60 rounded-2xl p-4 border border-blue-100 space-y-2 mt-4 text-xs">
-              <h4 className="font-bold text-blue-900">Lý do bạn nên sở hữu cuốn sách này:</h4>
-              <ul className="space-y-1.5 text-blue-800 list-disc list-inside">
-                <li>Tác phẩm được xuất bản chính thức, bản quyền chuẩn, chất lượng giấy in cao cấp chống lóa mắt.</li>
-                <li>Đóng gói 3 lớp chống sốc, bảo vệ mép bìa và gáy sách nguyên vẹn khi giao hàng.</li>
-                <li>Được đông đảo độc giả và giới phê bình đánh giá cao về giá trị tri thức và cảm xúc nhân văn.</li>
+            <div className="pt-4 mt-6 border-t border-slate-100 space-y-2 text-xs max-w-prose">
+              <h3 className="font-bold text-slate-900">Lý do bạn nên sở hữu cuốn sách này:</h3>
+              <ul className="space-y-1.5 text-slate-600 list-disc list-inside max-w-prose">
+                <li className="max-w-prose">Tác phẩm được xuất bản chính thức, bản quyền chuẩn, chất lượng giấy in cao cấp chống lóa mắt.</li>
+                <li className="max-w-prose">Đóng gói 3 lớp chống sốc, bảo vệ mép bìa và gáy sách nguyên vẹn khi giao hàng.</li>
+                <li className="max-w-prose">Được đông đảo độc giả và giới phê bình đánh giá cao về giá trị tri thức và cảm xúc nhân văn.</li>
               </ul>
             </div>
           </div>
@@ -601,9 +601,9 @@ export default function ProductDetailPage({
         {/* TAB 2: THÔNG TIN CHI TIẾT TÁC PHẨM */}
         {activeTab === "specs" && (
           <div className="space-y-4 animate-in fade-in">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">
               Bảng Thông Tin Chi Tiết Tác Phẩm
-            </h3>
+            </h2>
             <div className="overflow-hidden rounded-2xl border border-slate-200">
               <table className="w-full text-left text-xs">
                 <tbody className="divide-y divide-slate-200">
@@ -662,8 +662,8 @@ export default function ProductDetailPage({
         {/* TAB 3: ĐÁNH GIÁ & NHẬN XÉT CỦA KHÁCH HÀNG */}
         {activeTab === "reviews" && (
           <div className="space-y-8 animate-in fade-in">
-            {/* Reviews Overview Banner */}
-            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-6">
+            {/* Reviews Overview Banner - Dạng phẳng chuẩn Typography, không viền lồng NESTED CARDS */}
+            <div className="py-6 border-y border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-6">
               {hasReviews ? (
                 <div className="text-center sm:text-left space-y-1">
                   <div className="flex items-center justify-center sm:justify-start space-x-2">
@@ -681,7 +681,7 @@ export default function ProductDetailPage({
                           />
                         ))}
                       </div>
-                      <p className="text-xs text-slate-400">Dựa trên {visibleReviews.length} đánh giá thực tế</p>
+                      <p className="text-xs text-slate-500">Dựa trên {visibleReviews.length} đánh giá thực tế</p>
                     </div>
                   </div>
                 </div>
@@ -714,13 +714,13 @@ export default function ProductDetailPage({
             {/* Reviews List & Filter Bar */}
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                <h4 className="font-bold text-slate-900 text-sm">
+                <h3 className="font-bold text-slate-900 text-sm">
                   Tất cả nhận xét ({visibleReviews.length})
-                </h4>
+                </h3>
 
                 {/* Thanh lọc nhận xét theo tiêu chí */}
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="text-slate-400 text-[11px] font-medium mr-1 flex items-center">
+                  <span className="text-slate-500 text-xs font-medium mr-1 flex items-center">
                     <Filter className="w-3 h-3 mr-1" /> Lọc:
                   </span>
                   <button
@@ -783,7 +783,7 @@ export default function ProductDetailPage({
               </div>
 
               {!hasReviews ? (
-                <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs space-y-2">
+                <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-500 text-xs space-y-2">
                   <Star className="w-8 h-8 text-slate-200 mx-auto" />
                   <p className="font-bold text-slate-700 text-sm">Chưa có nhận xét nào</p>
                   <p className="max-w-sm mx-auto text-slate-500">
@@ -795,11 +795,11 @@ export default function ProductDetailPage({
                   Không có nhận xét nào phù hợp với bộ lọc đã chọn.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="divide-y divide-slate-100">
                 {filteredReviewsList.map((rev) => (
                   <div
                     key={rev.id}
-                    className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200 text-xs space-y-2.5 transition-shadow hover:shadow-xs"
+                    className="py-4 text-xs space-y-2.5"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
@@ -811,14 +811,14 @@ export default function ProductDetailPage({
                         <div>
                           <span className="font-bold text-slate-900">{rev.author}</span>
                           {rev.verified && (
-                            <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px] inline-flex items-center">
+                            <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-xs inline-flex items-center">
                               <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
                               Đã mua hàng
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className="text-[11px] text-slate-400">{rev.date}</span>
+                      <span className="text-xs text-slate-500">{rev.date}</span>
                     </div>
 
                     <div className="flex text-amber-400">
@@ -832,7 +832,7 @@ export default function ProductDetailPage({
                       ))}
                     </div>
 
-                    <p className="text-slate-700 leading-relaxed">
+                    <p className="text-slate-700 leading-relaxed max-w-prose">
                       {rev.content}
                     </p>
 
@@ -845,7 +845,7 @@ export default function ProductDetailPage({
                           className="w-24 h-24 object-cover rounded-xl border border-slate-200 shadow-xs cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => window.open(rev.imageUrl, "_blank")}
                         />
-                        <p className="text-[10px] text-slate-400 mt-1 italic">
+                        <p className="text-xs text-slate-500 mt-1 italic">
                           (Ảnh chụp sản phẩm thực tế từ người mua)
                         </p>
                       </div>
@@ -857,11 +857,11 @@ export default function ProductDetailPage({
                         <div className="font-bold text-purple-800 flex items-center space-x-1.5">
                           <CornerDownRight className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                           <span>Phản hồi từ Nhà Sách BookStore</span>
-                          <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">
+                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">
                             Quản trị viên
                           </span>
                           {rev.repliedAt && (
-                            <span className="text-[10px] text-slate-400 font-normal ml-auto">
+                            <span className="text-xs text-slate-500 font-normal ml-auto">
                               {new Date(rev.repliedAt).toLocaleDateString("vi-VN")}
                             </span>
                           )}
@@ -873,7 +873,7 @@ export default function ProductDetailPage({
                     )}
 
                     {/* Nút bấm Hữu ích tương tác */}
-                    <div className="flex items-center space-x-4 text-[11px] pt-1">
+                    <div className="flex items-center space-x-4 text-xs pt-1">
                       <button
                         type="button"
                         onClick={() => handleToggleLikeReview(rev.id)}
@@ -894,19 +894,19 @@ export default function ProductDetailPage({
             </div>
 
             {/* Write a Review Form - Luôn mở form để độc giả có thể gửi đánh giá bất kỳ lúc nào */}
-            <div id="write-review" className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
+            <div id="write-review" className="pt-8 border-t border-slate-200 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
-                <h4 className="font-bold text-slate-900 text-sm flex items-center space-x-1.5">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center space-x-1.5">
                   <MessageSquare className="w-4 h-4 text-blue-600" />
                   <span>Gửi Đánh Giá Của Bạn</span>
-                </h4>
+                </h3>
                 {userReceivedOrder ? (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-bold border border-emerald-200">
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold border border-emerald-200">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                     <span>✓ Đã mua và nhận hàng</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[11px] font-bold border border-blue-200">
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-200">
                     <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                     <span>Đánh giá từ độc giả</span>
                   </span>
@@ -958,7 +958,7 @@ export default function ProductDetailPage({
                               className="w-6 h-6 rounded-full object-cover border border-slate-200"
                             />
                             <span className="font-bold text-slate-800 text-xs">{currentUser.name}</span>
-                            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full ml-auto">
+                            <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full ml-auto">
                               Tài khoản của bạn
                             </span>
                           </div>
@@ -989,7 +989,7 @@ export default function ProductDetailPage({
                               key={num}
                               type="button"
                               onClick={() => setReviewRating(num)}
-                              className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                              className="p-1 transition-colors cursor-pointer"
                             >
                               <Star
                                 className={`w-6 h-6 ${
@@ -1035,7 +1035,7 @@ export default function ProductDetailPage({
                           />
                           <div className="flex-1">
                             <p className="text-xs font-semibold text-slate-800">Ảnh đã tải lên</p>
-                            <p className="text-[10px] text-slate-400">Ảnh sẽ hiển thị cùng nhận xét của bạn</p>
+                            <p className="text-xs text-slate-500">Ảnh sẽ hiển thị cùng nhận xét của bạn</p>
                           </div>
                           <button
                             type="button"
@@ -1063,7 +1063,7 @@ export default function ProductDetailPage({
                     <button
                       type="submit"
                       disabled={isSubmittingReview}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 transition-all flex items-center space-x-2 cursor-pointer"
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-md transition-all flex items-center space-x-2 cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
                       <span>{isSubmittingReview ? "Đang gửi..." : "Gửi Nhận Xét"}</span>
@@ -1079,9 +1079,9 @@ export default function ProductDetailPage({
         <div className="space-y-4 pt-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-black text-slate-900">
+              <h2 className="text-lg font-black text-slate-900">
                 Tác Phẩm Cùng Thể Loại Độc Giả Cũng Yêu Thích
-              </h3>
+              </h2>
               <p className="text-xs text-slate-500">Khám phá thêm các tựa sách thuộc thể loại {product.category} đặc sắc khác</p>
             </div>
           </div>
@@ -1094,33 +1094,33 @@ export default function ProductDetailPage({
                   onSelectRelatedProduct(rel);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="bg-white rounded-3xl border border-slate-200 p-3.5 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+                className="bg-white rounded-3xl border border-slate-200 p-3.5 shadow-sm hover:border-blue-300 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
               >
                 <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-slate-50 relative shadow-inner">
                   <img
                     src={rel.imageUrl}
                     alt={rel.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover transition-colors duration-200"
                   />
                   {/* Hiệu ứng gáy sách 3D */}
                   <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/25 via-black/5 to-transparent pointer-events-none" />
                   {rel.discountPercent > 0 && (
-                    <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">
+                    <span className="absolute top-2 left-2 bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-md shadow-sm">
                       -{rel.discountPercent}%
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded block w-fit mb-1">
+                  <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded block w-fit mb-1">
                     {rel.category}
                   </span>
-                  <h4 className="font-bold text-xs text-slate-900 line-clamp-2 group-hover:text-blue-600 transition-colors leading-snug">
+                  <h3 className="font-bold text-xs text-slate-900 line-clamp-2 group-hover:text-blue-600 transition-colors leading-snug">
                     {rel.name}
-                  </h4>
+                  </h3>
                   {rel.author && (
-                    <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                      Tác giả: <span className="text-slate-700">{rel.author}</span>
+                    <p className="text-xs text-slate-600 font-medium truncate mt-0.5">
+                      Tác giả: <span className="text-slate-800">{rel.author}</span>
                     </p>
                   )}
                   <div className="flex items-baseline space-x-2 mt-2">
@@ -1128,7 +1128,7 @@ export default function ProductDetailPage({
                       {formatVND(rel.price)}
                     </span>
                     {rel.originalPrice > rel.price && (
-                      <span className="text-[11px] text-slate-400 line-through">
+                      <span className="text-xs text-slate-500 line-through">
                         {formatVND(rel.originalPrice)}
                       </span>
                     )}

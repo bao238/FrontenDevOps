@@ -39,7 +39,7 @@ export default function WishlistModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 my-8 max-h-[85vh] flex flex-col">
+      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-lg border border-slate-200 animate-in fade-in zoom-in-95 my-8 max-h-[85vh] flex flex-col">
         {/* Header Modal */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center space-x-2.5">
@@ -50,14 +50,14 @@ export default function WishlistModal({
               <h3 className="font-bold text-slate-900 text-base sm:text-lg">
                 Danh Sách Sách Yêu Thích ({wishlist.length})
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Các tác phẩm bạn đã lưu để đọc và mua sau
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 text-slate-500 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -73,7 +73,7 @@ export default function WishlistModal({
               <h4 className="font-bold text-slate-800 text-base">
                 Chưa có cuốn sách yêu thích nào
               </h4>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                 Bấm vào biểu tượng trái tim trên bất kỳ cuốn sách nào để lưu lại tác phẩm bạn quan tâm.
               </p>
               <button
@@ -100,22 +100,22 @@ export default function WishlistModal({
                   <img
                     src={book.imageUrl}
                     alt={book.name}
-                    className="w-14 h-20 object-cover rounded-xl shadow-sm shrink-0 group-hover:scale-105 transition-transform"
+                    className="w-14 h-20 object-cover rounded-xl shadow-sm shrink-0 transition-colors"
                   />
                   <div>
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
                       {book.category}
                     </span>
                     <h4 className="font-bold text-slate-800 text-xs sm:text-sm mt-1 line-clamp-1 group-hover:text-blue-600 transition-colors">
                       {book.name}
                     </h4>
-                    <p className="text-[11px] text-slate-400">{book.author || "Tác giả"}</p>
+                    <p className="text-xs text-slate-500">{book.author || "Tác giả"}</p>
                     <div className="flex items-center space-x-2 mt-1">
                       <strong className="text-blue-600 font-bold text-xs sm:text-sm">
                         {formatVND(book.price)}
                       </strong>
                       {book.originalPrice > book.price && (
-                        <span className="text-[10px] text-slate-400 line-through">
+                        <span className="text-xs text-slate-500 line-through">
                           {formatVND(book.originalPrice)}
                         </span>
                       )}
@@ -133,7 +133,7 @@ export default function WishlistModal({
                   </button>
                   <button
                     onClick={() => onRemoveFromWishlist(book.id)}
-                    className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                    className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                     title="Xóa khỏi yêu thích"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -147,7 +147,7 @@ export default function WishlistModal({
         {/* Footer */}
         {wishlist.length > 0 && (
           <div className="pt-4 border-t border-slate-100 mt-4 flex items-center justify-between shrink-0">
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-500">
               Đang lưu trữ {wishlist.length} cuốn sách
             </span>
             <button

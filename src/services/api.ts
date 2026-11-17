@@ -2,7 +2,7 @@
 import { Product, ReviewItem, INITIAL_BOOKS } from "../data/products";
 import { UserAccount } from "../data/users";
 import { applyRatingBalancing } from "../utils/ratingBalancer";
-import { NotificationItem, NotificationApiResponse } from "../types/notification";
+import { NotificationItem, NotificationApiResponse, NotificationStats, AdminNotificationParams } from "../types/notification";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api";
 const TOKEN_STORAGE_KEY = "bookstore_token";
@@ -982,8 +982,9 @@ export const api = {
     title: string;
     message: string;
     type?: string;
-    link?: string;
-    userId?: string;
+    link?: string | null;
+    userId?: string | null;
+    metadata?: Record<string, any>;
   }): Promise<NotificationItem | null> {
     try {
       const res = await apiFetch("/notifications", {
@@ -996,6 +997,46 @@ export const api = {
       }
     } catch (err) {
       console.warn("⚠️ [API] Loi khi tao thong bao:", err);
+    }
+    return null;
+  },
+
+  // 39. Lay danh sach toan bo thong bao quan tri danh rieng cho Admin/Staff (Ho tro tim kiem, loc va phan trang)
+  async getAdminNotifications(params?: AdminNotificationParams): Promise<NotificationApiResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) query.append("page", String(params.page));
+    if (params?.limit) query.append("limit", String(params.limit));
+    if (params?.search && params.search.trim()) query.append("search", params.search.trim());
+    if (params?.type && params.type !== "all") query.append("type", params.type);
+    if (params?.target && params.target !== "all") query.append("target", params.target);
+
+    try {
+      const qs = query.toString() ? `?${query.toString()}` : "";
+      const res = await apiFetch(`/notifications/admin${qs}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) return json;
+      }
+    } catch (err) {
+      console.warn("⚠️ [API] Loi khi lay danh sach thong bao quan tri:", err);
+    }
+    return {
+      success: false,
+      data: [],
+      pagination: { page: params?.page || 1, limit: params?.limit || 10, total: 0, totalPages: 1 }
+    };
+  },
+
+  // 40. Lay thong ke KPI thong bao cho Admin Panel
+  async getNotificationStats(): Promise<NotificationStats | null> {
+    try {
+      const res = await apiFetch("/notifications/stats");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) return json.data;
+      }
+    } catch (err) {
+      console.warn("⚠️ [API] Loi khi lay thong ke thong bao:", err);
     }
     return null;
   }

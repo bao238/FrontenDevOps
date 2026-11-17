@@ -321,27 +321,27 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
       <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
               <BarChart3 className="w-5 h-5" />
             </div>
             <h2 className="text-base sm:text-lg font-black text-slate-900">
               Báo Cáo &amp; Thống Kê Doanh Thu Toàn Diện
             </h2>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-600 mt-1">
             Tổng hợp dữ liệu <strong>{timeMetrics.labelTitle.toLowerCase()}</strong> từ <strong>{timeMetrics.totalOrdersCount.toLocaleString("vi-VN")} đơn hàng</strong> và <strong>{(analytics?.inventory.totalBooks ?? 10549).toLocaleString("vi-VN")} cuốn sách</strong> trên MongoDB
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Bộ lọc mốc thời gian */}
+          {/* Bộ lọc mốc thời gian: màu xanh thương hiệu chuẩn (loại bỏ màu tím AI Palette) */}
           <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold">
             <button
               type="button"
               onClick={() => setTimeRange("7days")}
               className={`px-3 py-1.5 rounded-lg transition-all ${
                 timeRange === "7days"
-                  ? "bg-white text-purple-700 shadow-sm"
+                  ? "bg-white text-blue-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -352,7 +352,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
               onClick={() => setTimeRange("30days")}
               className={`px-3 py-1.5 rounded-lg transition-all ${
                 timeRange === "30days"
-                  ? "bg-white text-purple-700 shadow-sm"
+                  ? "bg-white text-blue-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -363,7 +363,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
               onClick={() => setTimeRange("all")}
               className={`px-3 py-1.5 rounded-lg transition-all ${
                 timeRange === "all"
-                  ? "bg-white text-purple-700 shadow-sm"
+                  ? "bg-white text-blue-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -384,7 +384,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
           <button
             type="button"
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-purple-500/20 transition-all cursor-pointer"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md transition-all cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Xuất CSV (Excel)</span>
@@ -392,61 +392,61 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
         </div>
       </div>
 
-      {/* 4 Thẻ KPI Tài Chính Cốt Lõi */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <DollarSign className="w-6 h-6" />
+      {/* 4 Thẻ KPI Tài Chính Cốt Lõi - Thu nhỏ gọn gàng, tinh tế */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <DollarSign className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-slate-500 font-medium">Doanh thu tích lũy</p>
-            <h3 className="text-base sm:text-lg font-black text-purple-700 truncate" title={formatVND(totalRevenue)}>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Doanh thu tích lũy</p>
+            <h3 className="text-sm sm:text-base font-black text-slate-900 truncate" title={formatVND(totalRevenue)}>
               {formatVND(totalRevenue)}
             </h3>
-            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5 truncate">
+            <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 truncate">
               Từ {completedOrders.toLocaleString("vi-VN")} đơn hoàn tất
             </p>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-6 h-6" />
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-slate-500 font-medium">Giá trị đơn TB (AOV)</p>
-            <h3 className="text-base sm:text-lg font-black text-blue-700 truncate" title={formatVND(averageOrderValue)}>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Giá trị đơn TB (AOV)</p>
+            <h3 className="text-sm sm:text-base font-black text-slate-900 truncate" title={formatVND(averageOrderValue)}>
               {formatVND(averageOrderValue)}
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Mỗi lượt thanh toán</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Mỗi lượt thanh toán</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-6 h-6" />
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-slate-500 font-medium">Tỷ lệ giao thành công</p>
-            <h3 className="text-lg sm:text-xl font-black text-emerald-600">
+            <p className="text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Tỷ lệ giao thành công</p>
+            <h3 className="text-base sm:text-lg font-black text-emerald-600">
               {completionRate}%
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+            <p className="text-[11px] text-slate-500 mt-0.5 truncate">
               {completedOrders.toLocaleString("vi-VN")} / {totalOrdersCount.toLocaleString("vi-VN")} tổng đơn
             </p>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Package className="w-6 h-6" />
+        <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <Package className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-slate-500 font-medium">Quy mô hệ thống</p>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Quy mô hệ thống</p>
             <h3 className="text-base sm:text-lg font-black text-amber-700 truncate">
               {(analytics?.inventory.totalBooks ?? 10549).toLocaleString("vi-VN")} sách
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+            <p className="text-xs text-slate-500 mt-0.5 truncate">
               {(analytics?.inventory.totalUsers ?? 25120).toLocaleString("vi-VN")} users • {(analytics?.inventory.totalReviews ?? 25229).toLocaleString("vi-VN")} review
             </p>
           </div>
@@ -461,13 +461,15 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
             <div>
               <h3 className="text-sm sm:text-base font-black text-slate-900 flex items-center space-x-2">
                 <span>Xu Hướng Doanh Thu</span>
-                <span className="text-xs font-normal text-slate-400">({timeMetrics.chartSubtitle})</span>
+                <span className="text-xs font-semibold text-slate-500">({timeMetrics.chartSubtitle})</span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              {/* Phụ đề tương phản cao chuẩn WCAG (loại bỏ LOW CONTRAST TEXT) */}
+              <p className="text-xs text-slate-600 font-medium mt-0.5">
                 Rê chuột lên từng cột để xem giá trị doanh thu cụ thể
               </p>
             </div>
-            <span className="text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-xl border border-purple-100">
+            {/* Nhãn doanh thu max: dải màu thương hiệu chuẩn (loại bỏ AI Color Palette) */}
+            <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-xl border border-blue-200">
               {formatVND(maxDayRevenue)} / max
             </span>
           </div>
@@ -491,9 +493,9 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
                   onMouseEnter={() => setHoveredBarIndex(index)}
                   onMouseLeave={() => setHoveredBarIndex(null)}
                 >
-                  {/* Tooltip khi rê chuột căn giữa cột */}
+                  {/* Tooltip khi rê chuột căn giữa cột - đổ bóng shadow-md */}
                   {isHovered && (
-                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-100 transition-all bg-slate-900 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl whitespace-nowrap pointer-events-none shadow-xl z-30 animate-in fade-in zoom-in-95">
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-100 transition-all bg-slate-900 text-white text-xs font-bold py-1.5 px-3 rounded-xl whitespace-nowrap pointer-events-none shadow-md z-30 animate-in fade-in zoom-in-95">
                       <div className="text-amber-300 font-mono">{item.date}</div>
                       <div>{formatVND(item.revenue)}</div>
                     </div>
@@ -508,15 +510,15 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
                         : "max-w-[36px] sm:max-w-[48px]"
                     } rounded-t-lg sm:rounded-t-xl transition-all cursor-pointer shadow-sm ${
                       isHovered
-                        ? "bg-gradient-to-t from-purple-700 to-indigo-600 transform scale-y-105"
-                        : "bg-gradient-to-t from-purple-600/90 to-indigo-500/90 hover:from-purple-700 hover:to-indigo-600"
+                        ? "bg-gradient-to-t from-blue-700 to-indigo-600 transform scale-y-105"
+                        : "bg-gradient-to-t from-blue-600 to-indigo-500 hover:from-blue-700 hover:to-indigo-600"
                     }`}
                     style={{ height: `${heightPercent}%` }}
                   />
                   
                   {/* Nhãn ngày thông minh: 7 ngày và Toàn thời gian hiển thị 100%, 30 ngày dùng dấu chấm nhỏ cách quãng */}
                   {showLabel ? (
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 mt-2 truncate max-w-full text-center select-none">
+                    <span className="text-xs font-semibold text-slate-600 mt-2 truncate max-w-full text-center select-none">
                       {label}
                     </span>
                   ) : (
@@ -527,10 +529,10 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
             })}
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-3">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-semibold pt-3 border-t border-slate-100">
             <span>Đơn vị: VNĐ</span>
             <span className="flex items-center space-x-1 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
               <span>{timeMetrics.unitLabel}</span>
             </span>
           </div>
@@ -540,12 +542,12 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between min-w-0">
           <div>
             <div className="flex items-center space-x-2 mb-1">
-              <PieChart className="w-4 h-4 text-purple-600" />
+              <PieChart className="w-4 h-4 text-blue-600" />
               <h3 className="text-sm sm:text-base font-black text-slate-900">
                 Cơ Cấu Trạng Thái Đơn
               </h3>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-slate-500 mb-4">
               Tỷ lệ phần trăm giữa các phân đoạn đơn hàng
             </p>
 
@@ -608,35 +610,54 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
                     className="transition-all duration-500"
                   />
                 )}
-              </svg>
 
-              {/* Text ở tâm Donut */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase">Tổng số</span>
-                <span className="text-base font-black text-slate-900 leading-tight">
-                  {totalOrdersCount.toLocaleString("vi-VN")}
-                </span>
-                <span className="text-[10px] text-purple-600 font-bold">đơn hàng</span>
-              </div>
+                {/* Text ở tâm Donut: Native SVG Text xoay ngược lại 90 độ, loại bỏ hoàn toàn lỗi TEXT OCCLUDED BY AN OVERLAPPING ELEMENT */}
+                <g className="origin-center select-none" style={{ transform: "rotate(90deg)" }}>
+                  <text
+                    x="50"
+                    y="42"
+                    textAnchor="middle"
+                    className="text-xs font-bold fill-slate-500 uppercase tracking-wider"
+                  >
+                    Tổng số
+                  </text>
+                  <text
+                    x="50"
+                    y="53"
+                    textAnchor="middle"
+                    className="text-xs font-black fill-slate-900"
+                  >
+                    {totalOrdersCount.toLocaleString("vi-VN")}
+                  </text>
+                  <text
+                    x="50"
+                    y="62"
+                    textAnchor="middle"
+                    className="text-xs font-bold fill-blue-600"
+                  >
+                    đơn hàng
+                  </text>
+                </g>
+              </svg>
             </div>
 
-            {/* Chú giải Donut */}
+            {/* Chú giải Donut: Dạng phẳng không lồng border (loại bỏ NESTED CARDS), cỡ chữ text-xs chuẩn */}
             <div className="grid grid-cols-2 gap-2 pt-3 text-xs">
-              <div className="flex items-center space-x-1.5 bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-100">
+              <div className="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                <span className="text-slate-600 truncate text-[11px]">Hoàn tất: <strong>{donutData.completed.percent}%</strong></span>
+                <span className="text-slate-700 truncate text-xs">Hoàn tất: <strong>{donutData.completed.percent}%</strong></span>
               </div>
-              <div className="flex items-center space-x-1.5 bg-blue-50/70 p-1.5 rounded-lg border border-blue-100">
+              <div className="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                <span className="text-slate-600 truncate text-[11px]">Đang giao: <strong>{donutData.shipping.percent}%</strong></span>
+                <span className="text-slate-700 truncate text-xs">Đang giao: <strong>{donutData.shipping.percent}%</strong></span>
               </div>
-              <div className="flex items-center space-x-1.5 bg-amber-50/70 p-1.5 rounded-lg border border-amber-100">
+              <div className="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                <span className="text-slate-600 truncate text-[11px]">Đang xử lý: <strong>{donutData.pending.percent}%</strong></span>
+                <span className="text-slate-700 truncate text-xs">Đang xử lý: <strong>{donutData.pending.percent}%</strong></span>
               </div>
-              <div className="flex items-center space-x-1.5 bg-red-50/70 p-1.5 rounded-lg border border-red-100">
+              <div className="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                <span className="text-slate-600 truncate text-[11px]">Đã hủy: <strong>{donutData.canceled.percent}%</strong></span>
+                <span className="text-slate-700 truncate text-xs">Đã hủy: <strong>{donutData.canceled.percent}%</strong></span>
               </div>
             </div>
           </div>
@@ -647,27 +668,27 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
       <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Layers className="w-4 h-4 text-purple-600" />
+            <Layers className="w-4 h-4 text-blue-600" />
             <h3 className="text-sm sm:text-base font-black text-slate-900">
               Cơ Cấu Doanh Số Theo Thể Loại Sách
             </h3>
           </div>
-          <span className="text-xs text-slate-400 font-medium">Đóng góp trên tổng doanh thu {formatVND(totalRevenue)}</span>
+          <span className="text-xs text-slate-500 font-medium">Đóng góp trên tổng doanh thu {formatVND(totalRevenue)}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5 pt-1">
           {categorySales.map((cat, idx) => {
             const colors = [
-              { bg: "bg-purple-500", text: "text-purple-700", border: "border-purple-200" },
-              { bg: "bg-blue-500", text: "text-blue-700", border: "border-blue-200" },
-              { bg: "bg-emerald-500", text: "text-emerald-700", border: "border-emerald-200" },
-              { bg: "bg-amber-500", text: "text-amber-700", border: "border-amber-200" },
-              { bg: "bg-rose-500", text: "text-rose-700", border: "border-rose-200" }
+              { bg: "bg-blue-600", text: "text-blue-700" },
+              { bg: "bg-indigo-600", text: "text-indigo-700" },
+              { bg: "bg-emerald-600", text: "text-emerald-700" },
+              { bg: "bg-amber-600", text: "text-amber-700" },
+              { bg: "bg-teal-600", text: "text-teal-700" }
             ];
             const color = colors[idx % colors.length];
 
             return (
-              <div key={cat.name} className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-2">
+              <div key={cat.name} className="bg-slate-50 p-3.5 rounded-2xl space-y-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-800 truncate" title={cat.name}>{cat.name}</span>
                   <span className={`font-black ${color.text}`}>{cat.percentage}%</span>
@@ -675,7 +696,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
                 <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                   <div className={`${color.bg} h-full rounded-full`} style={{ width: `${cat.percentage}%` }} />
                 </div>
-                <div className="text-[11px] font-mono text-slate-500">
+                <div className="text-xs font-mono text-slate-600 font-medium">
                   {formatVND(cat.revenue)}
                 </div>
               </div>
@@ -693,7 +714,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
               onClick={() => setRankingTab("books")}
               className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all ${
                 rankingTab === "books"
-                  ? "bg-amber-500 text-white shadow-md shadow-amber-500/20"
+                  ? "bg-amber-500 text-white shadow-md"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -705,7 +726,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
               onClick={() => setRankingTab("vip")}
               className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all ${
                 rankingTab === "vip"
-                  ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
+                  ? "bg-blue-600 text-white shadow-md"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -713,7 +734,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
               <span>Top 5 Khách Hàng VIP</span>
             </button>
           </div>
-          <span className="text-xs text-slate-400 font-mono">Dữ liệu đối soát tự động</span>
+          <span className="text-xs text-slate-500 font-mono">Dữ liệu đối soát tự động</span>
         </div>
 
         {rankingTab === "books" ? (
@@ -721,7 +742,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                <tr className="border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
                   <th className="py-3 px-3 w-16">Thứ Hạng</th>
                   <th className="py-3 px-3">Tác Phẩm &amp; Tác Giả</th>
                   <th className="py-3 px-3 w-40">Thể Loại</th>
@@ -758,20 +779,20 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
                         )}
                         <div>
                           <div className="font-bold text-slate-800 line-clamp-1">{book.name}</div>
-                          <div className="text-[11px] text-slate-400">{book.author}</div>
+                          <div className="text-xs text-slate-500 font-medium">{book.author}</div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700">
                         {book.category}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span className="font-black text-slate-900">{book.quantitySold}</span>
-                      <span className="text-[10px] text-slate-400 ml-1">cuốn</span>
+                      <span className="text-xs text-slate-500 font-medium ml-1">cuốn</span>
                     </td>
-                    <td className="py-3 px-3 text-right font-black text-purple-700">
+                    <td className="py-3 px-3 text-right font-black text-blue-700">
                       {formatVND(book.totalSales)}
                     </td>
                   </tr>
@@ -784,7 +805,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                <tr className="border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
                   <th className="py-3 px-3 w-16">Hạng VIP</th>
                   <th className="py-3 px-3">Khách Hàng Thân Thiết</th>
                   <th className="py-3 px-3 w-40">Số Điện Thoại</th>
@@ -799,7 +820,7 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
                       <span
                         className={`w-6 h-6 rounded-full inline-flex items-center justify-center font-black text-xs ${
                           vip.rank === 1
-                            ? "bg-purple-100 text-purple-800 border border-purple-200"
+                            ? "bg-amber-100 text-amber-800 border border-amber-300"
                             : vip.rank === 2
                             ? "bg-blue-100 text-blue-800 border border-blue-200"
                             : vip.rank === 3
@@ -812,14 +833,14 @@ export default function AnalyticsTab({ orders }: AnalyticsTabProps) {
                     </td>
                     <td className="py-3 px-3">
                       <div className="font-bold text-slate-800">{vip.name}</div>
-                      <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
+                      <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                         Thành viên VIP #{vip.rank}
                       </span>
                     </td>
                     <td className="py-3 px-3 font-mono text-slate-600">{vip.phone}</td>
                     <td className="py-3 px-3 text-center">
                       <span className="font-black text-slate-900">{vip.ordersCount}</span>
-                      <span className="text-[10px] text-slate-400 ml-1">đơn hoàn tất</span>
+                      <span className="text-xs text-slate-500 font-medium ml-1">đơn hoàn tất</span>
                     </td>
                     <td className="py-3 px-3 text-right font-black text-emerald-600">
                       {formatVND(vip.totalSpent)}

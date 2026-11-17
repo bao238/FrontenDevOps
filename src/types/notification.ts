@@ -32,11 +32,30 @@ export interface NotificationItem {
 export interface NotificationApiResponse {
   success: boolean;
   data: NotificationItem[];
-  unreadCount: number;
+  unreadCount?: number;
   pagination?: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
   };
+}
+
+// Cấu trúc số liệu thống kê KPI thông báo dành cho Quản trị viên
+export interface NotificationStats {
+  total: number;
+  coupon: number;
+  order: number;
+  system: number;
+  review: number;
+  broadcast: number;
+}
+
+// Tham số truy vấn danh sách thông báo quản trị
+export interface AdminNotificationParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+  target?: 'all' | 'broadcast' | 'specific';
 }

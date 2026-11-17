@@ -226,12 +226,13 @@ exports.deleteNotification = async (req, res, next) => {
       return next(new AppError('Không tìm thấy thông báo cần xóa', 404));
     }
 
-    // Kiểm tra quyền sở hữu
+    // Kiểm tra quyền sở hữu: Người dùng chỉ được xóa thông báo của chính mình, Admin/Staff có quyền xóa mọi thông báo
+    const isStaffOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'staff');
     if (
       notification.userId &&
       req.user &&
       notification.userId !== req.user.id &&
-      req.user.role !== 'admin'
+      !isStaffOrAdmin
     ) {
       return next(new AppError('Bạn không có quyền xóa thông báo này', 403));
     }
@@ -255,8 +256,8 @@ exports.deleteAllNotifications = async (req, res, next) => {
   try {
     const query = {};
     if (req.user && req.user.id) {
-      if (req.user.role === 'admin') {
-        // Admin xóa thông báo cá nhân hoặc thông báo chung
+      if (req.user.role === 'admin' || req.user.role === 'staff') {
+        // Admin/Staff xóa thông báo cá nhân hoặc thông báo chung
         query.$or = [{ userId: req.user.id }, { userId: null }];
       } else {
         query.userId = req.user.id;
@@ -279,20 +280,121 @@ exports.deleteAllNotifications = async (req, res, next) => {
 };
 
 /**
- * Tạo thông báo mới (Dành cho Quản trị viên hoặc gọi qua API nội bộ).
+ * Lấy danh sách toàn bộ thông báo dành cho Quản trị viên (Hỗ trợ phân trang, lọc và tìm kiếm).
+ * GET /api/notifications/admin
+ */
+exports.getAdminNotifications = async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const skip = (page - 1) * limit;
+
+    const { search, type, target } = req.query;
+    // Điều kiện truy vấn cơ bản: Bỏ qua các bản ghi giả lập thử nghiệm
+    const query = {
+      id: { $not: /^notif-bulk-/ }
+    };
+
+    // Bộ lọc theo loại thông báo: order (đơn hàng), coupon (khuyến mãi), review (đánh giá), system (hệ thống)
+    if (type && type !== 'all' && ['order', 'coupon', 'review', 'system'].includes(type)) {
+      query.type = type;
+    }
+
+    // Bộ lọc theo đối tượng nhận thông báo (target)
+    if (target === 'broadcast') {
+      // Thông báo phát sóng toàn sàn (userId là null)
+      query.userId = null;
+    } else if (target === 'specific') {
+      // Thông báo gửi đích danh cho từng tài khoản khách hàng
+      query.userId = { $ne: null };
+    }
+
+    // Tìm kiếm tương đối theo từ khóa trong tiêu đề, nội dung hoặc mã người nhận
+    if (search && search.trim()) {
+      const regex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { title: regex },
+        { message: regex },
+        { userId: regex }
+      ];
+    }
+
+    // Thực hiện đếm tổng số bản ghi và truy vấn dữ liệu phân trang đồng thời
+    const [total, notifications] = await Promise.all([
+      Notification.countDocuments(query),
+      Notification.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+    ]);
+
+    return res.json({
+      success: true,
+      data: notifications,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1
+      }
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * Thống kê tổng hợp số liệu thông báo cho Quản trị viên (KPI Cards).
+ * GET /api/notifications/stats
+ */
+exports.getNotificationStats = async (req, res, next) => {
+  try {
+    const baseQuery = { id: { $not: /^notif-bulk-/ } };
+
+    // Thống kê đồng thời các chỉ số thông báo theo loại và phạm vi
+    const [total, couponCount, orderCount, systemCount, reviewCount, broadcastCount] = await Promise.all([
+      Notification.countDocuments(baseQuery),
+      Notification.countDocuments({ ...baseQuery, type: 'coupon' }),
+      Notification.countDocuments({ ...baseQuery, type: 'order' }),
+      Notification.countDocuments({ ...baseQuery, type: 'system' }),
+      Notification.countDocuments({ ...baseQuery, type: 'review' }),
+      Notification.countDocuments({ ...baseQuery, userId: null })
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        total,
+        coupon: couponCount,
+        order: orderCount,
+        system: systemCount,
+        review: reviewCount,
+        broadcast: broadcastCount
+      }
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * Tạo thông báo mới (Dành cho Quản trị viên tự tạo hoặc gọi qua API nội bộ).
  * POST /api/notifications
  */
 exports.createNotification = async (req, res, next) => {
   try {
     const { userId, title, message, type, link, metadata } = req.body;
 
+    // Kiểm tra tính hợp lệ của dữ liệu đầu vào bắt buộc
     if (!title || !message) {
       return next(new AppError('Vui lòng cung cấp tiêu đề và nội dung thông báo', 400));
     }
 
+    // Khởi tạo bản ghi thông báo mới trong cơ sở dữ liệu MongoDB
     const newNotification = await Notification.create({
       id: `notif-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
-      userId: userId || null,
+      userId: userId || null, // null biểu thị thông báo toàn sàn (broadcast)
       title: title.trim(),
       message: message.trim(),
       type: type || 'system',
@@ -312,12 +414,13 @@ exports.createNotification = async (req, res, next) => {
 };
 
 /**
- * Hàm trợ giúp nội bộ để các Controller khác (như orderController) có thể kích hoạt thông báo tự động.
+ * Hàm trợ giúp nội bộ để các Controller khác (như orderController, productController) kích hoạt thông báo tự động.
  */
 exports.createInternalNotification = async ({ userId, title, message, type = 'system', link = null, metadata = {} }) => {
   try {
     if (!title || !message) return null;
 
+    // Tự động sinh ID duy nhất và lưu thông báo
     const notif = await Notification.create({
       id: `notif-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
       userId: userId || null,
@@ -330,6 +433,7 @@ exports.createInternalNotification = async ({ userId, title, message, type = 'sy
     });
     return notif;
   } catch (error) {
+    // Ghi log cảnh báo nhưng không làm gián đoạn luồng xử lý chính
     console.warn('Lỗi khi tạo thông báo nội bộ:', error.message);
     return null;
   }

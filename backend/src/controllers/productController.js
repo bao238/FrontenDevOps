@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const Review = require('../models/Review');
+const { createInternalNotification } = require('./notificationController');
 
 // GET /api/products
 // Lay danh sach sach tu MongoDB voi phan trang phia may chu (Server-Side Pagination), tranh tai toan bo 10.000+ san pham gay tran RAM
@@ -553,7 +554,7 @@ exports.updateReview = async (req, res, next) => {
 };
 
 // PUT /api/reviews/:id/reply
-// Admin phản hồi nhận xét đánh giá của khách hàng
+// Admin phản hồi nhận xét đánh giá của khách hàng và tự động gửi thông báo đến tác giả
 exports.replyToReview = async (req, res, next) => {
   try {
     const { reply } = req.body;
@@ -565,6 +566,23 @@ exports.replyToReview = async (req, res, next) => {
     review.adminReply = reply ? String(reply).trim() : null;
     review.repliedAt = reply ? new Date() : null;
     await review.save();
+
+    // Tự động gửi thông báo đến người dùng sở hữu đánh giá khi Ban Quản Trị phản hồi
+    if (reply && review.userId) {
+      try {
+        const prod = await Product.findOne({ id: review.productId }).lean();
+        createInternalNotification({
+          userId: review.userId,
+          title: 'Shop đã phản hồi đánh giá của bạn',
+          message: `BookStore vừa gửi lời phản hồi cho nhận xét của bạn về cuốn sách "${prod?.name || 'Sách'}".`,
+          type: 'review',
+          link: `/products?search=${encodeURIComponent(prod?.name || '')}`,
+          metadata: { reviewId: review.id, productId: review.productId }
+        });
+      } catch (notifErr) {
+        // Bỏ qua lỗi thông báo để đảm bảo API phản hồi ổn định
+      }
+    }
 
     return res.json({ message: 'Phản hồi đánh giá thành công trên MongoDB', data: review });
   } catch (err) {

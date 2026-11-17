@@ -52,7 +52,7 @@ export default function AdminPagination({
           <>
             <span className="text-slate-300 hidden sm:inline">&bull;</span>
             <div className="flex items-center space-x-1.5">
-              <span className="text-slate-400">Xem mỗi trang:</span>
+              <span className="text-slate-500">Xem mỗi trang:</span>
               <select
                 value={itemsPerPage}
                 onChange={(e) => onPerPageChange(Number(e.target.value))}
@@ -110,7 +110,7 @@ export default function AdminPagination({
             return items.map((item, idx) => {
               if (item === "dots-prev" || item === "dots-next") {
                 return (
-                  <span key={`dots-${idx}`} className="px-1 text-slate-400 select-none">
+                  <span key={`dots-${idx}`} className="px-1 text-slate-500 select-none">
                     &hellip;
                   </span>
                 );
@@ -124,7 +124,7 @@ export default function AdminPagination({
                   onMouseEnter={() => onPageHover && onPageHover(pageNum)}
                   className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     currentPage === pageNum
-                      ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                      ? "bg-blue-600 text-white shadow-sm"
                       : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300"
                   }`}
                 >

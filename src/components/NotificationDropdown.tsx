@@ -74,8 +74,8 @@ function getNotificationBadge(type: NotificationType) {
     case "system":
     default:
       return {
-        icon: <Info className="w-4 h-4 text-purple-600" />,
-        bgColor: "bg-purple-50 border-purple-200"
+        icon: <Info className="w-4 h-4 text-indigo-600" />,
+        bgColor: "bg-indigo-50 border-indigo-200"
       };
   }
 }
@@ -116,13 +116,13 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+      className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-lg border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
     >
       {/* Header của Dropdown */}
       <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Bell className="w-4 h-4 text-blue-600" />
-          <h3 className="text-sm font-bold text-slate-800">Thông báo</h3>
+          <h2 className="text-sm font-bold text-slate-800">Thông báo</h2>
           {unreadCount > 0 && (
             <span className="px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 rounded-full">
               {unreadCount} mới
@@ -143,7 +143,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
           )}
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors"
+            className="p-1 text-slate-500 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors"
             title="Đóng menu"
           >
             <X className="w-4 h-4" />
@@ -155,11 +155,11 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100">
         {previewItems.length === 0 ? (
           <div className="p-8 text-center space-y-2">
-            <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto">
               <Bell className="w-6 h-6" />
             </div>
             <p className="text-sm font-semibold text-slate-700">Chưa có thông báo nào</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Các thông tin cập nhật về đơn hàng và ưu đãi sẽ xuất hiện tại đây.
             </p>
           </div>
@@ -202,7 +202,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                   <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                     {item.message}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     {formatTimeAgo(item.createdAt)}
                   </p>
                 </div>

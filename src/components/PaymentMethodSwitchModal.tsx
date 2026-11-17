@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   X,
-  CheckCircle2,
   CreditCard,
   QrCode,
   Smartphone,
@@ -30,22 +29,14 @@ export default function PaymentMethodSwitchModal({
 }: PaymentMethodSwitchModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodChoice>("banking");
 
-  useEffect(() => {
-    if (order) {
-      const pm = (order.paymentMethod || "").toLowerCase();
-      if (pm.includes("vnpay")) {
-        setSelectedMethod("vnpay");
-      } else if (pm.includes("momo")) {
-        setSelectedMethod("momo");
-      } else if (pm.includes("cod") || pm.includes("tiền mặt") || pm.includes("nhận hàng")) {
-        setSelectedMethod("banking"); // Đề xuất chuyển khoản nếu đơn hiện đang là COD
-      } else {
-        setSelectedMethod("banking");
-      }
-    }
-  }, [order, isOpen]);
-
-  if (!isOpen || !order) return null;
+  const currentMethodId: PaymentMethodChoice = (() => {
+    if (!order) return "cod";
+    const pm = (order.paymentMethod || "").toLowerCase();
+    if (pm.includes("vnpay")) return "vnpay";
+    if (pm.includes("momo")) return "momo";
+    if (pm.includes("qr") || pm.includes("banking") || pm.includes("khoản")) return "banking";
+    return "cod";
+  })();
 
   const formatVND = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -55,6 +46,7 @@ export default function PaymentMethodSwitchModal({
   };
 
   const currentMethodFormatted = (() => {
+    if (!order) return "Tiền mặt (COD)";
     const pm = (order.paymentMethod || "").toLowerCase();
     if (pm.includes("cod") || pm.includes("nhận hàng") || pm.includes("tiền mặt")) return "Tiền mặt (COD)";
     if (pm.includes("qr") || pm.includes("banking") || pm.includes("khoản")) return "Chuyển khoản (VietQR)";
@@ -63,7 +55,7 @@ export default function PaymentMethodSwitchModal({
     return order.paymentMethod || "Tiền mặt (COD)";
   })();
 
-  const paymentOptions: Array<{
+  const allPaymentOptions: Array<{
     id: PaymentMethodChoice;
     title: string;
     sub: string;
@@ -117,6 +109,17 @@ export default function PaymentMethodSwitchModal({
     },
   ];
 
+  // Nếu đang ở phương thức nào thì KHÔNG hiển thị phương thức đó, CHỈ hiển thị những phương thức còn lại
+  const remainingOptions = allPaymentOptions.filter((opt) => opt.id !== currentMethodId);
+
+  useEffect(() => {
+    if (remainingOptions.length > 0) {
+      setSelectedMethod(remainingOptions[0].id);
+    }
+  }, [order?.id, order?.paymentMethod, isOpen]);
+
+  if (!isOpen || !order) return null;
+
   const handleConfirm = () => {
     onSelectMethod(selectedMethod);
   };
@@ -132,7 +135,7 @@ export default function PaymentMethodSwitchModal({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                Chuyển đổi phương thức thanh toán
+                Đổi phương thức thanh toán
               </h3>
               <p className="text-xs text-slate-500">
                 Đơn hàng: <strong className="font-mono text-blue-600 font-bold">#{order.id}</strong> &bull; Tổng tiền:{" "}
@@ -163,11 +166,11 @@ export default function PaymentMethodSwitchModal({
           </div>
 
           <p className="text-xs text-slate-600 font-medium">
-            Chọn một trong các phương thức dưới đây để thanh toán hoặc chuyển đổi:
+            Chọn phương thức thanh toán mới bạn muốn chuyển đổi sang:
           </p>
 
           <div className="space-y-2.5">
-            {paymentOptions.map((opt) => {
+            {remainingOptions.map((opt) => {
               const Icon = opt.icon;
               const isSelected = selectedMethod === opt.id;
 
@@ -237,7 +240,7 @@ export default function PaymentMethodSwitchModal({
             onClick={handleConfirm}
             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center space-x-1.5 shadow-sm transition-all text-xs cursor-pointer"
           >
-            <span>Xác nhận & Chuyển đổi</span>
+            <span>Xác nhận đổi</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

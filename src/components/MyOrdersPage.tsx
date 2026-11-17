@@ -894,16 +894,16 @@ export default function MyOrdersPage({
                         </button>
                       )}
 
-                      {/* Nút Chuyển đổi phương thức thanh toán: Hiển thị ở mục Chờ xác nhận & Chờ lấy hàng khi chưa thanh toán */}
+                      {/* Nút Đổi phương thức thanh toán: Hiển thị ở mục Chờ xác nhận & Chờ lấy hàng khi chưa thanh toán */}
                       {!isPaid && (ord.status === "Chờ xác nhận" || ord.status === "Đang xử lý" || ord.status === "Chờ lấy hàng") && onPayOrder && (
                         <button
                           type="button"
                           onClick={() => onPayOrder(ord)}
                           className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
-                          title="Chuyển đổi phương thức thanh toán (VietQR, VNPAY, MoMo, COD)"
+                          title="Đổi phương thức thanh toán"
                         >
                           <ArrowLeftRight className="w-3.5 h-3.5" />
-                          <span>Chuyển đổi phương thức thanh toán</span>
+                          <span>Đổi phương thức thanh toán</span>
                         </button>
                       )}
 

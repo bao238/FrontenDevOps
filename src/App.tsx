@@ -5244,7 +5244,7 @@ export default function App() {
           onClose={() => {
             setIsPaymentSimulatorOpen(false);
             switchTab("orders");
-            showToast("Đơn hàng đã được lưu. Bạn có thể bấm 'Chuyển đổi phương thức thanh toán' trong mục Đơn Hàng bất cứ lúc nào!");
+            showToast("Đơn hàng đã được lưu. Bạn có thể bấm 'Đổi phương thức thanh toán' trong mục Đơn Hàng bất cứ lúc nào!");
           }}
           onSuccess={async () => {
             const targetId = currentOrderId;

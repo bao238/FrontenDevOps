@@ -145,7 +145,7 @@ exports.getAllOrderItems = async (req, res, next) => {
 // POST /api/orders (Tạo đơn hàng mới)
 exports.createOrder = async (req, res, next) => {
   const { customerInfo, items, totalAmount, paymentMethod, userId, status, pickupTime, shippingCarrier, couponCode, discountAmount } = req.body;
-  const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+  const orderId = req.body.id ? String(req.body.id).trim() : `ORD-${Date.now().toString().slice(-6)}`;
 
   const newOrder = {
     id: orderId, // Khóa chính (PK)
@@ -305,13 +305,15 @@ exports.updateOrderStatus = async (req, res, next) => {
       if (!isOrderOwner(existingOrder, req.user)) {
         return res.status(403).json({ message: 'Bạn không có quyền cập nhật đơn hàng của người khác' });
       }
-      if (req.body.status !== undefined && req.body.status !== 'Hoàn tất') {
+      if (req.body.status !== undefined && req.body.status !== existingOrder.status && req.body.status !== 'Hoàn tất') {
         return res.status(403).json({ message: 'Khách hàng chỉ được phép xác nhận đã nhận hàng hoặc đánh giá đơn' });
       }
     }
 
     const updateData = {};
     if (req.body.status !== undefined) updateData.status = req.body.status;
+    if (req.body.paymentMethod !== undefined) updateData.paymentMethod = String(req.body.paymentMethod);
+    if (req.body.isPaid !== undefined) updateData.isPaid = Boolean(req.body.isPaid);
     if (isAdminOrStaff && req.body.pickupTime !== undefined) updateData.pickupTime = req.body.pickupTime;
     if (isAdminOrStaff && req.body.shippingCarrier !== undefined) updateData.shippingCarrier = req.body.shippingCarrier;
     if (req.body.isReviewed !== undefined) updateData.isReviewed = req.body.isReviewed;
@@ -320,7 +322,6 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (req.body.reviewedAt !== undefined) updateData.reviewedAt = req.body.reviewedAt;
     if (req.body.reviewImage !== undefined) updateData.reviewImage = req.body.reviewImage;
     if (req.body.receivedAt !== undefined) updateData.receivedAt = req.body.receivedAt;
-    if (req.body.isPaid !== undefined) updateData.isPaid = req.body.isPaid;
 
     const updated = await Order.findOneAndUpdate(
       { id: req.params.id },

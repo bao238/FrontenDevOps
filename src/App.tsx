@@ -79,6 +79,7 @@ import ProductDetailPage from "./components/ProductDetailPage";
 import CartPage from "./components/CartPage";
 import PaymentQRModal from "./components/PaymentQRModal";
 import PaymentSimulatorModal from "./components/PaymentSimulatorModal";
+import PaymentMethodSwitchModal, { PaymentMethodChoice } from "./components/PaymentMethodSwitchModal";
 import WishlistModal from "./components/WishlistModal";
 import MyOrdersPage, { OrderTabKey } from "./components/MyOrdersPage";
 import ProfilePage from "./components/ProfilePage";
@@ -282,6 +283,9 @@ export default function App() {
 
   // Trạng thái Modal In Hóa Đơn Bán Lẻ
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<OrderRecord | null>(null);
+
+  // Trạng thái Modal Chuyển đổi phương thức thanh toán
+  const [switchMethodOrder, setSwitchMethodOrder] = useState<OrderRecord | null>(null);
 
   // Trạng thái Quản lý Thông báo (Notifications)
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -1908,12 +1912,14 @@ export default function App() {
     const finalDiscountAmt = appliedDiscount > 0 ? appliedDiscountAmount : 0;
 
     api.createOrder({
+      id: generatedId,
       customerInfo: { ...customerInfo },
       items: [...selectedCartItems],
       totalAmount: orderTotalToPay,
       paymentMethod: customerInfo.paymentMethod,
       couponCode: finalCouponCode,
-      discountAmount: finalDiscountAmt
+      discountAmount: finalDiscountAmt,
+      isPaid: false
     })
       .then(() => {
         fetchNotifications();
@@ -2224,6 +2230,56 @@ export default function App() {
     setOrdersTabSelection(tabKey);
     switchTab("orders");
     refreshOrders();
+  };
+
+  // Xử lý chuyển đổi phương thức thanh toán cho đơn hàng
+  const handleSwitchPaymentMethod = async (newMethod: PaymentMethodChoice) => {
+    if (!switchMethodOrder) return;
+    const targetOrder = switchMethodOrder;
+    setSwitchMethodOrder(null);
+
+    if (newMethod === "cod") {
+      // Chuyển sang COD: Cập nhật hình thức COD và chưa thanh toán
+      const updatedOrders = orders.map((o) =>
+        o.id === targetOrder.id ? { ...o, paymentMethod: "cod", isPaid: false } : o
+      );
+      setOrders(updatedOrders);
+      try {
+        localStorage.setItem("bookstore_orders", JSON.stringify(updatedOrders));
+      } catch {}
+
+      try {
+        await api.updateOrderStatus(targetOrder.id, targetOrder.status, {
+          paymentMethod: "cod",
+          isPaid: false,
+        });
+      } catch (err) {
+        console.error("Lỗi khi cập nhật COD lên server:", err);
+      }
+
+      try {
+        const channel = new BroadcastChannel("bookstore_orders_sync");
+        channel.postMessage({
+          type: "ORDER_STATUS_UPDATED",
+          orderId: targetOrder.id,
+          status: targetOrder.status,
+          orders: updatedOrders,
+        });
+        channel.close();
+      } catch {}
+
+      showToast(`Đã chuyển đơn #${targetOrder.id} sang phương thức Thu tiền khi nhận (COD)!`);
+      refreshOrders();
+    } else if (newMethod === "banking") {
+      setCurrentOrderId(targetOrder.id);
+      setPaymentOrderTotal(targetOrder.totalAmount);
+      setIsPaymentQROpen(true);
+    } else if (newMethod === "vnpay" || newMethod === "momo") {
+      setCurrentOrderId(targetOrder.id);
+      setPaymentOrderTotal(targetOrder.totalAmount);
+      setSimulatorMethod(newMethod);
+      setIsPaymentSimulatorOpen(true);
+    }
   };
 
   const handleDeleteOrder = (orderId: string) => {
@@ -4136,14 +4192,7 @@ export default function App() {
             onReviewOrder={handleReviewOrder}
             onTriggerPickup={handleTriggerPickup}
             onPayOrder={(ord) => {
-              setCurrentOrderId(ord.id);
-              setPaymentOrderTotal(ord.totalAmount);
-              if (ord.paymentMethod === "vnpay" || ord.paymentMethod === "momo") {
-                setSimulatorMethod(ord.paymentMethod as "vnpay" | "momo");
-                setIsPaymentSimulatorOpen(true);
-              } else {
-                setIsPaymentQROpen(true);
-              }
+              setSwitchMethodOrder(ord);
             }}
           />
         )}
@@ -5145,19 +5194,44 @@ export default function App() {
           orderId={currentOrderId}
           totalAmount={paymentOrderTotal || finalTotal}
           customerName={customerInfo.fullName}
-          onConfirmPaid={() => {
+          onConfirmPaid={async () => {
+            const targetId = currentOrderId;
             setIsPaymentQROpen(false);
-            setOrders((prev) => {
-              const updated = prev.map((o) =>
-                o.id === currentOrderId ? { ...o, isPaid: true } : o
-              );
-              try {
-                localStorage.setItem("bookstore_orders", JSON.stringify(updated));
-              } catch {}
-              return updated;
-            });
+
+            const targetOrder = orders.find((o) => o.id === targetId);
+            const currentStatus = targetOrder?.status || "Chờ xác nhận";
+
+            const updated = orders.map((o) =>
+              o.id === targetId ? { ...o, isPaid: true, paymentMethod: "banking" } : o
+            );
+            setOrders(updated);
+            try {
+              localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+            } catch {}
+
+            try {
+              await api.updateOrderStatus(targetId, currentStatus, {
+                isPaid: true,
+                paymentMethod: "banking",
+              });
+            } catch (err) {
+              console.error("Lỗi khi lưu thanh toán QR lên server:", err);
+            }
+
+            try {
+              const channel = new BroadcastChannel("bookstore_orders_sync");
+              channel.postMessage({
+                type: "ORDER_STATUS_UPDATED",
+                orderId: targetId,
+                status: currentStatus,
+                orders: updated,
+              });
+              channel.close();
+            } catch {}
+
             switchTab("orders");
-            showToast("Xác nhận thanh toán thành công! Hóa đơn bán lẻ đã sẵn sàng để xem & in.");
+            showToast("Xác nhận chuyển khoản thành công! Đơn hàng đã được đánh dấu ĐÃ THANH TOÁN.");
+            refreshOrders();
           }}
         />
 
@@ -5170,26 +5244,60 @@ export default function App() {
           onClose={() => {
             setIsPaymentSimulatorOpen(false);
             switchTab("orders");
-            showToast("Đơn hàng đã được lưu. Bạn có thể bấm 'Thanh Toán Ngay' trong mục Đơn Hàng bất cứ lúc nào!");
+            showToast("Đơn hàng đã được lưu. Bạn có thể bấm 'Chuyển đổi phương thức thanh toán' trong mục Đơn Hàng bất cứ lúc nào!");
           }}
-          onSuccess={() => {
+          onSuccess={async () => {
+            const targetId = currentOrderId;
+            const methodUsed = simulatorMethod;
             setIsPaymentSimulatorOpen(false);
-            setOrders((prev) => {
-              const updated = prev.map((o) =>
-                o.id === currentOrderId ? { ...o, isPaid: true } : o
-              );
-              try {
-                localStorage.setItem("bookstore_orders", JSON.stringify(updated));
-              } catch {}
-              return updated;
-            });
+
+            const targetOrder = orders.find((o) => o.id === targetId);
+            const currentStatus = targetOrder?.status || "Chờ xác nhận";
+
+            const updated = orders.map((o) =>
+              o.id === targetId ? { ...o, isPaid: true, paymentMethod: methodUsed } : o
+            );
+            setOrders(updated);
+            try {
+              localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+            } catch {}
+
+            try {
+              await api.updateOrderStatus(targetId, currentStatus, {
+                isPaid: true,
+                paymentMethod: methodUsed,
+              });
+            } catch (err) {
+              console.error("Lỗi khi lưu thanh toán giả lập lên server:", err);
+            }
+
+            try {
+              const channel = new BroadcastChannel("bookstore_orders_sync");
+              channel.postMessage({
+                type: "ORDER_STATUS_UPDATED",
+                orderId: targetId,
+                status: currentStatus,
+                orders: updated,
+              });
+              channel.close();
+            } catch {}
+
             switchTab("orders");
             showToast(
               `Thanh toán qua ${
-                simulatorMethod === "vnpay" ? "VNPAY-QR" : "Ví MoMo"
-              } thành công! Hóa đơn bán lẻ đã sẵn sàng để xem & in.`
+                methodUsed === "vnpay" ? "VNPAY-QR" : "Ví MoMo"
+              } thành công! Đơn hàng đã được đánh dấu ĐÃ THANH TOÁN.`
             );
+            refreshOrders();
           }}
+        />
+
+        {/* MODAL CHUYỂN ĐỔI PHƯƠNG THỨC THANH TOÁN (VIETQR, VNPAY, MOMO, COD) */}
+        <PaymentMethodSwitchModal
+          isOpen={Boolean(switchMethodOrder)}
+          order={switchMethodOrder}
+          onClose={() => setSwitchMethodOrder(null)}
+          onSelectMethod={handleSwitchPaymentMethod}
         />
 
         {/* MODAL IN HÓA ĐƠN BÁN LẺ (RETAIL INVOICE VIEWER & PRINT) */}

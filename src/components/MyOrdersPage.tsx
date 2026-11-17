@@ -16,6 +16,8 @@ import {
   Star,
   Printer,
   QrCode,
+  ArrowLeftRight,
+  CreditCard,
   Camera,
   Edit3,
   Calendar,
@@ -317,7 +319,9 @@ export default function MyOrdersPage({
     if (!method) return "Tiền mặt (COD)";
     const m = method.toLowerCase();
     if (m.includes("cod") || m.includes("nhận hàng") || m.includes("tiền mặt")) return "Tiền mặt (COD)";
-    if (m.includes("qr") || m.includes("banking") || m.includes("khoản")) return "Chuyển khoản QR";
+    if (m.includes("qr") || m.includes("banking") || m.includes("khoản")) return "Chuyển khoản (VietQR)";
+    if (m.includes("vnpay")) return "Cổng VNPAY-QR";
+    if (m.includes("momo")) return "Ví MoMo";
     if (m.includes("thẻ") || m.includes("card")) return "Thẻ ngân hàng";
     return method;
   };
@@ -890,15 +894,16 @@ export default function MyOrdersPage({
                         </button>
                       )}
 
-                      {/* Nút Thanh Toán Ngay: Hiển thị khi đơn mới đặt đang Chờ xác nhận và chưa thanh toán */}
-                      {!isPaid && ord.status === "Chờ xác nhận" && onPayOrder && (
+                      {/* Nút Chuyển đổi phương thức thanh toán: Hiển thị ở mục Chờ xác nhận & Chờ lấy hàng khi chưa thanh toán */}
+                      {!isPaid && (ord.status === "Chờ xác nhận" || ord.status === "Đang xử lý" || ord.status === "Chờ lấy hàng") && onPayOrder && (
                         <button
                           type="button"
                           onClick={() => onPayOrder(ord)}
                           className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
+                          title="Chuyển đổi phương thức thanh toán (VietQR, VNPAY, MoMo, COD)"
                         >
-                          <QrCode className="w-3.5 h-3.5" />
-                          <span>Thanh Toán Ngay</span>
+                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                          <span>Chuyển đổi phương thức thanh toán</span>
                         </button>
                       )}
 
@@ -915,15 +920,17 @@ export default function MyOrdersPage({
                         </button>
                       )}
 
-                      {/* Nút Mua lại đơn này */}
-                      <button
-                        type="button"
-                        onClick={() => onReorder(ord)}
-                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Mua Lại</span>
-                      </button>
+                      {/* Nút Mua lại đơn này: Bỏ ở mục Chờ xác nhận, Chờ lấy hàng, Chờ giao hàng; CHỈ hiển thị ở mục Đánh giá khi đã hoàn tất nhận hàng và thanh toán */}
+                      {isCompleted && isPaid && (
+                        <button
+                          type="button"
+                          onClick={() => onReorder(ord)}
+                          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Mua Lại</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -101,6 +101,7 @@ async function parseJsonSafe(res: Response) {
 }
 
 export interface OrderPayload {
+  id?: string;
   customerInfo: {
     fullName: string;
     phone: string;
@@ -116,6 +117,7 @@ export interface OrderPayload {
   couponCode?: string;
   discountAmount?: number;
   status?: string;
+  isPaid?: boolean;
   pickupTime?: string;
   shippingCarrier?: string;
 }

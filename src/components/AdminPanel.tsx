@@ -1055,6 +1055,8 @@ export default function AdminPanel({
     const m = method.toLowerCase();
     if (m.includes("qr") || m.includes("banking") || m.includes("khoản")) return "Chuyển khoản QR";
     if (m.includes("cod") || m.includes("nhận hàng") || m.includes("tiền mặt")) return "Tiền mặt (COD)";
+    if (m.includes("vnpay")) return "Cổng VNPAY-QR";
+    if (m.includes("momo")) return "Ví MoMo";
     if (m.includes("thẻ") || m.includes("card")) return "Thẻ ngân hàng";
     return method;
   };

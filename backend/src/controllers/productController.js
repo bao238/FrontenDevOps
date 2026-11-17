@@ -6,9 +6,9 @@ const { createInternalNotification } = require('./notificationController');
 // Lay danh sach sach tu MongoDB voi phan trang phia may chu (Server-Side Pagination), tranh tai toan bo 10.000+ san pham gay tran RAM
 exports.getProducts = async (req, res, next) => {
   try {
-    // 1. Tham so phan trang: trang hien tai va so luong moi trang (mac dinh 10 cuon, toi da 100)
+    // 1. Tham so phan trang: trang hien tai va so luong moi trang (mac dinh 10 cuon, toi da 500)
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
+    const limit = Math.max(1, Math.min(500, parseInt(req.query.limit) || 10));
     const skip = (page - 1) * limit;
 
     // 2. Xay dung dieu kien loc linh hoat (Category, Search, Kho hang)

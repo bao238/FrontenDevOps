@@ -1105,12 +1105,11 @@ async function seedData() {
     }
     console.log('🔄 [MongoDB Seed] Đã tính toán và đồng bộ chuẩn xác rating & reviewsCount cho toàn bộ sách!');
 
-    // 7. Nạp danh mục thể loại vào collection categories
-    const catCount = await Category.countDocuments();
-    if (catCount === 0) {
-      await Category.insertMany(initialCategories);
-      console.log('📂 [MongoDB Seed] Đã tự động nạp 6 thể loại sách mẫu vào collection categories!');
+    // 7. Nạp danh mục thể loại vào collection categories (đảm bảo đầy đủ 11 thể loại chuẩn)
+    for (const cat of initialCategories) {
+      await Category.updateOne({ name: cat.name }, { $setOnInsert: cat }, { upsert: true });
     }
+    console.log('📂 [MongoDB Seed] Đã tự động kiểm tra và đồng bộ đủ 11 thể loại sách vào collection categories!');
 
     // 8. Nạp mã giảm giá vào collection coupons
     const coupCount = await Coupon.countDocuments();

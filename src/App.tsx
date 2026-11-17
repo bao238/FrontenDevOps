@@ -155,6 +155,8 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>("Tất cả");
   // Danh mục thể loại sách động tải trực tiếp từ MongoDB API (/api/categories)
   const [dynamicCategories, setDynamicCategories] = useState<string[]>(CATEGORIES);
+  // Bản đồ số lượng sách theo từng thể loại chuẩn xác từ cơ sở dữ liệu MongoDB
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("default");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -669,10 +671,15 @@ export default function App() {
       // ignore
     }
 
-    // Tự động đồng bộ danh sách sách công khai từ Backend REST API (MongoDB)
-    api.getProducts({ page: 1, limit: 35 }).then((res) => {
+    // Tự động đồng bộ toàn bộ danh sách sách từ Backend REST API (MongoDB)
+    api.getProducts({ page: 1, limit: 200 }).then((res) => {
       if (res && res.data) {
         setProducts(applyRatingBalancing(res.data));
+        if (typeof res.totalAllCount === "number" && res.totalAllCount > 0) {
+          setTotalStoreProducts(res.totalAllCount);
+        } else if (typeof res.count === "number" && res.count > 0) {
+          setTotalStoreProducts(res.count);
+        }
       }
     });
 
@@ -922,30 +929,62 @@ export default function App() {
     };
   }, [currentUser]);
 
-  // Tự động nạp danh mục thể loại sách động từ MongoDB API (/api/categories)
-  useEffect(() => {
-    let isMounted = true;
-    const fetchCategories = async () => {
-      try {
-        const cats = await api.getCategories();
-        if (isMounted && Array.isArray(cats) && cats.length > 0) {
-          const activeNames = cats
-            .filter((c) => c.isActive !== false)
-            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
-            .map((c) => c.name);
-          if (activeNames.length > 0) {
-            setDynamicCategories(["Tất cả", ...activeNames]);
-          }
+  // Tự động nạp danh mục thể loại sách động kèm số lượng sách từ MongoDB API (/api/categories)
+  const fetchCategories = useCallback(async () => {
+    try {
+      const cats = await api.getCategories();
+      if (Array.isArray(cats) && cats.length > 0) {
+        const activeCats = cats.filter((c) => c.isActive !== false);
+        const activeNames = activeCats
+          .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+          .map((c) => c.name);
+
+        // Tạo bảng tra cứu số lượng sách theo từng thể loại chuẩn xác từ MongoDB
+        const countsMap: Record<string, number> = {};
+        let totalMongoBooks = 0;
+        activeCats.forEach((c) => {
+          const count = typeof c.bookCount === "number" ? c.bookCount : 0;
+          countsMap[c.name] = count;
+          totalMongoBooks += count;
+        });
+        countsMap["Tất cả"] = totalMongoBooks;
+        setCategoryCounts(countsMap);
+
+        if (activeNames.length > 0) {
+          setDynamicCategories(["Tất cả", ...activeNames]);
         }
-      } catch (err) {
-        console.warn("⚠️ Không thể nạp danh mục thể loại sách động:", err);
       }
-    };
-    fetchCategories();
-    return () => {
-      isMounted = false;
-    };
+    } catch (err) {
+      console.warn("⚠️ Không thể nạp danh mục thể loại sách động:", err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  // Lắng nghe tín hiệu đồng bộ thể loại sách qua BroadcastChannel và CustomEvent
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("bookstore_categories_sync");
+      channel.onmessage = () => {
+        fetchCategories();
+      };
+    } catch {
+      // ignore
+    }
+
+    const handleLocalCatSync = () => {
+      fetchCategories();
+    };
+    window.addEventListener("bookstore_categories_sync", handleLocalCatSync);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener("bookstore_categories_sync", handleLocalCatSync);
+    };
+  }, [fetchCategories]);
 
   // Thao tác đánh dấu 1 thông báo cụ thể là đã đọc
   const handleMarkNotificationAsRead = async (id: string) => {
@@ -1582,10 +1621,10 @@ export default function App() {
     return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredProducts, currentPage, itemsPerPage]);
 
-  // Server-Side State cho Cửa Hàng (Storefront): Chỉ lấy đúng 12 cuốn của trang hiện tại từ 10.549 cuốn trong MongoDB
+  // Server-Side State cho Cửa Hàng (Storefront): Phân trang kết nối trực tiếp với 150 cuốn sách trong MongoDB
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
-  const [totalStoreProducts, setTotalStoreProducts] = useState<number>(10549);
-  const [totalStorePages, setTotalStorePages] = useState<number>(879);
+  const [totalStoreProducts, setTotalStoreProducts] = useState<number>(150);
+  const [totalStorePages, setTotalStorePages] = useState<number>(13);
   const [isLoadingStoreProducts, setIsLoadingStoreProducts] = useState<boolean>(false);
   const [hasFetchedStoreProducts, setHasFetchedStoreProducts] = useState<boolean>(false);
 
@@ -3144,9 +3183,12 @@ export default function App() {
                       >
                         {dynamicCategories.map((cat) => {
                           const icon = CATEGORY_ICONS[cat] || "📚";
+                          // Ưu tiên hiển thị số lượng sách thực tế từ MongoDB API
                           const count =
-                            cat === "Tất cả"
-                              ? products.length
+                            categoryCounts[cat] !== undefined
+                              ? categoryCounts[cat]
+                              : cat === "Tất cả"
+                              ? (totalStoreProducts || products.length)
                               : products.filter(
                                   (p) => p.category === cat || normalizeCategoryName(p.category) === cat
                                 ).length;

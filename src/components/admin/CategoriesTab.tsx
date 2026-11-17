@@ -129,6 +129,15 @@ export default function CategoriesTab() {
       }
       setIsModalOpen(false);
       await fetchCategories();
+      // Bắn tín hiệu đồng bộ danh mục sang trang bán hàng và các tab khác
+      try {
+        const ch = new BroadcastChannel("bookstore_categories_sync");
+        ch.postMessage({ type: "CATEGORIES_UPDATED" });
+        ch.close();
+      } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent("bookstore_categories_sync"));
+      } catch {}
     } catch (err: any) {
       setModalError(err.message || "Lỗi khi lưu thể loại sách");
     } finally {
@@ -147,6 +156,15 @@ export default function CategoriesTab() {
       }
       setCategories((prev) => prev.filter((c) => c._id !== deletingCategory._id));
       setDeletingCategory(null);
+      // Bắn tín hiệu đồng bộ danh mục sang trang bán hàng và các tab khác
+      try {
+        const ch = new BroadcastChannel("bookstore_categories_sync");
+        ch.postMessage({ type: "CATEGORIES_UPDATED" });
+        ch.close();
+      } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent("bookstore_categories_sync"));
+      } catch {}
     } catch (err: any) {
       alert("Lỗi khi xóa thể loại: " + err.message);
     }

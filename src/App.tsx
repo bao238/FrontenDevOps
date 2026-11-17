@@ -757,7 +757,7 @@ export default function App() {
         const updated = prevOrders.map((ord) => {
           if (ord.status === "Chờ lấy hàng" && ord.pickupTime) {
             const pickupTs = new Date(ord.pickupTime).getTime();
-            if (now >= pickupTs) {
+            if (!isNaN(pickupTs) && now >= pickupTs) {
               hasChanges = true;
               api.updateOrderStatus(ord.id, "Chờ giao hàng").catch(console.error);
               return {
@@ -772,6 +772,9 @@ export default function App() {
         if (hasChanges) {
           try {
             localStorage.setItem("bookstore_orders", JSON.stringify(updated));
+            const channel = new BroadcastChannel("bookstore_orders_sync");
+            channel.postMessage({ type: "ORDER_STATUS_UPDATED", orders: updated });
+            channel.close();
           } catch {
             // ignore
           }
@@ -779,7 +782,7 @@ export default function App() {
         }
         return prevOrders;
       });
-    }, 2000);
+    }, 1000);
 
     return () => clearInterval(timer);
   }, []);
@@ -2070,25 +2073,6 @@ export default function App() {
 
     showToast(`Đã đổi trạng thái đơn #${orderId} thành "${newStatus}"!`);
   };
-
-  // Tự động kiểm tra và chuyển đơn từ "Chờ lấy hàng" sang "Chờ giao hàng" khi đến giờ lấy hàng
-  useEffect(() => {
-    const checkPickupSchedule = () => {
-      const now = Date.now();
-      orders.forEach((ord) => {
-        if (ord.status === "Chờ lấy hàng" && ord.pickupTime) {
-          const pickupMs = new Date(ord.pickupTime).getTime();
-          if (!isNaN(pickupMs) && now >= pickupMs) {
-            handleUpdateOrderStatus(ord.id, "Chờ giao hàng");
-          }
-        }
-      });
-    };
-
-    checkPickupSchedule();
-    const pickupTimer = setInterval(checkPickupSchedule, 5000);
-    return () => clearInterval(pickupTimer);
-  }, [orders]);
 
   // Xác nhận đã nhận hàng (Ở phần chờ giao hàng -> chuyển sang Đánh giá)
   const handleConfirmReceived = (orderId: string) => {

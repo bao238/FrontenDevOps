@@ -59,7 +59,8 @@ import {
   CornerDownRight,
   EyeOff,
   Send,
-  Bell
+  Bell,
+  XCircle
 } from "lucide-react";
 import CouponsTab from "./admin/CouponsTab";
 import NotificationsTab from "./admin/NotificationsTab";
@@ -599,6 +600,36 @@ export default function AdminPanel({
     };
   }, [adminOrderPage, adminOrdersPerPage, adminOrderFilter, debouncedOrderSearch, adminTab]);
 
+  // Timer tự động kiểm tra thời gian lấy hàng ở phía Admin (0ms delay):
+  // Khi đến ngày giờ lấy hàng (now >= pickupTime), đơn tự chuyển sang "Chờ giao hàng"
+  useEffect(() => {
+    const autoPickupInterval = setInterval(() => {
+      const now = Date.now();
+      let hasTransitions = false;
+      setServerOrders((prevOrders) => {
+        const next = prevOrders.map((ord) => {
+          if (ord.status === "Chờ lấy hàng" && ord.pickupTime) {
+            const pMs = new Date(ord.pickupTime).getTime();
+            if (!isNaN(pMs) && now >= pMs) {
+              hasTransitions = true;
+              onUpdateOrderStatus(ord.id, "Chờ giao hàng");
+              return { ...ord, status: "Chờ giao hàng" as AdminOrderStatus };
+            }
+          }
+          return ord;
+        });
+        return hasTransitions ? next : prevOrders;
+      });
+
+      if (hasTransitions) {
+        orderPageCacheRef.current.clear();
+        fetchServerOrders(adminOrderPage, adminOrdersPerPage, true);
+      }
+    }, 1000);
+
+    return () => clearInterval(autoPickupInterval);
+  }, [adminOrderPage, adminOrdersPerPage, onUpdateOrderStatus]);
+
   // Reset trang về 1 khi người dùng đổi bộ lọc trạng thái hoặc từ khóa tìm kiếm
   useEffect(() => {
     setAdminOrderPage(1);
@@ -633,7 +664,9 @@ export default function AdminPanel({
     orderId: string,
     scheduleData: { pickupTime: string; deliveryTime: string; shippingCarrier: string }
   ) => {
-    handleUpdateOrderStatusRealtime(orderId, "Chờ lấy hàng", scheduleData);
+    const isPastOrNow = new Date() >= new Date(scheduleData.pickupTime);
+    const targetStatus: AdminOrderStatus = isPastOrNow ? "Chờ giao hàng" : "Chờ lấy hàng";
+    handleUpdateOrderStatusRealtime(orderId, targetStatus, scheduleData);
     setSchedulingOrder(null);
   };
 
@@ -2626,61 +2659,85 @@ export default function AdminPanel({
                             </div>
                           </td>
 
-                          {/* Cột 5: Trạng Thái - Căn giữa chuẩn mực, chữ vừa khít không bị che khuất */}
+                          {/* Cột 5: Trạng Thái - Hiển thị badge trạng thái chuẩn mực, không dùng droplist */}
                           <td className="py-3.5 px-4 text-xs align-middle">
-                            <div className="flex flex-col items-center justify-center">
-                              <select
-                                value={ord.status}
-                                onChange={(e) => {
-                                  const val = e.target.value as AdminOrderStatus;
-                                  if (val === "Chờ lấy hàng") {
-                                    setSchedulingOrder(ord);
-                                  } else {
-                                    handleUpdateOrderStatusRealtime(ord.id, val);
-                                  }
-                                }}
-                                className={`font-bold px-3 py-1.5 rounded-xl border text-xs focus:outline-none cursor-pointer w-full max-w-[150px] transition-colors shadow-2xs ${
+                            <div className="flex flex-col items-center justify-center space-y-1.5">
+                              {/* Badge Trạng Thái trực quan với icon và màu chuẩn nhận diện */}
+                              <span
+                                className={`inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-xl font-bold text-xs border w-full max-w-[150px] shadow-2xs ${
                                   isDone
-                                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100/70"
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                                     : isShipping
-                                    ? "bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100/70"
+                                    ? "bg-blue-50 text-blue-800 border-blue-300"
                                     : isPickup
-                                    ? "bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100/70"
+                                    ? "bg-indigo-50 text-indigo-800 border-indigo-300"
                                     : ord.status === "Đã hủy"
-                                    ? "bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100/70"
-                                    : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100/70"
+                                    ? "bg-rose-50 text-rose-800 border-rose-300"
+                                    : "bg-amber-50 text-amber-800 border-amber-300"
                                 }`}
                               >
-                                <option value="Chờ xác nhận">Chờ xác nhận</option>
-                                <option value="Chờ lấy hàng">Chờ lấy hàng</option>
-                                <option value="Chờ giao hàng">Chờ giao hàng</option>
-                                <option value="Hoàn tất">Hoàn tất</option>
-                                <option value="Đã hủy">Đã hủy</option>
-                              </select>
+                                {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                                {isShipping && <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                                {isPickup && <Package className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
+                                {isPendingConfirm && <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                                {ord.status === "Đã hủy" && <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />}
+                                <span className="truncate">{ord.status === "Hoàn tất" ? "Hoàn tất / Đã giao" : ord.status}</span>
+                              </span>
 
+                              {/* Đơn Chờ xác nhận: Nút hẹn lịch lấy & giao hàng để chuyển sang Chờ lấy hàng */}
                               {isPendingConfirm && (
                                 <button
                                   type="button"
                                   onClick={() => setSchedulingOrder(ord)}
-                                  className="w-full max-w-[150px] mt-1.5 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10.5px] font-bold flex items-center justify-center space-x-1 shadow-xs cursor-pointer transition-all"
+                                  className="w-full max-w-[150px] px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10.5px] font-bold flex items-center justify-center space-x-1 shadow-xs cursor-pointer transition-all transform hover:-translate-y-0.5"
                                   title="Chọn thời gian lấy hàng và thời gian giao hàng rồi xác nhận đơn"
                                 >
-                                  <Calendar className="w-3 h-3" />
+                                  <Calendar className="w-3 h-3 shrink-0" />
                                   <span>Hẹn Lịch & Xác Nhận</span>
                                 </button>
                               )}
 
+                              {/* Hiển thị chi tiết giờ Lấy → Giao nếu đơn đã có lịch hẹn */}
                               {(ord.pickupTime || ord.deliveryTime) && (
                                 <button
                                   type="button"
                                   onClick={() => setSchedulingOrder(ord)}
-                                  className="mt-1 text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold hover:underline flex items-center justify-center space-x-1 w-full text-center cursor-pointer max-w-[150px]"
-                                  title="Bấm để xem hoặc chỉnh sửa lịch lấy/giao hàng"
+                                  className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold hover:underline flex items-center justify-center space-x-1 w-full text-center cursor-pointer max-w-[150px] px-1 py-0.5 rounded bg-indigo-50/50 border border-indigo-100"
+                                  title="Bấm để xem hoặc chỉnh sửa lại lịch lấy/giao hàng"
                                 >
-                                  <Clock className="w-3 h-3 shrink-0" />
+                                  <Clock className="w-3 h-3 shrink-0 text-indigo-500" />
                                   <span className="truncate">
                                     {ord.pickupTime ? new Date(ord.pickupTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--:--"} → {ord.deliveryTime ? new Date(ord.deliveryTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
                                   </span>
+                                </button>
+                              )}
+
+                              {/* Phím tắt thao tác nhanh nếu shipper lấy sớm hoặc giao hàng xong */}
+                              {isPickup && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateOrderStatusRealtime(ord.id, "Chờ giao hàng")}
+                                  className="w-full max-w-[150px] px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-colors"
+                                  title="Shipper đã lấy hàng sớm hơn dự kiến, chuyển ngay sang Chờ giao"
+                                >
+                                  <Truck className="w-2.5 h-2.5 shrink-0" />
+                                  <span>Shipper Đã Lấy Hàng</span>
+                                </button>
+                              )}
+
+                              {isShipping && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateOrderStatusRealtime(ord.id, "Hoàn tất", {
+                                      receivedAt: new Date().toISOString(),
+                                    })
+                                  }
+                                  className="w-full max-w-[150px] px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-bold flex items-center justify-center space-x-1 cursor-pointer transition-colors"
+                                  title="Đánh dấu đơn hàng đã giao thành công tới khách"
+                                >
+                                  <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                                  <span>Đã Giao Thành Công</span>
                                 </button>
                               )}
                             </div>
@@ -2801,33 +2858,26 @@ export default function AdminPanel({
                             </button>
                           )}
 
-                          <span className="text-slate-500 font-medium">Trạng thái:</span>
-                          <select
-                            value={ord.status}
-                            onChange={(e) =>
-                              handleUpdateOrderStatusRealtime(
-                                ord.id,
-                                e.target.value as AdminOrderStatus
-                              )
-                            }
-                            className={`font-bold px-2.5 py-1 rounded-lg border text-xs focus:outline-none cursor-pointer ${
+                          <span
+                            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-bold text-xs border ${
                               isDone
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                                 : isShipping
-                                ? "bg-blue-100 text-blue-800 border-blue-300"
+                                ? "bg-blue-50 text-blue-800 border-blue-300"
                                 : isPickup
-                                ? "bg-indigo-100 text-indigo-800 border-indigo-300"
+                                ? "bg-indigo-50 text-indigo-800 border-indigo-300"
                                 : ord.status === "Đã hủy"
-                                ? "bg-red-100 text-red-800 border-red-300"
-                                : "bg-amber-100 text-amber-800 border-amber-300"
+                                ? "bg-rose-50 text-rose-800 border-rose-300"
+                                : "bg-amber-50 text-amber-800 border-amber-300"
                             }`}
                           >
-                            <option value="Chờ xác nhận">Chờ xác nhận</option>
-                            <option value="Chờ lấy hàng">Chờ lấy hàng</option>
-                            <option value="Chờ giao hàng">Chờ giao hàng</option>
-                            <option value="Hoàn tất">Hoàn tất / Đã giao</option>
-                            <option value="Đã hủy">Đã hủy</option>
-                          </select>
+                            {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                            {isShipping && <Truck className="w-3.5 h-3.5 text-blue-600" />}
+                            {isPickup && <Package className="w-3.5 h-3.5 text-indigo-600" />}
+                            {isPendingConfirm && <Clock className="w-3.5 h-3.5 text-amber-600" />}
+                            {ord.status === "Đã hủy" && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
+                            <span>{ord.status === "Hoàn tất" ? "Hoàn tất / Đã giao" : ord.status}</span>
+                          </span>
 
                           <button
                             type="button"
@@ -2896,6 +2946,28 @@ export default function AdminPanel({
                               type="button"
                               onClick={() => setSchedulingOrder(ord)}
                               className="text-xs text-indigo-700 hover:text-indigo-900 underline font-bold cursor-pointer"
+                            >
+                              Sửa lịch
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Banner hiển thị chi tiết lịch dự kiến giao hàng */}
+                      {isShipping && ord.deliveryTime && (
+                        <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center space-x-1.5 font-bold">
+                            <Truck className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>Dự kiến giao: {new Date(ord.deliveryTime).toLocaleString("vi-VN")} ({ord.shippingCarrier || "GHN"})</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[11px] text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
+                              Mở nút nhận hàng bên người dùng khi đến giờ
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSchedulingOrder(ord)}
+                              className="text-xs text-blue-700 hover:text-blue-900 underline font-bold cursor-pointer"
                             >
                               Sửa lịch
                             </button>

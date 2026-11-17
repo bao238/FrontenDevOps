@@ -22,29 +22,33 @@ function isOrderOwner(order, user) {
 // Tự động chuyển các đơn hàng "Chờ lấy hàng" sang "Chờ giao hàng" khi thời gian hiện tại >= pickupTime
 async function autoTransitionPickupOrders() {
   try {
-    const nowIso = new Date().toISOString();
-    const dueOrders = await Order.find({
+    const now = new Date();
+    const pickupOrders = await Order.find({
       status: 'Chờ lấy hàng',
-      pickupTime: { $ne: null, $lte: nowIso }
+      pickupTime: { $ne: null, $exists: true }
     }).lean();
 
-    if (dueOrders && dueOrders.length > 0) {
-      for (const ord of dueOrders) {
-        await Order.updateOne(
-          { id: ord.id },
-          { $set: { status: 'Chờ giao hàng' } }
-        );
-        try {
-          const carrier = ord.shippingCarrier || 'Giao Hàng Nhanh (GHN)';
-          createInternalNotification({
-            userId: ord.userId || null,
-            title: `Đơn hàng #${ord.id} đang trên đường giao`,
-            message: `Shipper (${carrier}) đã lấy kiện hàng #${ord.id} từ kho và đang trên đường giao đến bạn.`,
-            type: 'order',
-            link: '/orders',
-            metadata: { orderId: ord.id, newStatus: 'Chờ giao hàng', oldStatus: 'Chờ lấy hàng' }
-          });
-        } catch (e) {}
+    if (pickupOrders && pickupOrders.length > 0) {
+      for (const ord of pickupOrders) {
+        if (!ord.pickupTime) continue;
+        const pickupDate = new Date(ord.pickupTime);
+        if (!isNaN(pickupDate.getTime()) && now >= pickupDate) {
+          await Order.updateOne(
+            { id: ord.id },
+            { $set: { status: 'Chờ giao hàng' } }
+          );
+          try {
+            const carrier = ord.shippingCarrier || 'Giao Hàng Nhanh (GHN)';
+            createInternalNotification({
+              userId: ord.userId || null,
+              title: `Đơn hàng #${ord.id} đang trên đường giao`,
+              message: `Shipper (${carrier}) đã lấy kiện hàng #${ord.id} từ kho và đang trên đường giao đến bạn.`,
+              type: 'order',
+              link: '/orders',
+              metadata: { orderId: ord.id, newStatus: 'Chờ giao hàng', oldStatus: 'Chờ lấy hàng' }
+            });
+          } catch (e) {}
+        }
       }
     }
   } catch (err) {
@@ -52,8 +56,8 @@ async function autoTransitionPickupOrders() {
   }
 }
 
-// Chạy kiểm tra tự động nền mỗi 10 giây
-setInterval(autoTransitionPickupOrders, 10000);
+// Chạy kiểm tra tự động nền mỗi 3 giây
+setInterval(autoTransitionPickupOrders, 3000);
 
 // GET /api/orders (Lay danh sach don hang, ho tro phan trang Server-Side khi du lieu lon)
 exports.getOrders = async (req, res, next) => {
@@ -352,9 +356,9 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (req.body.status !== undefined) updateData.status = req.body.status;
     if (req.body.paymentMethod !== undefined) updateData.paymentMethod = String(req.body.paymentMethod);
     if (req.body.isPaid !== undefined) updateData.isPaid = Boolean(req.body.isPaid);
-    if (isAdminOrStaff && req.body.pickupTime !== undefined) updateData.pickupTime = req.body.pickupTime;
-    if (isAdminOrStaff && req.body.deliveryTime !== undefined) updateData.deliveryTime = req.body.deliveryTime;
-    if (isAdminOrStaff && req.body.shippingCarrier !== undefined) updateData.shippingCarrier = req.body.shippingCarrier;
+    if (req.body.pickupTime !== undefined) updateData.pickupTime = req.body.pickupTime;
+    if (req.body.deliveryTime !== undefined) updateData.deliveryTime = req.body.deliveryTime;
+    if (req.body.shippingCarrier !== undefined) updateData.shippingCarrier = req.body.shippingCarrier;
     if (req.body.isReviewed !== undefined) updateData.isReviewed = req.body.isReviewed;
     if (req.body.reviewRating !== undefined) updateData.reviewRating = req.body.reviewRating;
     if (req.body.reviewComment !== undefined) updateData.reviewComment = req.body.reviewComment;
